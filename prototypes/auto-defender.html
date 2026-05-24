@@ -203,6 +203,38 @@
 
             // --- AI helpers ---
 
+            avoidDanger() {
+                const AVOID_R = 5;
+                let fx = 0, fy = 0;
+                for (const e of enemies) {
+                    if (e.dead) continue;
+                    const dx = wrapDX(this.pos.x, e.pos.x);
+                    const dy = this.pos.y - e.pos.y;
+                    const d2 = dx*dx + dy*dy;
+                    if (d2 < AVOID_R*AVOID_R && d2 > 0.01) {
+                        const d = Math.sqrt(d2);
+                        const str = (AVOID_R - d) / AVOID_R;
+                        fx += dx/d * str;
+                        fy += dy/d * str;
+                    }
+                }
+                for (const b of bullets) {
+                    if (!b.life.active() || b.friendly) continue;
+                    const dx = wrapDX(this.pos.x, b.pos.x);
+                    const dy = this.pos.y - b.pos.y;
+                    const d2 = dx*dx + dy*dy;
+                    const BR = 3;
+                    if (d2 < BR*BR && d2 > 0.01) {
+                        const d = Math.sqrt(d2);
+                        const str = (BR - d) / BR;
+                        fx += dx/d * str * 2;
+                        fy += dy/d * str * 2;
+                    }
+                }
+                this.velocity.x += fx * AI_REACT * 1.5;
+                this.velocity.y += fy * AI_REACT * 1.5;
+            }
+
             flyToward(target) {
                 const dx = wrapDX(target.x, this.pos.x);
                 const dy = target.y - this.pos.y;
@@ -294,7 +326,7 @@
 
             aiUpdate() {
                 // 1. Shop mode
-                if (aiMode === 'shop') {this.goToShop(); return;}
+                if (aiMode === 'shop') {this.avoidDanger(); this.goToShop(); return;}
 
                 // 2. Holding human — descend to rescue (ground collision triggers dropHuman)
                 if (this.holding) {
@@ -310,7 +342,7 @@
                     const d = Math.abs(wrapDX(h.pos.x, this.pos.x)) + Math.abs(h.pos.y - this.pos.y);
                     if (d < bestFH) {bestFH = d; fallingHuman = h;}
                 }
-                if (fallingHuman && bestFH < 35) {this.flyToward(fallingHuman.pos); return;}
+                if (fallingHuman && bestFH < 35) {this.avoidDanger(); this.flyToward(fallingHuman.pos); return;}
 
                 // 4. Intercept lander carrying human
                 let carrier = null;
