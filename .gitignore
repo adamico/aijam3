@@ -1,0 +1,15 @@
+# node files
+node_modules
+
+# local files
+local/
+
+.github/
+.vscode/
+
+# personal Claude Code settings (machine-specific)
+.claude/settings.json
+.claude/settings.local.json
+
+# runtime data from skills (per-session scratch dirs)
+.claude/skills/*/sessions/
