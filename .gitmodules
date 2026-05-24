@@ -1,0 +1,3 @@
+[submodule "LittleJS-AI"]
+	path = LittleJS-AI
+	url = https://github.com/KilledByAPixel/LittleJS-AI.git
