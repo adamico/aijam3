@@ -62,26 +62,39 @@
 
         // Auto-Defender additions
         let money;
-let bombKill = false; // true while doSmartBomb() is processing hits
+        let bombKill = false; // true while doSmartBomb() is processing hits
         let aiMode;          // 'combat' | 'shop'
         let shopLanded;
         let teleportCharges, shieldCharges;
         let AI_SPEED, AI_REACT, AI_BULLET_CAP;
         let SHOP_X, SHOP_GROUND_Y;
+        let shopAbortTimer;
 
         const UPGRADES = [
-            {id: 'speed',     label: 'SPEED UP',        baseCost: 200, cost: 200, bought: 0,
-                apply(u) {AI_SPEED = min(AI_SPEED + 0.05, 1.2); AI_REACT = min(AI_REACT + 0.005, 0.1); u.bought++; u.cost = Math.floor(u.baseCost * Math.pow(1.5, u.bought));}},
-            {id: 'teleport',  label: 'TELEPORT CHARGE', baseCost: 150, cost: 150, bought: 0,
-                apply()  {teleportCharges++;}},
-            {id: 'bomb',      label: 'SMART BOMB',       baseCost: 175, cost: 175, bought: 0,
-                apply()  {smartBombs++;}},
-            {id: 'shield',    label: 'SHIELD CHARGE',    baseCost: 250, cost: 250, bought: 0,
-                apply()  {shieldCharges++;}},
-            {id: 'life',      label: 'EXTRA LIFE',       baseCost: 500, cost: 500, bought: 0,
-                apply()  {lives++;}},
-            {id: 'bulletcap', label: 'BULLET CAP +1',    baseCost: 300, cost: 300, bought: 0,
-                apply(u) {AI_BULLET_CAP = min(AI_BULLET_CAP + 1, 8); u.bought++; u.cost = Math.floor(u.baseCost * Math.pow(1.6, u.bought));}},
+            {
+                id: 'speed', label: 'SPEED UP', baseCost: 200, cost: 200, bought: 0,
+                apply(u) {AI_SPEED = min(AI_SPEED + 0.05, 1.2); AI_REACT = min(AI_REACT + 0.005, 0.1); u.bought++; u.cost = Math.floor(u.baseCost * Math.pow(1.5, u.bought));}
+            },
+            {
+                id: 'teleport', label: 'TELEPORT CHARGE', baseCost: 150, cost: 150, bought: 0,
+                apply() {teleportCharges++;}
+            },
+            {
+                id: 'bomb', label: 'SMART BOMB', baseCost: 175, cost: 175, bought: 0,
+                apply() {smartBombs++;}
+            },
+            {
+                id: 'shield', label: 'SHIELD CHARGE', baseCost: 250, cost: 250, bought: 0,
+                apply() {shieldCharges++;}
+            },
+            {
+                id: 'life', label: 'EXTRA LIFE', baseCost: 500, cost: 500, bought: 0,
+                apply() {lives++;}
+            },
+            {
+                id: 'bulletcap', label: 'BULLET CAP +1', baseCost: 300, cost: 300, bought: 0,
+                apply(u) {AI_BULLET_CAP = min(AI_BULLET_CAP + 1, 8); u.bought++; u.cost = Math.floor(u.baseCost * Math.pow(1.6, u.bought));}
+            },
         ];
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -217,25 +230,25 @@ let bombKill = false; // true while doSmartBomb() is processing hits
                     if (e.dead) continue;
                     const dx = wrapDX(this.pos.x, e.pos.x);
                     const dy = this.pos.y - e.pos.y;
-                    const d2 = dx*dx + dy*dy;
-                    if (d2 < AVOID_R*AVOID_R && d2 > 0.01) {
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 < AVOID_R * AVOID_R && d2 > 0.01) {
                         const d = Math.sqrt(d2);
                         const str = (AVOID_R - d) / AVOID_R;
-                        fx += dx/d * str;
-                        fy += dy/d * str;
+                        fx += dx / d * str;
+                        fy += dy / d * str;
                     }
                 }
                 for (const b of bullets) {
                     if (!b.life.active() || b.friendly) continue;
                     const dx = wrapDX(this.pos.x, b.pos.x);
                     const dy = this.pos.y - b.pos.y;
-                    const d2 = dx*dx + dy*dy;
+                    const d2 = dx * dx + dy * dy;
                     const BR = 3;
-                    if (d2 < BR*BR && d2 > 0.01) {
+                    if (d2 < BR * BR && d2 > 0.01) {
                         const d = Math.sqrt(d2);
                         const str = (BR - d) / BR;
-                        fx += dx/d * str * 2;
-                        fy += dy/d * str * 2;
+                        fx += dx / d * str * 2;
+                        fy += dy / d * str * 2;
                     }
                 }
                 this.velocity.x += fx * AI_REACT * 1.5;
@@ -256,13 +269,13 @@ let bombKill = false; // true while doSmartBomb() is processing hits
             // Engage enemy: hold safe X firing distance, align Y, fire.
             // Does NOT drive into the enemy.
             engageEnemy(target) {
-                const SAFE_X   = 7;
+                const SAFE_X = 7;
                 const DANGER_X = 3;
-                const dx   = wrapDX(target.pos.x, this.pos.x);
-                const dy   = target.pos.y - this.pos.y;
+                const dx = wrapDX(target.pos.x, this.pos.x);
+                const dy = target.pos.y - this.pos.y;
                 const absDx = Math.abs(dx);
                 const absdy = Math.abs(dy);
-                const side  = Math.sign(dx) || this.facing;
+                const side = Math.sign(dx) || this.facing;
 
                 // Stall detection: if no shot fired for 2s, trigger brief disengage
                 if (this.stallTimer.elapsed()) {
@@ -342,8 +355,7 @@ let bombKill = false; // true while doSmartBomb() is processing hits
                         if (e.dead || e.type === 'mine' || e.type === 'swarmer') continue;
                         const dx = wrapDX(e.pos.x, this.pos.x);
                         const dy = e.pos.y - this.pos.y;
-                        if (Math.sign(dx) === this.facing && Math.abs(dy) < 2.5 && Math.abs(dx) < 20)
-                        { this.fire(); break; }
+                        if (Math.sign(dx) === this.facing && Math.abs(dy) < 2.5 && Math.abs(dx) < 20) {this.fire(); break;}
                     }
                     return;
                 }
@@ -1169,7 +1181,7 @@ let bombKill = false; // true while doSmartBomb() is processing hits
             bombFlash = 0;
             shakeTimer = new Timer(); spawnTimer = new Timer(); baiterTimer = new Timer();
             isPlaying = false; gameOver = false; player = null;
-            money = 0; aiMode = 'combat'; shopLanded = false;
+            money = 0; aiMode = 'combat'; shopLanded = false; shopAbortTimer = new Timer();
             teleportCharges = 0; shieldCharges = 0;
             AI_SPEED = 0.45; AI_REACT = 0.05; AI_BULLET_CAP = 4;
 
@@ -1357,7 +1369,7 @@ let bombKill = false; // true while doSmartBomb() is processing hits
                 direction: 'horizontal',
                 items: [
                     {type: 'button', id: 'fs', label: '⛶', title: 'Fullscreen', hideOnTouch: true, onClick: toggleFullscreen},
-                    {type: 'button', id: 'shop', label: '🏪 Q', title: 'Go to shop', onClick: () => {if (isPlaying && !isMenuVisible()) aiMode = 'shop';}},
+                    {type: 'button', id: 'shop', label: '🏪 Q', title: 'Go to shop', onClick: () => {if (isPlaying && !isMenuVisible()) {if (aiMode === 'shop') {aiMode = 'combat'; shopAbortTimer.set(2);} else aiMode = 'shop';} }},
                     {
                         type: 'button', id: 'menu', label: '☰', title: 'Menu', onClick: () => {
                             if (isMenuVisible()) {clearSubmenuStack(); hideAllMenus();}
@@ -1400,8 +1412,11 @@ let bombKill = false; // true while doSmartBomb() is processing hits
             particles = particles.filter(p => p.life.active());
 
             if (isPlaying) {
-                // Q key → go to shop
-                if (keyWasPressed('KeyQ') && !isMenuVisible()) aiMode = 'shop';
+                // Q key → toggle shop autopilot
+                if (keyWasPressed('KeyQ') && !isMenuVisible()) {
+                    if (aiMode === 'shop') {aiMode = 'combat'; shopAbortTimer.set(2);}
+                    else aiMode = 'shop';
+                }
 
                 // Wave / spawn
                 if (pendingSpawns.length && !spawnTimer.active()) {
@@ -1683,11 +1698,14 @@ let bombKill = false; // true while doSmartBomb() is processing hits
             ctx.fillText(`HUMANS ${humansAlive}`, mainCanvasSize.x - RADAR_MARGIN, RADAR_MARGIN + RADAR_H_SCREEN + 36);
 
             // AI mode indicator
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 24px monospace';
             if (aiMode === 'shop') {
                 ctx.fillStyle = '#fa0';
-                ctx.textAlign = 'center';
-                ctx.font = 'bold 24px monospace';
                 ctx.fillText('→ HEADING TO SHOP', mainCanvasSize.x / 2, RADAR_MARGIN + RADAR_H_SCREEN + 8);
+            } else if (shopAbortTimer && shopAbortTimer.active()) {
+                ctx.fillStyle = '#f66';
+                ctx.fillText('✕ AUTOPILOT ABORTED', mainCanvasSize.x / 2, RADAR_MARGIN + RADAR_H_SCREEN + 8);
             }
 
             if (planetDestroyed) {
