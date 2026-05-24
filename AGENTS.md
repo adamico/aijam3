@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues live in GitHub Issues for `adamico/aijam3`. See `docs/agents/issue-tracker.md`.
+Issues live as local markdown files under `.scratch/<feature-slug>/PRD.md`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

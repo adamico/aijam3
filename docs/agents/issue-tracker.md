@@ -1,22 +1,19 @@
-# Issue tracker: GitHub
+# Issue tracker: Local Markdown
 
-Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+Issues and PRDs for this repo live as markdown files under `.scratch/`.
 
 ## Conventions
 
-- **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
-- **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
-- **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
-- **Comment on an issue**: `gh issue comment <number> --body "..."`
-- **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
-- **Close**: `gh issue close <number> --comment "..."`
-
-Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
+- **Create an issue/PRD**: create a folder `.scratch/<feature-slug>/` with a `PRD.md` inside.
+- **Status header**: second line of `PRD.md` is `Status: <value>`. Valid values: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`.
+- **List issues**: `find .scratch -name PRD.md | xargs grep -l "Status:"` — filter by status as needed.
+- **Update status**: edit the `Status:` line in the relevant `PRD.md`.
+- **Close/resolve**: set `Status: wontfix` or delete the folder.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue.
+Create `.scratch/<feature-slug>/PRD.md`.
 
 ## When a skill says "fetch the relevant ticket"
 
-Run `gh issue view <number> --comments`.
+Read `.scratch/<feature-slug>/PRD.md`.
