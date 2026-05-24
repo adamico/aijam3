@@ -351,14 +351,18 @@
                 }
                 if (carrier) {this.engageEnemy(carrier); return;}
 
-                // 5. Kill nearest enemy
+                // 5. Kill nearest non-swarmer enemy
                 let target = null, bestDist = 1e9;
                 for (const e of enemies) {
-                    if (e.dead) continue;
+                    if (e.dead || e.type === 'swarmer') continue;
                     const d = Math.abs(wrapDX(e.pos.x, this.pos.x)) + Math.abs(e.pos.y - this.pos.y) * 2;
                     if (d < bestDist) {bestDist = d; target = e;}
                 }
                 if (target) {this.engageEnemy(target); return;}
+
+                // 5b. Only swarmers left — use smart bomb if available, else ignore
+                const swarmersLeft = enemies.some(e => !e.dead && e.type === 'swarmer');
+                if (swarmersLeft && smartBombs > 0) {doSmartBomb(); return;}
 
                 // 6. Patrol near humans
                 const liveH = humans.filter(h => !h.dead && !h.heldBy && !h.falling);
