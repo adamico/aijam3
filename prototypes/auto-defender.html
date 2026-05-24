@@ -197,6 +197,8 @@
                 this.holding = null;
                 this.thrusting = false;
                 this.hyperCool = new Timer();
+                this.stallTimer = new Timer(2);    // breaks stuck engagement loops
+                this.disengageTimer = new Timer(); // brief disengage phase
             }
 
             // --- AI helpers ---
@@ -215,34 +217,52 @@
             // Engage enemy: hold safe X firing distance, align Y, fire.
             // Does NOT drive into the enemy.
             engageEnemy(target) {
-                const SAFE_X  = 7;   // ideal stand-off distance (world units)
-                const DANGER_X = 3;  // retreat threshold
-                const dx = wrapDX(target.pos.x, this.pos.x);
-                const dy = target.pos.y - this.pos.y;
+                const SAFE_X   = 7;
+                const DANGER_X = 3;
+                const dx   = wrapDX(target.pos.x, this.pos.x);
+                const dy   = target.pos.y - this.pos.y;
                 const absDx = Math.abs(dx);
-                const side = Math.sign(dx) || this.facing; // which side target is on
+                const absdy = Math.abs(dy);
+                const side  = Math.sign(dx) || this.facing;
 
+                // Stall detection: if no shot fired for 2s, trigger brief disengage
+                if (this.stallTimer.elapsed()) {
+                    this.stallTimer.set(2);
+                    this.disengageTimer.set(0.8);
+                }
+                if (this.disengageTimer.active()) {
+                    // Disengage: dash perpendicular (vertical escape) to break oscillation
+                    this.velocity.y += AI_REACT * 1.5;
+                    this.velocity.x *= 0.92;
+                    return;
+                }
+
+                // X positioning
                 if (absDx < DANGER_X) {
-                    // Too close — retreat away from enemy
                     this.facing = -side;
                     this.velocity.x -= side * AI_REACT * 2;
                 } else if (absDx < SAFE_X) {
-                    // Inside safe zone — hold X, just align Y
                     this.facing = side;
-                    this.velocity.x *= 0.9; // brake horizontally
+                    this.velocity.x *= 0.9;
                 } else {
-                    // Outside safe zone — close the gap normally
                     this.facing = side;
                     this.velocity.x += side * AI_REACT;
                 }
 
-                // Always align Y toward target
-                if (Math.abs(dy) > 0.5)
-                    this.velocity.y += Math.sign(dy) * AI_REACT * 0.6;
+                // Y alignment — kill opposing momentum when nearly level
+                if (absdy > 0.3) {
+                    const yReact = absdy < 1.2 ? AI_REACT * 0.2 : AI_REACT * 0.6;
+                    this.velocity.y += Math.sign(dy) * yReact;
+                }
+                if (absdy < 1.0 && Math.sign(this.velocity.y) !== Math.sign(dy))
+                    this.velocity.y *= 0.4; // damp overshoot
 
-                // Fire when: correct facing, Y aligned, at safe distance
-                if (this.facing === side && Math.abs(dy) < 2.5 && absDx >= DANGER_X && absDx < 25)
+                // Fire — threshold scales with target size
+                const fireY = target.size ? max(2.5, target.size.y * 2.5) : 2.5;
+                if (this.facing === side && absdy < fireY && absDx >= DANGER_X && absDx < 25) {
                     this.fire();
+                    this.stallTimer.set(2); // reset stall on shot
+                }
             }
 
             tryFire(target) {
