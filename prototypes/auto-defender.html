@@ -1,1764 +1,1640 @@
-<!DOCTYPE html><head>
-<title>Auto-Defender</title>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-#littlejs-menus {
-    --menu-bg:           rgba(0, 0, 20, 0.92);
-    --menu-fg:           #fff;
-    --menu-accent:       #0f8;
-    --menu-font:         monospace;
-    --menu-border-width: 3px;
-    --menu-radius:       4px;
-}
-</style>
-</head><body style="background:#000">
-<script src="../LittleJS-AI/dist/littlejs.js?1.18.12"></script>
-<script src="../LittleJS-AI/templates/soundGenerator.js"></script>
-<script src="../LittleJS-AI/templates/menus.js"></script>
-<script>
-'use strict';
+<!DOCTYPE html>
 
-debugWatermark = false;
-showEngineVersion = false;
-paused = false;
-
-gravity = vec2(0, 0);
-cameraPos = vec2(0, 0);
-cameraScale = 24;
-canvasMaxSize = vec2(2048, 2048);
-canvasClearColor = new Color(0, 0, 0.03);
-
-///////////////////////////////////////////////////////////////////////////////
-// Constants
-const WORLD_W        = 220;
-const SKY_TOP        = 22;
-const GROUND_Y       = -14;
-const HUMAN_COUNT    = 10;
-const RADAR_H_SCREEN = 80;
-const RADAR_MARGIN   = 12;
-const EXTRA_LIFE_EVERY    = 10000;
-const HUMAN_RESCUE_MONEY  = 150;
-const SHOP_X_FRAC         = 0.25;   // fraction of WORLD_W
-
-///////////////////////////////////////////////////////////////////////////////
-// Game state
-let score, lives, smartBombs, wave, nextExtra;
-let humansAlive, planetDestroyed, mutantWavesLeft;
-let isPlaying, gameOver;
-let player;
-let enemies, bullets, humans, particles;
-let terrain;
-let stars;
-let baiterTimer;
-let bombFlash;
-let shakeTimer;
-let spawnTimer;
-let pendingSpawns;
-
-// Auto-Defender additions
-let money;
-let aiMode;          // 'combat' | 'shop'
-let shopLanded;
-let teleportCharges, shieldCharges;
-let AI_SPEED, AI_REACT, AI_BULLET_CAP;
-let SHOP_X, SHOP_GROUND_Y;
-
-const UPGRADES = [
-    { id:'speed',     label:'SPEED UP',       cost:200, apply:() => { AI_SPEED  = min(AI_SPEED  + 0.05, 1.2); AI_REACT = min(AI_REACT + 0.005, 0.1); } },
-    { id:'teleport',  label:'TELEPORT CHARGE', cost:150, apply:() => { teleportCharges++; } },
-    { id:'bomb',      label:'SMART BOMB',      cost:175, apply:() => { smartBombs++; } },
-    { id:'shield',    label:'SHIELD CHARGE',   cost:250, apply:() => { shieldCharges++; } },
-    { id:'life',      label:'EXTRA LIFE',      cost:500, apply:() => { lives++; } },
-    { id:'bulletcap', label:'BULLET CAP +1',   cost:300, apply:() => { AI_BULLET_CAP = min(AI_BULLET_CAP + 1, 8); } },
-];
-
-///////////////////////////////////////////////////////////////////////////////
-// Sounds
-let sfxShoot, sfxExplode, sfxEnemyShoot, sfxLanderGrab, sfxSaved, sfxBomb,
-    sfxHyper, sfxPickup, sfxThrust, sfxMutate, sfxExtraLife, sfxAlarm, sfxShield;
-
-function initSounds()
-{
-    sfxShoot      = new SoundGenerator({volume:.4, frequency:1200, attack:.005, release:.05, slide:-3, shapeCurve:0});
-    sfxExplode    = new SoundGenerator({volume:.6, frequency:80,   attack:.02,  release:.4,  noise:.8,  slide:-.5});
-    sfxEnemyShoot = new SoundGenerator({volume:.3, frequency:600,  attack:.005, release:.06, slide:1,   shapeCurve:0});
-    sfxLanderGrab = new SoundGenerator({volume:.4, frequency:400,  attack:.01,  release:.2,  repeatTime:.04, pitchJump:200, pitchJumpTime:.02});
-    sfxSaved      = new SoundGenerator({volume:.5, frequency:440,  attack:.01,  release:.3,  pitchJump:880,  pitchJumpTime:.1});
-    sfxBomb       = new SoundGenerator({volume:.8, frequency:60,   attack:.05,  release:1.0, noise:.6,  slide:-.2});
-    sfxHyper      = new SoundGenerator({volume:.5, frequency:200,  attack:.02,  release:.4,  slide:3,   noise:.3});
-    sfxPickup     = new SoundGenerator({volume:.4, frequency:660,  attack:.01,  release:.15, pitchJump:330, pitchJumpTime:.05});
-    sfxThrust     = new SoundGenerator({volume:.05,frequency:120,  attack:.01,  release:.08, noise:.5});
-    sfxMutate     = new SoundGenerator({volume:.5, frequency:200,  attack:.05,  release:.3,  repeatTime:.08, pitchJump:300, pitchJumpTime:.04});
-    sfxExtraLife  = new SoundGenerator({volume:.6, frequency:660,  attack:.01,  release:.3,  pitchJump:330, pitchJumpTime:.1, repeatTime:.15});
-    sfxAlarm      = new SoundGenerator({volume:.3, frequency:880,  attack:.01,  release:.15, slide:-2});
-    sfxShield     = new SoundGenerator({volume:.5, frequency:300,  attack:.01,  release:.2,  pitchJump:600, pitchJumpTime:.08});
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Wrap helpers
-function wrapX(x)         { return mod(x, WORLD_W); }
-function wrapDX(toX, fromX)
-{
-    let d = toX - fromX;
-    d -= Math.round(d / WORLD_W) * WORLD_W;
-    return d;
-}
-function camDrawX(x) { return cameraPos.x + wrapDX(x, cameraPos.x); }
-function dpos(p)     { return vec2(camDrawX(p.x), p.y); }
-
-///////////////////////////////////////////////////////////////////////////////
-// Terrain
-function genTerrain()
-{
-    terrain = [];
-    const N = 440;
-    for (let i = 0; i < N; i++)
-    {
-        const t = i / N * Math.PI * 2;
-        const h = GROUND_Y +
-            Math.sin(t * 3 + 0.5)  * 1.6 +
-            Math.sin(t * 7 + 1.3)  * 1.0 +
-            Math.sin(t * 13 + 2.1) * 0.6 +
-            Math.sin(t * 22 + 0.7) * 0.3;
-        terrain.push(h);
-    }
-    // Flatten a landing pad at SHOP_X
-    const si = Math.round(SHOP_X_FRAC * N);
-    const flatH = terrain[si];
-    for (let i = si - 4; i <= si + 4; i++) terrain[mod(i, N)] = flatH;
-}
-function terrainAt(x)
-{
-    x = wrapX(x);
-    const N = terrain.length;
-    const f = (x / WORLD_W) * N;
-    const i0 = Math.floor(f) % N;
-    const i1 = (i0 + 1) % N;
-    return lerp(terrain[i0], terrain[i1], f - Math.floor(f));
-}
-
-// Stars
-const STAR_Y_LOW  = -16;
-const STAR_Y_HIGH = SKY_TOP + 4;
-const STAR_LAYERS = [
-    {count:240, depth:.25, sizeMul:.7,  brightMul:.55},
-    {count:180, depth:.55, sizeMul:1.0, brightMul:.8},
-    {count: 90, depth:1.0, sizeMul:1.3, brightMul:1.0},
-];
-function genStars()
-{
-    stars = [];
-    const rg = new RandomGenerator(8472);
-    for (const layer of STAR_LAYERS)
-        for (let i = 0; i < layer.count; i++)
-            stars.push({
-                x:     rg.float(0, WORLD_W),
-                y:     rg.float(STAR_Y_LOW, STAR_Y_HIGH),
-                b:     rg.float(.35, 1) * layer.brightMul,
-                s:     rg.float(.05, .12) * layer.sizeMul,
-                phase: rg.float(0, Math.PI * 2),
-                depth: layer.depth,
-            });
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Particles
-function spark(pos, count, color, speed = .4, life = .8)
-{
-    for (let i = 0; i < count; i++)
-    {
-        const a = rand(0, Math.PI * 2);
-        const s = rand(speed * .3, speed);
-        particles.push({
-            pos: pos.copy(),
-            vel: vec2(Math.cos(a) * s, Math.sin(a) * s),
-            life: new Timer(life * rand(.6, 1.2)),
-            color,
-            size: rand(.15, .35),
-        });
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Bullet
-function spawnBullet(pos, vel, friendly, color, life = 1.0)
-{
-    bullets.push({ pos: pos.copy(), vel: vel.copy(), friendly, life: new Timer(life), color });
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Player — AI controlled
-class Player
-{
-    constructor()
-    {
-        this.pos        = vec2(0, 5);
-        this.size       = vec2(2.8, 1.1);
-        this.velocity   = vec2();
-        this.facing     = 1;
-        this.shootCool  = new Timer();
-        this.invincible = new Timer(2);
-        this.dead       = false;
-        this.respawn    = new Timer();
-        this.holding    = null;
-        this.thrusting  = false;
-        this.hyperCool  = new Timer();
-    }
-
-    // --- AI helpers ---
-
-    flyToward(target)
-    {
-        const dx = wrapDX(target.x, this.pos.x);
-        const dy = target.y - this.pos.y;
-        if (Math.abs(dx) > 0.3)
-        {
-            this.facing = Math.sign(dx);
-            this.velocity.x += Math.sign(dx) * AI_REACT;
+<head>
+    <title>Auto-Defender</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        #littlejs-menus {
+            --menu-bg: rgba(0, 0, 20, 0.92);
+            --menu-fg: #fff;
+            --menu-accent: #0f8;
+            --menu-font: monospace;
+            --menu-border-width: 3px;
+            --menu-radius: 4px;
         }
-        if (Math.abs(dy) > 0.5)
-            this.velocity.y += Math.sign(dy) * AI_REACT * 0.6;
-    }
+    </style>
+</head>
 
-    tryFire(target)
-    {
-        const dx = wrapDX(target.x, this.pos.x);
-        const dy = target.y - this.pos.y;
-        if (Math.sign(dx) === this.facing && Math.abs(dy) < 2.5 && Math.abs(dx) < 25)
-            this.fire();
-    }
+<body style="background:#000">
+    <script src="../LittleJS-AI/dist/littlejs.js?1.18.12"></script>
+    <script src="../LittleJS-AI/templates/soundGenerator.js"></script>
+    <script src="../LittleJS-AI/templates/menus.js"></script>
+    <script>
+        'use strict';
 
-    goToShop()
-    {
-        const dx = wrapDX(SHOP_X, this.pos.x);
-        if (Math.abs(dx) > 2)
-        {
-            this.facing = Math.sign(dx);
-            this.velocity.x += Math.sign(dx) * AI_REACT;
-            // Rise to clear terrain obstacles en route
-            const clearY = terrainAt(this.pos.x + this.facing * 3) + 4;
-            if (this.pos.y < clearY) this.velocity.y += AI_REACT * 0.5;
+        debugWatermark = false;
+        showEngineVersion = false;
+        paused = false;
+
+        gravity = vec2(0, 0);
+        cameraPos = vec2(0, 0);
+        cameraScale = 24;
+        canvasMaxSize = vec2(2048, 2048);
+        canvasClearColor = new Color(0, 0, 0.03);
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Constants
+        const WORLD_W = 220;
+        const SKY_TOP = 22;
+        const GROUND_Y = -14;
+        const HUMAN_COUNT = 10;
+        const RADAR_H_SCREEN = 80;
+        const RADAR_MARGIN = 12;
+        const EXTRA_LIFE_EVERY = 10000;
+        const HUMAN_RESCUE_MONEY = 150;
+        const SHOP_X_FRAC = 0.25;   // fraction of WORLD_W
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Game state
+        let score, lives, smartBombs, wave, nextExtra;
+        let humansAlive, planetDestroyed, mutantWavesLeft;
+        let isPlaying, gameOver;
+        let player;
+        let enemies, bullets, humans, particles;
+        let terrain;
+        let stars;
+        let baiterTimer;
+        let bombFlash;
+        let shakeTimer;
+        let spawnTimer;
+        let pendingSpawns;
+
+        // Auto-Defender additions
+        let money;
+        let aiMode;          // 'combat' | 'shop'
+        let shopLanded;
+        let teleportCharges, shieldCharges;
+        let AI_SPEED, AI_REACT, AI_BULLET_CAP;
+        let SHOP_X, SHOP_GROUND_Y;
+
+        const UPGRADES = [
+            {id: 'speed', label: 'SPEED UP', cost: 200, apply: () => {AI_SPEED = min(AI_SPEED + 0.05, 1.2); AI_REACT = min(AI_REACT + 0.005, 0.1);}},
+            {id: 'teleport', label: 'TELEPORT CHARGE', cost: 150, apply: () => {teleportCharges++;}},
+            {id: 'bomb', label: 'SMART BOMB', cost: 175, apply: () => {smartBombs++;}},
+            {id: 'shield', label: 'SHIELD CHARGE', cost: 250, apply: () => {shieldCharges++;}},
+            {id: 'life', label: 'EXTRA LIFE', cost: 500, apply: () => {lives++;}},
+            {id: 'bulletcap', label: 'BULLET CAP +1', cost: 300, apply: () => {AI_BULLET_CAP = min(AI_BULLET_CAP + 1, 8);}},
+        ];
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Sounds
+        let sfxShoot, sfxExplode, sfxEnemyShoot, sfxLanderGrab, sfxSaved, sfxBomb,
+            sfxHyper, sfxPickup, sfxThrust, sfxMutate, sfxExtraLife, sfxAlarm, sfxShield;
+
+        function initSounds() {
+            sfxShoot = new SoundGenerator({volume: .4, frequency: 1200, attack: .005, release: .05, slide: -3, shapeCurve: 0});
+            sfxExplode = new SoundGenerator({volume: .6, frequency: 80, attack: .02, release: .4, noise: .8, slide: -.5});
+            sfxEnemyShoot = new SoundGenerator({volume: .3, frequency: 600, attack: .005, release: .06, slide: 1, shapeCurve: 0});
+            sfxLanderGrab = new SoundGenerator({volume: .4, frequency: 400, attack: .01, release: .2, repeatTime: .04, pitchJump: 200, pitchJumpTime: .02});
+            sfxSaved = new SoundGenerator({volume: .5, frequency: 440, attack: .01, release: .3, pitchJump: 880, pitchJumpTime: .1});
+            sfxBomb = new SoundGenerator({volume: .8, frequency: 60, attack: .05, release: 1.0, noise: .6, slide: -.2});
+            sfxHyper = new SoundGenerator({volume: .5, frequency: 200, attack: .02, release: .4, slide: 3, noise: .3});
+            sfxPickup = new SoundGenerator({volume: .4, frequency: 660, attack: .01, release: .15, pitchJump: 330, pitchJumpTime: .05});
+            sfxThrust = new SoundGenerator({volume: .05, frequency: 120, attack: .01, release: .08, noise: .5});
+            sfxMutate = new SoundGenerator({volume: .5, frequency: 200, attack: .05, release: .3, repeatTime: .08, pitchJump: 300, pitchJumpTime: .04});
+            sfxExtraLife = new SoundGenerator({volume: .6, frequency: 660, attack: .01, release: .3, pitchJump: 330, pitchJumpTime: .1, repeatTime: .15});
+            sfxAlarm = new SoundGenerator({volume: .3, frequency: 880, attack: .01, release: .15, slide: -2});
+            sfxShield = new SoundGenerator({volume: .5, frequency: 300, attack: .01, release: .2, pitchJump: 600, pitchJumpTime: .08});
         }
-        else
-        {
-            // Aligned — descend to land
-            this.velocity.x *= 0.85;
-            this.velocity.y -= 0.05;
-            if (!shopLanded && this.pos.y <= SHOP_GROUND_Y + 0.5)
-            {
-                shopLanded = true;
-                openShop();
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Wrap helpers
+        function wrapX(x) {return mod(x, WORLD_W);}
+        function wrapDX(toX, fromX) {
+            let d = toX - fromX;
+            d -= Math.round(d / WORLD_W) * WORLD_W;
+            return d;
+        }
+        function camDrawX(x) {return cameraPos.x + wrapDX(x, cameraPos.x);}
+        function dpos(p) {return vec2(camDrawX(p.x), p.y);}
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Terrain
+        function genTerrain() {
+            terrain = [];
+            const N = 440;
+            for (let i = 0; i < N; i++) {
+                const t = i / N * Math.PI * 2;
+                const h = GROUND_Y +
+                    Math.sin(t * 3 + 0.5) * 1.6 +
+                    Math.sin(t * 7 + 1.3) * 1.0 +
+                    Math.sin(t * 13 + 2.1) * 0.6 +
+                    Math.sin(t * 22 + 0.7) * 0.3;
+                terrain.push(h);
+            }
+            // Flatten a landing pad at SHOP_X
+            const si = Math.round(SHOP_X_FRAC * N);
+            const flatH = terrain[si];
+            for (let i = si - 4; i <= si + 4; i++) terrain[mod(i, N)] = flatH;
+        }
+        function terrainAt(x) {
+            x = wrapX(x);
+            const N = terrain.length;
+            const f = (x / WORLD_W) * N;
+            const i0 = Math.floor(f) % N;
+            const i1 = (i0 + 1) % N;
+            return lerp(terrain[i0], terrain[i1], f - Math.floor(f));
+        }
+
+        // Stars
+        const STAR_Y_LOW = -16;
+        const STAR_Y_HIGH = SKY_TOP + 4;
+        const STAR_LAYERS = [
+            {count: 240, depth: .25, sizeMul: .7, brightMul: .55},
+            {count: 180, depth: .55, sizeMul: 1.0, brightMul: .8},
+            {count: 90, depth: 1.0, sizeMul: 1.3, brightMul: 1.0},
+        ];
+        function genStars() {
+            stars = [];
+            const rg = new RandomGenerator(8472);
+            for (const layer of STAR_LAYERS)
+                for (let i = 0; i < layer.count; i++)
+                    stars.push({
+                        x: rg.float(0, WORLD_W),
+                        y: rg.float(STAR_Y_LOW, STAR_Y_HIGH),
+                        b: rg.float(.35, 1) * layer.brightMul,
+                        s: rg.float(.05, .12) * layer.sizeMul,
+                        phase: rg.float(0, Math.PI * 2),
+                        depth: layer.depth,
+                    });
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Particles
+        function spark(pos, count, color, speed = .4, life = .8) {
+            for (let i = 0; i < count; i++) {
+                const a = rand(0, Math.PI * 2);
+                const s = rand(speed * .3, speed);
+                particles.push({
+                    pos: pos.copy(),
+                    vel: vec2(Math.cos(a) * s, Math.sin(a) * s),
+                    life: new Timer(life * rand(.6, 1.2)),
+                    color,
+                    size: rand(.15, .35),
+                });
             }
         }
-    }
 
-    aiUpdate()
-    {
-        // 1. Shop mode
-        if (aiMode === 'shop') { this.goToShop(); return; }
-
-        // 2. Holding human — descend to rescue (ground collision triggers dropHuman)
-        if (this.holding)
-        {
-            this.velocity.y -= 0.04;
-            this.velocity.x *= 0.97;
-            return;
+        ///////////////////////////////////////////////////////////////////////////////
+        // Bullet
+        function spawnBullet(pos, vel, friendly, color, life = 1.0) {
+            bullets.push({pos: pos.copy(), vel: vel.copy(), friendly, life: new Timer(life), color});
         }
 
-        // 3. Rescue falling human
-        let fallingHuman = null, bestFH = 1e9;
-        for (const h of humans)
-        {
-            if (h.dead || h.heldBy || !h.falling) continue;
-            const d = Math.abs(wrapDX(h.pos.x, this.pos.x)) + Math.abs(h.pos.y - this.pos.y);
-            if (d < bestFH) { bestFH = d; fallingHuman = h; }
-        }
-        if (fallingHuman && bestFH < 35) { this.flyToward(fallingHuman.pos); return; }
+        ///////////////////////////////////////////////////////////////////////////////
+        // Player — AI controlled
+        class Player {
+            constructor() {
+                this.pos = vec2(0, 5);
+                this.size = vec2(2.8, 1.1);
+                this.velocity = vec2();
+                this.facing = 1;
+                this.shootCool = new Timer();
+                this.invincible = new Timer(2);
+                this.dead = false;
+                this.respawn = new Timer();
+                this.holding = null;
+                this.thrusting = false;
+                this.hyperCool = new Timer();
+            }
 
-        // 4. Intercept lander carrying human
-        let carrier = null;
-        for (const e of enemies)
-        {
-            if (!e.dead && e.type === 'lander' && e.carrying) { carrier = e; break; }
-        }
-        if (carrier) { this.flyToward(carrier.pos); this.tryFire(carrier.pos); return; }
+            // --- AI helpers ---
 
-        // 5. Kill nearest enemy
-        let target = null, bestDist = 1e9;
-        for (const e of enemies)
-        {
-            if (e.dead) continue;
-            const d = Math.abs(wrapDX(e.pos.x, this.pos.x)) + Math.abs(e.pos.y - this.pos.y) * 2;
-            if (d < bestDist) { bestDist = d; target = e; }
-        }
-        if (target) { this.flyToward(target.pos); this.tryFire(target.pos); return; }
+            flyToward(target) {
+                const dx = wrapDX(target.x, this.pos.x);
+                const dy = target.y - this.pos.y;
+                if (Math.abs(dx) > 0.3) {
+                    this.facing = Math.sign(dx);
+                    this.velocity.x += Math.sign(dx) * AI_REACT;
+                }
+                if (Math.abs(dy) > 0.5)
+                    this.velocity.y += Math.sign(dy) * AI_REACT * 0.6;
+            }
 
-        // 6. Patrol near humans
-        const liveH = humans.filter(h => !h.dead && !h.heldBy && !h.falling);
-        if (liveH.length)
-        {
-            const closest = liveH.reduce((a, b) =>
-                Math.abs(wrapDX(a.pos.x, this.pos.x)) < Math.abs(wrapDX(b.pos.x, this.pos.x)) ? a : b);
-            const dx = wrapDX(closest.pos.x, this.pos.x);
-            this.facing = Math.sign(dx) || this.facing;
-            this.velocity.x += Math.sign(dx) * AI_REACT * 0.4;
-        }
-        // Hover at mid altitude
-        const midY = (terrainAt(this.pos.x) + 1.5 + SKY_TOP) / 2;
-        this.velocity.y += Math.sign(midY - this.pos.y) * AI_REACT * 0.3;
-    }
+            // Engage enemy: hold safe X firing distance, align Y, fire.
+            // Does NOT drive into the enemy.
+            engageEnemy(target) {
+                const SAFE_X  = 7;   // ideal stand-off distance (world units)
+                const DANGER_X = 3;  // retreat threshold
+                const dx = wrapDX(target.pos.x, this.pos.x);
+                const dy = target.pos.y - this.pos.y;
+                const absDx = Math.abs(dx);
+                const side = Math.sign(dx) || this.facing; // which side target is on
 
-    update()
-    {
-        if (this.dead)
-        {
-            if (lives > 0 && this.respawn.elapsed()) this.doRespawn();
-            return;
-        }
+                if (absDx < DANGER_X) {
+                    // Too close — retreat away from enemy
+                    this.facing = -side;
+                    this.velocity.x -= side * AI_REACT * 2;
+                } else if (absDx < SAFE_X) {
+                    // Inside safe zone — hold X, just align Y
+                    this.facing = side;
+                    this.velocity.x *= 0.9; // brake horizontally
+                } else {
+                    // Outside safe zone — close the gap normally
+                    this.facing = side;
+                    this.velocity.x += side * AI_REACT;
+                }
 
-        this.thrusting = false;
-        this.aiUpdate();
+                // Always align Y toward target
+                if (Math.abs(dy) > 0.5)
+                    this.velocity.y += Math.sign(dy) * AI_REACT * 0.6;
 
-        // Damping and speed cap
-        this.velocity.y *= 0.93;
-        this.velocity.x *= 0.985;
-        this.velocity = this.velocity.clampLength(AI_SPEED);
-        this.thrusting = Math.abs(this.velocity.x) > 0.08;
+                // Fire when: correct facing, Y aligned, at safe distance
+                if (this.facing === side && Math.abs(dy) < 2.5 && absDx >= DANGER_X && absDx < 25)
+                    this.fire();
+            }
 
-        this.pos.x = wrapX(this.pos.x + this.velocity.x);
-        this.pos.y += this.velocity.y;
+            tryFire(target) {
+                const dx = wrapDX(target.x, this.pos.x);
+                const dy = target.y - this.pos.y;
+                if (Math.sign(dx) === this.facing && Math.abs(dy) < 2.5 && Math.abs(dx) < 25)
+                    this.fire();
+            }
 
-        // Ground / ceiling bounds
-        const ground = terrainAt(this.pos.x) + 0.9;
-        if (this.pos.y < ground)
-        {
-            this.pos.y = ground;
-            if (this.velocity.y < 0) this.velocity.y = 0;
-            if (this.holding) this.dropHuman();
-        }
-        if (this.pos.y > SKY_TOP)
-        {
-            this.pos.y = SKY_TOP;
-            if (this.velocity.y > 0) this.velocity.y = 0;
-        }
-
-        // Auto-pickup falling humans
-        if (!this.holding)
-        {
-            for (const h of humans)
-            {
-                if (h.dead || h.heldBy || !h.falling) continue;
-                if (Math.abs(wrapDX(this.pos.x, h.pos.x)) < 1.0 && Math.abs(this.pos.y - h.pos.y) < 1.0)
-                {
-                    this.holding = h;
-                    h.heldBy = this;
-                    h.falling = false;
-                    sfxPickup.play();
-                    break;
+            goToShop() {
+                const dx = wrapDX(SHOP_X, this.pos.x);
+                if (Math.abs(dx) > 2) {
+                    this.facing = Math.sign(dx);
+                    this.velocity.x += Math.sign(dx) * AI_REACT;
+                    // Rise to clear terrain obstacles en route
+                    const clearY = terrainAt(this.pos.x + this.facing * 3) + 4;
+                    if (this.pos.y < clearY) this.velocity.y += AI_REACT * 0.5;
+                }
+                else {
+                    // Aligned — descend to land
+                    this.velocity.x *= 0.85;
+                    this.velocity.y -= 0.05;
+                    if (!shopLanded && this.pos.y <= SHOP_GROUND_Y + 0.5) {
+                        shopLanded = true;
+                        openShop();
+                    }
                 }
             }
-        }
-        if (this.holding)
-            this.holding.pos = vec2(this.pos.x, this.pos.y - 0.9);
 
-        if (this.thrusting && !(frame % 6)) sfxThrust.play(this.pos, .4, 1 + rand(-.1, .1));
-    }
+            aiUpdate() {
+                // 1. Shop mode
+                if (aiMode === 'shop') {this.goToShop(); return;}
 
-    dropHuman()
-    {
-        if (!this.holding) return;
-        const h = this.holding;
-        h.heldBy = null;
-        h.standing = true;
-        h.falling = false;
-        h.pos = vec2(this.pos.x, terrainAt(this.pos.x) + .4);
-        this.holding = null;
-        addScore(500);
-        money += HUMAN_RESCUE_MONEY;
-        sfxSaved.play();
-    }
-
-    fire()
-    {
-        if (this.shootCool.active()) return;
-        const activeFriendly = bullets.filter(b => b.friendly && b.life.active()).length;
-        if (activeFriendly >= AI_BULLET_CAP) return;
-        this.shootCool.set(.09);
-        const bx = this.pos.x + this.facing * 1.6;
-        spawnBullet(vec2(bx, this.pos.y), vec2(this.facing * 1.6, 0), true, hsl(.14, 1, .7), .7);
-        sfxShoot.play();
-    }
-
-    doRespawn()
-    {
-        this.dead = false;
-        this.invincible.set(2.5);
-        this.pos = vec2(cameraPos.x, 6);
-        this.velocity = vec2();
-        this.holding = null;
-        aiMode = 'combat';
-        shopLanded = false;
-    }
-
-    die()
-    {
-        if (this.dead || this.invincible.active()) return;
-        if (shieldCharges > 0)
-        {
-            shieldCharges--;
-            this.invincible.set(2);
-            sfxShield.play();
-            return;
-        }
-        this.dead = true;
-        this.respawn.set(2);
-        spark(this.pos, 40, hsl(.55, .8, .7), .6, 1.2);
-        spark(this.pos, 20, hsl(.13, 1, .7), .8, 1.0);
-        sfxExplode.play();
-        shakeTimer.set(.4);
-        if (this.holding)
-        {
-            this.holding.heldBy = null;
-            this.holding.falling = true;
-            this.holding = null;
-        }
-        lives--;
-        if (lives <= 0) setTimeout(doGameOver, 1500);
-    }
-
-    render()
-    {
-        if (this.dead) return;
-        const p = this.pos;
-        const f = this.facing;
-        const blink = this.invincible.active() && (Math.floor(time * 18) % 2);
-        if (blink) return;
-        const dp = dpos(p);
-        const bodyCol = hsl(.55, .3, .85);
-        drawRect(dp.add(vec2(-f * .2, 0)), vec2(2.2, .35), bodyCol);
-        drawRect(dp.add(vec2(f * 1.2, 0)), vec2(.6, .2), hsl(.13, 1, .7));
-        drawRect(dp.add(vec2(f * 1.5, 0)), vec2(.3, .1), hsl(.13, 1, .8));
-        drawRect(dp.add(vec2(-f * .5, .35)), vec2(.7, .35), bodyCol);
-        drawRect(dp.add(vec2(-f * .5, .45)), vec2(.4, .15), hsl(.55, 1, .6));
-        drawRect(dp.add(vec2(-f * .1, -.3)), vec2(1.8, .2), hsl(.55, .2, .55));
-        if (this.thrusting && (frame % 2))
-        {
-            drawRect(dp.add(vec2(-f * 1.4, 0)), vec2(.7, .25), hsl(.05, 1, .6));
-            drawRect(dp.add(vec2(-f * 1.7, 0)), vec2(.4, .15), hsl(.15, 1, .8));
-        }
-        // Shield visual ring
-        if (shieldCharges > 0)
-        {
-            const r = 1.8 + Math.sin(time * 4) * 0.15;
-            drawCircle(dp, r, hsl(.55, 1, .7, .2));
-        }
-        if (this.holding) drawHumanFigure(this.holding.pos);
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Human figure
-function drawHumanFigure(p)
-{
-    const dp = dpos(p);
-    drawRect(dp.add(vec2(0, -.1)), vec2(.25, .5), hsl(.07, .8, .7));
-    drawRect(dp.add(vec2(0, .3)), vec2(.3, .25), hsl(.6, .4, .4));
-    drawCircle(dp.add(vec2(0, .55)), .3, hsl(.07, .9, .85));
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Human
-class Human
-{
-    constructor(x)
-    {
-        this.pos      = vec2(x, terrainAt(x) + .4);
-        this.velocity = vec2();
-        this.walking  = false;
-        this.standing = true;
-        this.heldBy   = null;
-        this.falling  = false;
-        this.dead     = false;
-        this.walkDir  = randSign();
-        this.walkTimer = new Timer(rand(1, 3));
-    }
-
-    update()
-    {
-        if (this.dead || this.heldBy) return;
-        if (this.falling)
-        {
-            this.velocity.y -= .03;
-            this.pos.y += this.velocity.y;
-            const g = terrainAt(this.pos.x) + .4;
-            if (this.pos.y <= g)
-            {
-                this.pos.y = g;
-                if (this.velocity.y < -.35)
-                {
-                    this.dead = true;
-                    humansAlive--;
-                    spark(this.pos, 8, hsl(0, 1, .6), .3, .6);
-                    checkPlanetDestroyed();
+                // 2. Holding human — descend to rescue (ground collision triggers dropHuman)
+                if (this.holding) {
+                    this.velocity.y -= 0.04;
+                    this.velocity.x *= 0.97;
+                    return;
                 }
-                else { this.falling = false; this.standing = true; }
-                this.velocity.y = 0;
-            }
-            return;
-        }
-        this.pos.y = terrainAt(this.pos.x) + .4;
-        if (this.walkTimer.elapsed())
-        {
-            this.walking = !this.walking;
-            this.walkTimer.set(rand(1, 3));
-            if (this.walking) this.walkDir = randSign();
-        }
-        if (this.walking) this.pos.x = wrapX(this.pos.x + this.walkDir * .025);
-    }
 
-    render()
-    {
-        if (this.dead) return;
-        if (this.heldBy && this.heldBy === player) return;
-        drawHumanFigure(this.pos);
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Lander
-class Lander
-{
-    constructor(x, y)
-    {
-        this.pos        = vec2(x, y);
-        this.size       = vec2(1.2, 1.1);
-        this.velocity   = vec2();
-        this.color      = hsl(.3, 1, .55);
-        this.radarColor = hsl(.3, 1, .55);
-        this.scoreValue = 150;
-        this.moneyDrop  = 50;
-        this.type       = 'lander';
-        this.state      = 'descend';
-        this.target     = null;
-        this.shootCool  = new Timer(rand(1.5, 4));
-        this.dead       = false;
-        this.carrying   = null;
-    }
-
-    findHuman()
-    {
-        let best = null, bd = 1e9;
-        for (const h of humans)
-        {
-            if (h.dead || h.heldBy || h.falling) continue;
-            const dx = Math.abs(wrapDX(h.pos.x, this.pos.x));
-            if (dx < bd) { bd = dx; best = h; }
-        }
-        return best;
-    }
-
-    update()
-    {
-        if (this.state === 'descend')
-        {
-            if (!this.target || this.target.dead || this.target.heldBy || this.target.falling)
-                this.target = this.findHuman();
-            if (this.target)
-            {
-                const dx = wrapDX(this.target.pos.x, this.pos.x);
-                this.velocity.x = clamp(dx * .05, -.06, .06);
-                const groundClear = terrainAt(this.pos.x) + 1.3;
-                this.velocity.y = this.pos.y > groundClear ? -.04 : -.005;
-                if (Math.abs(dx) < .5 && this.pos.y < groundClear + .5)
-                {
-                    this.carrying = this.target;
-                    this.target.heldBy = this;
-                    this.target.walking = false;
-                    this.target.standing = false;
-                    this.state = 'ascend';
-                    sfxLanderGrab.play();
+                // 3. Rescue falling human
+                let fallingHuman = null, bestFH = 1e9;
+                for (const h of humans) {
+                    if (h.dead || h.heldBy || !h.falling) continue;
+                    const d = Math.abs(wrapDX(h.pos.x, this.pos.x)) + Math.abs(h.pos.y - this.pos.y);
+                    if (d < bestFH) {bestFH = d; fallingHuman = h;}
                 }
-            }
-            else
-            {
-                this.velocity.x = .03;
-                this.velocity.y = lerp(this.velocity.y, 0, .1);
-            }
-        }
-        else if (this.state === 'ascend')
-        {
-            this.velocity.x = lerp(this.velocity.x, 0, .1);
-            this.velocity.y = .045;
-            if (this.carrying) this.carrying.pos = vec2(this.pos.x, this.pos.y - 1.1);
-            if (this.pos.y > SKY_TOP - 1)
-            {
-                if (this.carrying)
-                {
-                    this.carrying.dead = true;
-                    this.carrying.heldBy = null;
-                    humansAlive--;
-                    checkPlanetDestroyed();
+                if (fallingHuman && bestFH < 35) {this.flyToward(fallingHuman.pos); return;}
+
+                // 4. Intercept lander carrying human
+                let carrier = null;
+                for (const e of enemies) {
+                    if (!e.dead && e.type === 'lander' && e.carrying) {carrier = e; break;}
                 }
-                enemies.push(new Mutant(this.pos.x, this.pos.y));
-                sfxMutate.play();
+                if (carrier) {this.engageEnemy(carrier); return;}
+
+                // 5. Kill nearest enemy
+                let target = null, bestDist = 1e9;
+                for (const e of enemies) {
+                    if (e.dead) continue;
+                    const d = Math.abs(wrapDX(e.pos.x, this.pos.x)) + Math.abs(e.pos.y - this.pos.y) * 2;
+                    if (d < bestDist) {bestDist = d; target = e;}
+                }
+                if (target) {this.engageEnemy(target); return;}
+
+                // 6. Patrol near humans
+                const liveH = humans.filter(h => !h.dead && !h.heldBy && !h.falling);
+                if (liveH.length) {
+                    const closest = liveH.reduce((a, b) =>
+                        Math.abs(wrapDX(a.pos.x, this.pos.x)) < Math.abs(wrapDX(b.pos.x, this.pos.x)) ? a : b);
+                    const dx = wrapDX(closest.pos.x, this.pos.x);
+                    this.facing = Math.sign(dx) || this.facing;
+                    this.velocity.x += Math.sign(dx) * AI_REACT * 0.4;
+                }
+                // Hover at mid altitude
+                const midY = (terrainAt(this.pos.x) + 1.5 + SKY_TOP) / 2;
+                this.velocity.y += Math.sign(midY - this.pos.y) * AI_REACT * 0.3;
+            }
+
+            update() {
+                if (this.dead) {
+                    if (lives > 0 && this.respawn.elapsed()) this.doRespawn();
+                    return;
+                }
+
+                this.thrusting = false;
+                this.aiUpdate();
+
+                // Damping and speed cap
+                this.velocity.y *= 0.93;
+                this.velocity.x *= 0.985;
+                this.velocity = this.velocity.clampLength(AI_SPEED);
+                this.thrusting = Math.abs(this.velocity.x) > 0.08;
+
+                this.pos.x = wrapX(this.pos.x + this.velocity.x);
+                this.pos.y += this.velocity.y;
+
+                // Ground / ceiling bounds
+                const ground = terrainAt(this.pos.x) + 0.9;
+                if (this.pos.y < ground) {
+                    this.pos.y = ground;
+                    if (this.velocity.y < 0) this.velocity.y = 0;
+                    if (this.holding) this.dropHuman();
+                }
+                if (this.pos.y > SKY_TOP) {
+                    this.pos.y = SKY_TOP;
+                    if (this.velocity.y > 0) this.velocity.y = 0;
+                }
+
+                // Auto-pickup falling humans
+                if (!this.holding) {
+                    for (const h of humans) {
+                        if (h.dead || h.heldBy || !h.falling) continue;
+                        if (Math.abs(wrapDX(this.pos.x, h.pos.x)) < 1.0 && Math.abs(this.pos.y - h.pos.y) < 1.0) {
+                            this.holding = h;
+                            h.heldBy = this;
+                            h.falling = false;
+                            sfxPickup.play();
+                            break;
+                        }
+                    }
+                }
+                if (this.holding)
+                    this.holding.pos = vec2(this.pos.x, this.pos.y - 0.9);
+
+                if (this.thrusting && !(frame % 6)) sfxThrust.play(this.pos, .4, 1 + rand(-.1, .1));
+            }
+
+            dropHuman() {
+                if (!this.holding) return;
+                const h = this.holding;
+                h.heldBy = null;
+                h.standing = true;
+                h.falling = false;
+                h.pos = vec2(this.pos.x, terrainAt(this.pos.x) + .4);
+                this.holding = null;
+                addScore(500);
+                money += HUMAN_RESCUE_MONEY;
+                sfxSaved.play();
+            }
+
+            fire() {
+                if (this.shootCool.active()) return;
+                const activeFriendly = bullets.filter(b => b.friendly && b.life.active()).length;
+                if (activeFriendly >= AI_BULLET_CAP) return;
+                this.shootCool.set(.09);
+                const bx = this.pos.x + this.facing * 1.6;
+                spawnBullet(vec2(bx, this.pos.y), vec2(this.facing * 1.6, 0), true, hsl(.14, 1, .7), .7);
+                sfxShoot.play();
+            }
+
+            doRespawn() {
+                this.dead = false;
+                this.invincible.set(2.5);
+                this.pos = vec2(cameraPos.x, 6);
+                this.velocity = vec2();
+                this.holding = null;
+                aiMode = 'combat';
+                shopLanded = false;
+            }
+
+            die() {
+                if (this.dead || this.invincible.active()) return;
+                if (shieldCharges > 0) {
+                    shieldCharges--;
+                    this.invincible.set(2);
+                    sfxShield.play();
+                    return;
+                }
                 this.dead = true;
-                return;
+                this.respawn.set(2);
+                spark(this.pos, 40, hsl(.55, .8, .7), .6, 1.2);
+                spark(this.pos, 20, hsl(.13, 1, .7), .8, 1.0);
+                sfxExplode.play();
+                shakeTimer.set(.4);
+                if (this.holding) {
+                    this.holding.heldBy = null;
+                    this.holding.falling = true;
+                    this.holding = null;
+                }
+                lives--;
+                if (lives <= 0) setTimeout(doGameOver, 1500);
+            }
+
+            render() {
+                if (this.dead) return;
+                const p = this.pos;
+                const f = this.facing;
+                const blink = this.invincible.active() && (Math.floor(time * 18) % 2);
+                if (blink) return;
+                const dp = dpos(p);
+                const bodyCol = hsl(.55, .3, .85);
+                drawRect(dp.add(vec2(-f * .2, 0)), vec2(2.2, .35), bodyCol);
+                drawRect(dp.add(vec2(f * 1.2, 0)), vec2(.6, .2), hsl(.13, 1, .7));
+                drawRect(dp.add(vec2(f * 1.5, 0)), vec2(.3, .1), hsl(.13, 1, .8));
+                drawRect(dp.add(vec2(-f * .5, .35)), vec2(.7, .35), bodyCol);
+                drawRect(dp.add(vec2(-f * .5, .45)), vec2(.4, .15), hsl(.55, 1, .6));
+                drawRect(dp.add(vec2(-f * .1, -.3)), vec2(1.8, .2), hsl(.55, .2, .55));
+                if (this.thrusting && (frame % 2)) {
+                    drawRect(dp.add(vec2(-f * 1.4, 0)), vec2(.7, .25), hsl(.05, 1, .6));
+                    drawRect(dp.add(vec2(-f * 1.7, 0)), vec2(.4, .15), hsl(.15, 1, .8));
+                }
+                // Shield visual ring
+                if (shieldCharges > 0) {
+                    const r = 1.8 + Math.sin(time * 4) * 0.15;
+                    drawCircle(dp, r, hsl(.55, 1, .7, .2));
+                }
+                if (this.holding) drawHumanFigure(this.holding.pos);
             }
         }
-        this.pos.x = wrapX(this.pos.x + this.velocity.x);
-        this.pos.y += this.velocity.y;
-        if (player && !player.dead && !this.shootCool.active())
-        {
-            this.shootCool.set(rand(2, 5));
-            const dx = wrapDX(player.pos.x, this.pos.x);
-            const dy = player.pos.y - this.pos.y;
-            spawnBullet(this.pos, vec2(dx, dy).normalize(.45), false, hsl(.3, 1, .7), 3);
-            sfxEnemyShoot.play(this.pos, .4);
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Human figure
+        function drawHumanFigure(p) {
+            const dp = dpos(p);
+            drawRect(dp.add(vec2(0, -.1)), vec2(.25, .5), hsl(.07, .8, .7));
+            drawRect(dp.add(vec2(0, .3)), vec2(.3, .25), hsl(.6, .4, .4));
+            drawCircle(dp.add(vec2(0, .55)), .3, hsl(.07, .9, .85));
         }
-    }
 
-    hit()
-    {
-        if (this.dead) return;
-        money += this.moneyDrop;
-        addScore(this.scoreValue);
-        if (this.carrying)
-        {
-            addScore(500);
-            this.carrying.heldBy = null;
-            this.carrying.falling = true;
-            this.carrying.velocity = vec2(0, this.velocity.y);
-            this.carrying = null;
+        ///////////////////////////////////////////////////////////////////////////////
+        // Human
+        class Human {
+            constructor(x) {
+                this.pos = vec2(x, terrainAt(x) + .4);
+                this.velocity = vec2();
+                this.walking = false;
+                this.standing = true;
+                this.heldBy = null;
+                this.falling = false;
+                this.dead = false;
+                this.walkDir = randSign();
+                this.walkTimer = new Timer(rand(1, 3));
+            }
+
+            update() {
+                if (this.dead || this.heldBy) return;
+                if (this.falling) {
+                    this.velocity.y -= .03;
+                    this.pos.y += this.velocity.y;
+                    const g = terrainAt(this.pos.x) + .4;
+                    if (this.pos.y <= g) {
+                        this.pos.y = g;
+                        if (this.velocity.y < -.35) {
+                            this.dead = true;
+                            humansAlive--;
+                            spark(this.pos, 8, hsl(0, 1, .6), .3, .6);
+                            checkPlanetDestroyed();
+                        }
+                        else {this.falling = false; this.standing = true;}
+                        this.velocity.y = 0;
+                    }
+                    return;
+                }
+                this.pos.y = terrainAt(this.pos.x) + .4;
+                if (this.walkTimer.elapsed()) {
+                    this.walking = !this.walking;
+                    this.walkTimer.set(rand(1, 3));
+                    if (this.walking) this.walkDir = randSign();
+                }
+                if (this.walking) this.pos.x = wrapX(this.pos.x + this.walkDir * .025);
+            }
+
+            render() {
+                if (this.dead) return;
+                if (this.heldBy && this.heldBy === player) return;
+                drawHumanFigure(this.pos);
+            }
         }
-        spark(this.pos, 14, this.color, .5, .8);
-        sfxExplode.play(this.pos, .5);
-        this.dead = true;
-    }
 
-    render()
-    {
-        const dp = dpos(this.pos);
-        const c = this.color;
-        drawRect(dp.add(vec2(0, .35)), vec2(.7, .35), c);
-        drawRect(dp.add(vec2(0, .5)), vec2(.4, .2), hsl(.13, 1, .7));
-        drawRect(dp, vec2(1.2, .35), c);
-        drawRect(dp.add(vec2(-.45, -.4)), vec2(.18, .55), c);
-        drawRect(dp.add(vec2(.45, -.4)), vec2(.18, .55), c);
-        if (this.carrying) drawHumanFigure(this.carrying.pos);
-    }
-}
+        ///////////////////////////////////////////////////////////////////////////////
+        // Lander
+        class Lander {
+            constructor(x, y) {
+                this.pos = vec2(x, y);
+                this.size = vec2(1.2, 1.1);
+                this.velocity = vec2();
+                this.color = hsl(.3, 1, .55);
+                this.radarColor = hsl(.3, 1, .55);
+                this.scoreValue = 150;
+                this.moneyDrop = 50;
+                this.type = 'lander';
+                this.state = 'descend';
+                this.target = null;
+                this.shootCool = new Timer(rand(1.5, 4));
+                this.dead = false;
+                this.carrying = null;
+            }
 
-///////////////////////////////////////////////////////////////////////////////
-// Mutant
-class Mutant
-{
-    constructor(x, y)
-    {
-        this.pos        = vec2(x, y);
-        this.size       = vec2(1.2, 1.2);
-        this.velocity   = vec2();
-        this.color      = hsl(.95, 1, .55);
-        this.radarColor = hsl(.95, 1, .55);
-        this.scoreValue = 150;
-        this.moneyDrop  = 75;
-        this.type       = 'mutant';
-        this.shootCool  = new Timer(rand(.5, 1.5));
-        this.jerkCool   = new Timer();
-        this.dead       = false;
-    }
+            findHuman() {
+                let best = null, bd = 1e9;
+                for (const h of humans) {
+                    if (h.dead || h.heldBy || h.falling) continue;
+                    const dx = Math.abs(wrapDX(h.pos.x, this.pos.x));
+                    if (dx < bd) {bd = dx; best = h;}
+                }
+                return best;
+            }
 
-    update()
-    {
-        if (!player || player.dead) { this.velocity = this.velocity.scale(.95); }
-        else if (this.jerkCool.elapsed())
-        {
-            this.jerkCool.set(rand(.25, .6));
-            const dx = wrapDX(player.pos.x, this.pos.x);
-            const dy = player.pos.y - this.pos.y;
-            this.velocity = vec2(dx, dy).normalize(.1).add(vec2(rand(-.05, .05), rand(-.05, .05)));
+            update() {
+                if (this.state === 'descend') {
+                    if (!this.target || this.target.dead || this.target.heldBy || this.target.falling)
+                        this.target = this.findHuman();
+                    if (this.target) {
+                        const dx = wrapDX(this.target.pos.x, this.pos.x);
+                        this.velocity.x = clamp(dx * .05, -.06, .06);
+                        const groundClear = terrainAt(this.pos.x) + 1.3;
+                        this.velocity.y = this.pos.y > groundClear ? -.04 : -.005;
+                        if (Math.abs(dx) < .5 && this.pos.y < groundClear + .5) {
+                            this.carrying = this.target;
+                            this.target.heldBy = this;
+                            this.target.walking = false;
+                            this.target.standing = false;
+                            this.state = 'ascend';
+                            sfxLanderGrab.play();
+                        }
+                    }
+                    else {
+                        this.velocity.x = .03;
+                        this.velocity.y = lerp(this.velocity.y, 0, .1);
+                    }
+                }
+                else if (this.state === 'ascend') {
+                    this.velocity.x = lerp(this.velocity.x, 0, .1);
+                    this.velocity.y = .045;
+                    if (this.carrying) this.carrying.pos = vec2(this.pos.x, this.pos.y - 1.1);
+                    if (this.pos.y > SKY_TOP - 1) {
+                        if (this.carrying) {
+                            this.carrying.dead = true;
+                            this.carrying.heldBy = null;
+                            humansAlive--;
+                            checkPlanetDestroyed();
+                        }
+                        enemies.push(new Mutant(this.pos.x, this.pos.y));
+                        sfxMutate.play();
+                        this.dead = true;
+                        return;
+                    }
+                }
+                this.pos.x = wrapX(this.pos.x + this.velocity.x);
+                this.pos.y += this.velocity.y;
+                if (player && !player.dead && !this.shootCool.active()) {
+                    this.shootCool.set(rand(2, 5));
+                    const dx = wrapDX(player.pos.x, this.pos.x);
+                    const dy = player.pos.y - this.pos.y;
+                    spawnBullet(this.pos, vec2(dx, dy).normalize(.45), false, hsl(.3, 1, .7), 3);
+                    sfxEnemyShoot.play(this.pos, .4);
+                }
+            }
+
+            hit() {
+                if (this.dead) return;
+                money += this.moneyDrop;
+                addScore(this.scoreValue);
+                if (this.carrying) {
+                    addScore(500);
+                    this.carrying.heldBy = null;
+                    this.carrying.falling = true;
+                    this.carrying.velocity = vec2(0, this.velocity.y);
+                    this.carrying = null;
+                }
+                spark(this.pos, 14, this.color, .5, .8);
+                sfxExplode.play(this.pos, .5);
+                this.dead = true;
+            }
+
+            render() {
+                const dp = dpos(this.pos);
+                const c = this.color;
+                drawRect(dp.add(vec2(0, .35)), vec2(.7, .35), c);
+                drawRect(dp.add(vec2(0, .5)), vec2(.4, .2), hsl(.13, 1, .7));
+                drawRect(dp, vec2(1.2, .35), c);
+                drawRect(dp.add(vec2(-.45, -.4)), vec2(.18, .55), c);
+                drawRect(dp.add(vec2(.45, -.4)), vec2(.18, .55), c);
+                if (this.carrying) drawHumanFigure(this.carrying.pos);
+            }
         }
-        this.pos.x = wrapX(this.pos.x + this.velocity.x);
-        this.pos.y += this.velocity.y;
-        const g = terrainAt(this.pos.x) + .8;
-        if (this.pos.y < g) { this.pos.y = g; this.velocity.y = Math.abs(this.velocity.y); }
-        if (this.pos.y > SKY_TOP) { this.pos.y = SKY_TOP; this.velocity.y = -Math.abs(this.velocity.y); }
-        if (player && !player.dead && !this.shootCool.active())
-        {
-            this.shootCool.set(rand(.8, 2));
-            const dx = wrapDX(player.pos.x, this.pos.x);
-            const dy = player.pos.y - this.pos.y;
-            spawnBullet(this.pos, vec2(dx, dy).normalize(.55), false, hsl(.95, 1, .7), 3);
-            sfxEnemyShoot.play(this.pos, .35, 1.4);
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Mutant
+        class Mutant {
+            constructor(x, y) {
+                this.pos = vec2(x, y);
+                this.size = vec2(1.2, 1.2);
+                this.velocity = vec2();
+                this.color = hsl(.95, 1, .55);
+                this.radarColor = hsl(.95, 1, .55);
+                this.scoreValue = 150;
+                this.moneyDrop = 75;
+                this.type = 'mutant';
+                this.shootCool = new Timer(rand(.5, 1.5));
+                this.jerkCool = new Timer();
+                this.dead = false;
+            }
+
+            update() {
+                if (!player || player.dead) {this.velocity = this.velocity.scale(.95);}
+                else if (this.jerkCool.elapsed()) {
+                    this.jerkCool.set(rand(.25, .6));
+                    const dx = wrapDX(player.pos.x, this.pos.x);
+                    const dy = player.pos.y - this.pos.y;
+                    this.velocity = vec2(dx, dy).normalize(.1).add(vec2(rand(-.05, .05), rand(-.05, .05)));
+                }
+                this.pos.x = wrapX(this.pos.x + this.velocity.x);
+                this.pos.y += this.velocity.y;
+                const g = terrainAt(this.pos.x) + .8;
+                if (this.pos.y < g) {this.pos.y = g; this.velocity.y = Math.abs(this.velocity.y);}
+                if (this.pos.y > SKY_TOP) {this.pos.y = SKY_TOP; this.velocity.y = -Math.abs(this.velocity.y);}
+                if (player && !player.dead && !this.shootCool.active()) {
+                    this.shootCool.set(rand(.8, 2));
+                    const dx = wrapDX(player.pos.x, this.pos.x);
+                    const dy = player.pos.y - this.pos.y;
+                    spawnBullet(this.pos, vec2(dx, dy).normalize(.55), false, hsl(.95, 1, .7), 3);
+                    sfxEnemyShoot.play(this.pos, .35, 1.4);
+                }
+            }
+
+            hit() {
+                if (this.dead) return;
+                money += this.moneyDrop;
+                addScore(this.scoreValue);
+                spark(this.pos, 14, this.color, .5, .8);
+                sfxExplode.play(this.pos, .5);
+                this.dead = true;
+            }
+
+            render() {
+                const dp = dpos(this.pos);
+                const c = this.color;
+                drawRect(dp, vec2(.7, .7), c);
+                drawRect(dp.add(vec2(-.55, .25)), vec2(.35, .2), c);
+                drawRect(dp.add(vec2(.55, .25)), vec2(.35, .2), c);
+                drawRect(dp.add(vec2(-.55, -.25)), vec2(.35, .2), c);
+                drawRect(dp.add(vec2(.55, -.25)), vec2(.35, .2), c);
+                drawRect(dp, vec2(.3, .3), hsl(.13, 1, .8));
+            }
         }
-    }
 
-    hit()
-    {
-        if (this.dead) return;
-        money += this.moneyDrop;
-        addScore(this.scoreValue);
-        spark(this.pos, 14, this.color, .5, .8);
-        sfxExplode.play(this.pos, .5);
-        this.dead = true;
-    }
+        ///////////////////////////////////////////////////////////////////////////////
+        // Bomber
+        class Bomber {
+            constructor(x, y) {
+                this.pos = vec2(x, y);
+                this.size = vec2(2, .8);
+                this.velocity = vec2(randSign() * .06, 0);
+                this.color = hsl(.6, .8, .55);
+                this.radarColor = hsl(.6, .8, .55);
+                this.scoreValue = 250;
+                this.moneyDrop = 100;
+                this.type = 'bomber';
+                this.mineTimer = new Timer(rand(1, 2));
+                this.dead = false;
+            }
 
-    render()
-    {
-        const dp = dpos(this.pos);
-        const c = this.color;
-        drawRect(dp, vec2(.7, .7), c);
-        drawRect(dp.add(vec2(-.55,  .25)), vec2(.35, .2), c);
-        drawRect(dp.add(vec2( .55,  .25)), vec2(.35, .2), c);
-        drawRect(dp.add(vec2(-.55, -.25)), vec2(.35, .2), c);
-        drawRect(dp.add(vec2( .55, -.25)), vec2(.35, .2), c);
-        drawRect(dp, vec2(.3, .3), hsl(.13, 1, .8));
-    }
-}
+            update() {
+                this.velocity.y = Math.sin(time * 1.3 + this.pos.x) * .03;
+                this.pos.x = wrapX(this.pos.x + this.velocity.x);
+                this.pos.y += this.velocity.y;
+                this.pos.y = clamp(this.pos.y, terrainAt(this.pos.x) + 3, SKY_TOP - 1);
+                if (!this.mineTimer.active()) {
+                    this.mineTimer.set(rand(1, 2.5));
+                    enemies.push(new Mine(this.pos.x, this.pos.y));
+                }
+            }
 
-///////////////////////////////////////////////////////////////////////////////
-// Bomber
-class Bomber
-{
-    constructor(x, y)
-    {
-        this.pos        = vec2(x, y);
-        this.size       = vec2(2, .8);
-        this.velocity   = vec2(randSign() * .06, 0);
-        this.color      = hsl(.6, .8, .55);
-        this.radarColor = hsl(.6, .8, .55);
-        this.scoreValue = 250;
-        this.moneyDrop  = 100;
-        this.type       = 'bomber';
-        this.mineTimer  = new Timer(rand(1, 2));
-        this.dead       = false;
-    }
+            hit() {
+                if (this.dead) return;
+                money += this.moneyDrop;
+                addScore(this.scoreValue);
+                spark(this.pos, 16, this.color, .6, .9);
+                sfxExplode.play(this.pos, .5);
+                this.dead = true;
+            }
 
-    update()
-    {
-        this.velocity.y = Math.sin(time * 1.3 + this.pos.x) * .03;
-        this.pos.x = wrapX(this.pos.x + this.velocity.x);
-        this.pos.y += this.velocity.y;
-        this.pos.y = clamp(this.pos.y, terrainAt(this.pos.x) + 3, SKY_TOP - 1);
-        if (!this.mineTimer.active())
-        {
-            this.mineTimer.set(rand(1, 2.5));
-            enemies.push(new Mine(this.pos.x, this.pos.y));
+            render() {
+                const dp = dpos(this.pos);
+                const c = this.color;
+                drawRect(dp, vec2(2, .35), c);
+                drawRect(dp.add(vec2(-.7, .2)), vec2(.3, .25), c);
+                drawRect(dp.add(vec2(.7, .2)), vec2(.3, .25), c);
+                drawRect(dp.add(vec2(0, -.3)), vec2(.4, .25), c);
+                drawRect(dp.add(vec2(0, 0)), vec2(.3, .15), hsl(.13, 1, .8));
+            }
         }
-    }
 
-    hit()
-    {
-        if (this.dead) return;
-        money += this.moneyDrop;
-        addScore(this.scoreValue);
-        spark(this.pos, 16, this.color, .6, .9);
-        sfxExplode.play(this.pos, .5);
-        this.dead = true;
-    }
+        ///////////////////////////////////////////////////////////////////////////////
+        // Mine
+        class Mine {
+            constructor(x, y) {
+                this.pos = vec2(x, y);
+                this.size = vec2(.6, .6);
+                this.velocity = vec2();
+                this.color = hsl(.6, .8, .6);
+                this.radarColor = hsl(.6, .8, .6);
+                this.scoreValue = 0;
+                this.moneyDrop = 0;
+                this.type = 'mine';
+                this.life = new Timer(15);
+                this.dead = false;
+            }
 
-    render()
-    {
-        const dp = dpos(this.pos);
-        const c = this.color;
-        drawRect(dp, vec2(2, .35), c);
-        drawRect(dp.add(vec2(-.7, .2)), vec2(.3, .25), c);
-        drawRect(dp.add(vec2( .7, .2)), vec2(.3, .25), c);
-        drawRect(dp.add(vec2(0, -.3)), vec2(.4, .25), c);
-        drawRect(dp.add(vec2(0, 0)), vec2(.3, .15), hsl(.13, 1, .8));
-    }
-}
+            update() {if (this.life.elapsed()) this.dead = true;}
 
-///////////////////////////////////////////////////////////////////////////////
-// Mine
-class Mine
-{
-    constructor(x, y)
-    {
-        this.pos        = vec2(x, y);
-        this.size       = vec2(.6, .6);
-        this.velocity   = vec2();
-        this.color      = hsl(.6, .8, .6);
-        this.radarColor = hsl(.6, .8, .6);
-        this.scoreValue = 0;
-        this.moneyDrop  = 0;
-        this.type       = 'mine';
-        this.life       = new Timer(15);
-        this.dead       = false;
-    }
+            hit() {
+                if (this.dead) return;
+                spark(this.pos, 8, this.color, .4, .6);
+                sfxExplode.play(this.pos, .3);
+                this.dead = true;
+            }
 
-    update() { if (this.life.elapsed()) this.dead = true; }
-
-    hit()
-    {
-        if (this.dead) return;
-        spark(this.pos, 8, this.color, .4, .6);
-        sfxExplode.play(this.pos, .3);
-        this.dead = true;
-    }
-
-    render()
-    {
-        const dp = dpos(this.pos);
-        const pulse = .5 + .5 * Math.sin(time * 8);
-        drawCircle(dp, .5, this.color);
-        drawCircle(dp, .25, hsl(.05, 1, pulse));
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Pod
-class Pod
-{
-    constructor(x, y)
-    {
-        this.pos        = vec2(x, y);
-        this.size       = vec2(1.4, 1.4);
-        this.velocity   = vec2(rand(-.02, .02), rand(-.02, .02));
-        this.color      = hsl(.78, .7, .55);
-        this.radarColor = hsl(.78, .7, .55);
-        this.scoreValue = 1000;
-        this.moneyDrop  = 250;
-        this.type       = 'pod';
-        this.dead       = false;
-    }
-
-    update()
-    {
-        this.pos.x = wrapX(this.pos.x + this.velocity.x);
-        this.pos.y += this.velocity.y;
-        if (this.pos.y < terrainAt(this.pos.x) + 2) this.velocity.y =  Math.abs(this.velocity.y);
-        if (this.pos.y > SKY_TOP - 1)               this.velocity.y = -Math.abs(this.velocity.y);
-    }
-
-    hit()
-    {
-        if (this.dead) return;
-        money += this.moneyDrop;
-        addScore(this.scoreValue);
-        spark(this.pos, 24, this.color, .7, 1.0);
-        sfxExplode.play(this.pos, .6);
-        for (let i = 0; i < 4; i++)
-            enemies.push(new Swarmer(this.pos.x + rand(-.5, .5), this.pos.y + rand(-.5, .5)));
-        this.dead = true;
-    }
-
-    render()
-    {
-        const dp = dpos(this.pos);
-        const pulse = .8 + .2 * Math.sin(time * 4);
-        drawCircle(dp, 1.4 * pulse, this.color);
-        drawCircle(dp, .8, hsl(.85, 1, .7));
-        drawCircle(dp, .3, hsl(.13, 1, .9));
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Swarmer
-class Swarmer
-{
-    constructor(x, y)
-    {
-        this.pos        = vec2(x, y);
-        this.size       = vec2(.7, .7);
-        this.velocity   = vec2(rand(-.3, .3), rand(-.3, .3));
-        this.color      = hsl(.85, 1, .7);
-        this.radarColor = hsl(.85, 1, .7);
-        this.scoreValue = 150;
-        this.moneyDrop  = 25;
-        this.type       = 'swarmer';
-        this.jerkCool   = new Timer();
-        this.dead       = false;
-    }
-
-    update()
-    {
-        if (this.jerkCool.elapsed() && player && !player.dead)
-        {
-            this.jerkCool.set(rand(.15, .35));
-            const dx = wrapDX(player.pos.x, this.pos.x);
-            const dy = player.pos.y - this.pos.y;
-            this.velocity = vec2(dx, dy).normalize(.13).add(vec2(rand(-.05, .05), rand(-.05, .05)));
+            render() {
+                const dp = dpos(this.pos);
+                const pulse = .5 + .5 * Math.sin(time * 8);
+                drawCircle(dp, .5, this.color);
+                drawCircle(dp, .25, hsl(.05, 1, pulse));
+            }
         }
-        this.pos.x = wrapX(this.pos.x + this.velocity.x);
-        this.pos.y += this.velocity.y;
-        const g = terrainAt(this.pos.x) + .6;
-        if (this.pos.y < g) { this.pos.y = g; this.velocity.y =  Math.abs(this.velocity.y); }
-        if (this.pos.y > SKY_TOP) { this.pos.y = SKY_TOP; this.velocity.y = -Math.abs(this.velocity.y); }
-    }
 
-    hit()
-    {
-        if (this.dead) return;
-        money += this.moneyDrop;
-        addScore(this.scoreValue);
-        spark(this.pos, 8, this.color, .5, .6);
-        sfxExplode.play(this.pos, .3, 1.5);
-        this.dead = true;
-    }
+        ///////////////////////////////////////////////////////////////////////////////
+        // Pod
+        class Pod {
+            constructor(x, y) {
+                this.pos = vec2(x, y);
+                this.size = vec2(1.4, 1.4);
+                this.velocity = vec2(rand(-.02, .02), rand(-.02, .02));
+                this.color = hsl(.78, .7, .55);
+                this.radarColor = hsl(.78, .7, .55);
+                this.scoreValue = 1000;
+                this.moneyDrop = 250;
+                this.type = 'pod';
+                this.dead = false;
+            }
 
-    render()
-    {
-        const dp = dpos(this.pos);
-        drawCircle(dp, .55, this.color);
-        drawCircle(dp, .25, hsl(.0, 1, .9));
-    }
-}
+            update() {
+                this.pos.x = wrapX(this.pos.x + this.velocity.x);
+                this.pos.y += this.velocity.y;
+                if (this.pos.y < terrainAt(this.pos.x) + 2) this.velocity.y = Math.abs(this.velocity.y);
+                if (this.pos.y > SKY_TOP - 1) this.velocity.y = -Math.abs(this.velocity.y);
+            }
 
-///////////////////////////////////////////////////////////////////////////////
-// Baiter
-class Baiter
-{
-    constructor(x, y)
-    {
-        this.pos        = vec2(x, y);
-        this.size       = vec2(1.4, .6);
-        this.velocity   = vec2(randSign() * .25, 0);
-        this.color      = hsl(0, 0, .95);
-        this.radarColor = hsl(0, 0, .95);
-        this.scoreValue = 200;
-        this.moneyDrop  = 60;
-        this.type       = 'baiter';
-        this.shootCool  = new Timer(rand(.5, 1.5));
-        this.dead       = false;
-    }
+            hit() {
+                if (this.dead) return;
+                money += this.moneyDrop;
+                addScore(this.scoreValue);
+                spark(this.pos, 24, this.color, .7, 1.0);
+                sfxExplode.play(this.pos, .6);
+                for (let i = 0; i < 4; i++)
+                    enemies.push(new Swarmer(this.pos.x + rand(-.5, .5), this.pos.y + rand(-.5, .5)));
+                this.dead = true;
+            }
 
-    update()
-    {
-        if (player && !player.dead)
-        {
-            const dy = player.pos.y - this.pos.y;
-            this.velocity.y = clamp(dy * .04, -.15, .15);
+            render() {
+                const dp = dpos(this.pos);
+                const pulse = .8 + .2 * Math.sin(time * 4);
+                drawCircle(dp, 1.4 * pulse, this.color);
+                drawCircle(dp, .8, hsl(.85, 1, .7));
+                drawCircle(dp, .3, hsl(.13, 1, .9));
+            }
         }
-        this.pos.x = wrapX(this.pos.x + this.velocity.x);
-        this.pos.y += this.velocity.y;
-        this.pos.y = clamp(this.pos.y, terrainAt(this.pos.x) + 1.5, SKY_TOP - .5);
-        if (player && !player.dead && !this.shootCool.active())
-        {
-            this.shootCool.set(rand(.6, 1.4));
-            const dx = wrapDX(player.pos.x, this.pos.x);
-            const dy = player.pos.y - this.pos.y;
-            spawnBullet(this.pos, vec2(dx, dy).normalize(.7), false, hsl(0, 0, 1), 3);
-            sfxEnemyShoot.play(this.pos, .4, 1.2);
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Swarmer
+        class Swarmer {
+            constructor(x, y) {
+                this.pos = vec2(x, y);
+                this.size = vec2(.7, .7);
+                this.velocity = vec2(rand(-.3, .3), rand(-.3, .3));
+                this.color = hsl(.85, 1, .7);
+                this.radarColor = hsl(.85, 1, .7);
+                this.scoreValue = 150;
+                this.moneyDrop = 25;
+                this.type = 'swarmer';
+                this.jerkCool = new Timer();
+                this.dead = false;
+            }
+
+            update() {
+                if (this.jerkCool.elapsed() && player && !player.dead) {
+                    this.jerkCool.set(rand(.15, .35));
+                    const dx = wrapDX(player.pos.x, this.pos.x);
+                    const dy = player.pos.y - this.pos.y;
+                    this.velocity = vec2(dx, dy).normalize(.13).add(vec2(rand(-.05, .05), rand(-.05, .05)));
+                }
+                this.pos.x = wrapX(this.pos.x + this.velocity.x);
+                this.pos.y += this.velocity.y;
+                const g = terrainAt(this.pos.x) + .6;
+                if (this.pos.y < g) {this.pos.y = g; this.velocity.y = Math.abs(this.velocity.y);}
+                if (this.pos.y > SKY_TOP) {this.pos.y = SKY_TOP; this.velocity.y = -Math.abs(this.velocity.y);}
+            }
+
+            hit() {
+                if (this.dead) return;
+                money += this.moneyDrop;
+                addScore(this.scoreValue);
+                spark(this.pos, 8, this.color, .5, .6);
+                sfxExplode.play(this.pos, .3, 1.5);
+                this.dead = true;
+            }
+
+            render() {
+                const dp = dpos(this.pos);
+                drawCircle(dp, .55, this.color);
+                drawCircle(dp, .25, hsl(.0, 1, .9));
+            }
         }
-    }
 
-    hit()
-    {
-        if (this.dead) return;
-        money += this.moneyDrop;
-        addScore(this.scoreValue);
-        spark(this.pos, 14, this.color, .6, .8);
-        sfxExplode.play(this.pos, .5);
-        this.dead = true;
-    }
+        ///////////////////////////////////////////////////////////////////////////////
+        // Baiter
+        class Baiter {
+            constructor(x, y) {
+                this.pos = vec2(x, y);
+                this.size = vec2(1.4, .6);
+                this.velocity = vec2(randSign() * .25, 0);
+                this.color = hsl(0, 0, .95);
+                this.radarColor = hsl(0, 0, .95);
+                this.scoreValue = 200;
+                this.moneyDrop = 60;
+                this.type = 'baiter';
+                this.shootCool = new Timer(rand(.5, 1.5));
+                this.dead = false;
+            }
 
-    render()
-    {
-        const dp = dpos(this.pos);
-        drawEllipse(dp, vec2(1.6, .35), this.color);
-        drawEllipse(dp.add(vec2(0, .15)), vec2(.6, .25), hsl(.55, 1, .7));
-    }
-}
+            update() {
+                if (player && !player.dead) {
+                    const dy = player.pos.y - this.pos.y;
+                    this.velocity.y = clamp(dy * .04, -.15, .15);
+                }
+                this.pos.x = wrapX(this.pos.x + this.velocity.x);
+                this.pos.y += this.velocity.y;
+                this.pos.y = clamp(this.pos.y, terrainAt(this.pos.x) + 1.5, SKY_TOP - .5);
+                if (player && !player.dead && !this.shootCool.active()) {
+                    this.shootCool.set(rand(.6, 1.4));
+                    const dx = wrapDX(player.pos.x, this.pos.x);
+                    const dy = player.pos.y - this.pos.y;
+                    spawnBullet(this.pos, vec2(dx, dy).normalize(.7), false, hsl(0, 0, 1), 3);
+                    sfxEnemyShoot.play(this.pos, .4, 1.2);
+                }
+            }
 
-///////////////////////////////////////////////////////////////////////////////
-// Score
-function addScore(n)
-{
-    score += n;
-    while (score >= nextExtra && nextExtra < 1_000_000)
-    {
-        lives++;
-        smartBombs++;
-        nextExtra += EXTRA_LIFE_EVERY;
-        sfxExtraLife.play();
-    }
-}
+            hit() {
+                if (this.dead) return;
+                money += this.moneyDrop;
+                addScore(this.scoreValue);
+                spark(this.pos, 14, this.color, .6, .8);
+                sfxExplode.play(this.pos, .5);
+                this.dead = true;
+            }
 
-///////////////////////////////////////////////////////////////////////////////
-// Smart bomb (AI uses automatically)
-function doSmartBomb()
-{
-    if (smartBombs <= 0 || !player || player.dead) return;
-    smartBombs--;
-    bombFlash = 1;
-    sfxBomb.play();
-    shakeTimer.set(.5);
-    const halfView = getCameraSize().x / 2 + 2;
-    for (const e of enemies)
-    {
-        if (e.dead) continue;
-        if (e.type === 'mine') { e.hit(); continue; }
-        if (Math.abs(wrapDX(e.pos.x, cameraPos.x)) <= halfView) e.hit();
-    }
-    for (const b of bullets)
-        if (!b.friendly && Math.abs(wrapDX(b.pos.x, cameraPos.x)) <= halfView)
-            b.life.set(0);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Hyperspace — gated on teleportCharges
-function doHyperspace()
-{
-    if (!player || player.dead || player.hyperCool.active()) return;
-    if (teleportCharges <= 0) return;
-    teleportCharges--;
-    player.hyperCool.set(.4);
-    sfxHyper.play();
-    if (rand() < .15) { player.die(); return; }
-    player.pos = vec2(rand(0, WORLD_W), rand(0, SKY_TOP - 2));
-    player.velocity = vec2();
-    player.invincible.set(1.5);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Shop
-function refreshShopMenu()
-{
-    const m = getMenu('shop');
-    if (!m) return;
-    for (const upg of UPGRADES)
-    {
-        const item = m.getItem('buy_' + upg.id);
-        if (!item) continue;
-        item.setLabel(`${upg.label}  [$${upg.cost}]`);
-        item.setDisabled(money < upg.cost);
-    }
-}
-
-function buyUpgrade(upg)
-{
-    if (money < upg.cost) return;
-    money -= upg.cost;
-    upg.apply();
-    refreshShopMenu();
-    sfxPickup.play();
-}
-
-function openShop()
-{
-    if (isMenuVisible()) return;
-    refreshShopMenu();
-    showMenu('shop');
-}
-
-function closeShop()
-{
-    aiMode = 'combat';
-    shopLanded = false;
-    hideMenu('shop');
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Wave management
-function landersInWave()    { return clamp(4 + wave, 5, 15); }
-function buildWave()
-{
-    pendingSpawns = [];
-    if (planetDestroyed)
-    {
-        const n = 8 + wave;
-        for (let i = 0; i < n; i++) pendingSpawns.push('mutant');
-        if (wave % 2 === 0) for (let i = 0; i < 2; i++) pendingSpawns.push('pod');
-    }
-    else
-    {
-        const n = landersInWave();
-        for (let i = 0; i < n; i++) pendingSpawns.push('lander');
-        if (wave >= 2) for (let i = 0; i < min(wave - 1, 4); i++) pendingSpawns.push('pod');
-        if (wave >= 3) for (let i = 0; i < min(wave - 2, 3); i++) pendingSpawns.push('bomber');
-    }
-    baiterTimer.set(45 - clamp(wave * 2, 0, 25));
-    spawnTimer.set(0);
-}
-
-function spawnOne(type)
-{
-    let x;
-    do { x = rand(0, WORLD_W); } while (player && Math.abs(wrapDX(x, player.pos.x)) < 12);
-    if      (type === 'lander')  enemies.push(new Lander(x, SKY_TOP - rand(2, 5)));
-    else if (type === 'mutant')  enemies.push(new Mutant(x, rand(SKY_TOP - 6, SKY_TOP - 1)));
-    else if (type === 'pod')     enemies.push(new Pod(x, rand(2, SKY_TOP - 2)));
-    else if (type === 'bomber')  enemies.push(new Bomber(x, rand(2, SKY_TOP - 2)));
-    else if (type === 'baiter')  enemies.push(new Baiter(x, SKY_TOP - 3));
-}
-
-function landersOrMutantsLeft()
-{
-    return enemies.some(e => !e.dead && (e.type === 'lander' || e.type === 'mutant'));
-}
-
-function waveComplete()
-{
-    if (!planetDestroyed) addScore(humansAlive * 100 * wave);
-    wave++;
-    if (planetDestroyed) { mutantWavesLeft--; if (mutantWavesLeft <= 0) restorePlanet(); }
-    buildWave();
-}
-
-function restorePlanet()
-{
-    planetDestroyed = false;
-    humansAlive = HUMAN_COUNT;
-    humans.length = 0;
-    for (let i = 0; i < HUMAN_COUNT; i++) humans.push(new Human(rand(0, WORLD_W)));
-}
-
-function checkPlanetDestroyed()
-{
-    if (humansAlive <= 0 && !planetDestroyed)
-    {
-        planetDestroyed = true;
-        mutantWavesLeft = 3;
-        sfxAlarm.play();
-        for (const e of enemies)
-        {
-            if (e.dead || e.type !== 'lander') continue;
-            enemies.push(new Mutant(e.pos.x, e.pos.y));
-            e.dead = true;
+            render() {
+                const dp = dpos(this.pos);
+                drawEllipse(dp, vec2(1.6, .35), this.color);
+                drawEllipse(dp.add(vec2(0, .15)), vec2(.6, .25), hsl(.55, 1, .7));
+            }
         }
-    }
-}
 
-///////////////////////////////////////////////////////////////////////////////
-// Game lifecycle
-function startGame()
-{
-    score = 0; lives = 3; smartBombs = 3; wave = 1; nextExtra = EXTRA_LIFE_EVERY;
-    humansAlive = HUMAN_COUNT; planetDestroyed = false; mutantWavesLeft = 0;
-    enemies = []; bullets = []; humans = []; particles = []; pendingSpawns = [];
-    bombFlash = 0;
-    shakeTimer = new Timer(); spawnTimer = new Timer(); baiterTimer = new Timer();
-    gameOver = false; isPlaying = true;
+        ///////////////////////////////////////////////////////////////////////////////
+        // Score
+        function addScore(n) {
+            score += n;
+            while (score >= nextExtra && nextExtra < 1_000_000) {
+                lives++;
+                smartBombs++;
+                nextExtra += EXTRA_LIFE_EVERY;
+                sfxExtraLife.play();
+            }
+        }
 
-    // Auto-Defender state
-    money = 0;
-    aiMode = 'combat';
-    shopLanded = false;
-    teleportCharges = 0;
-    shieldCharges   = 0;
-    AI_SPEED        = 0.75;
-    AI_REACT        = 0.05;
-    AI_BULLET_CAP   = 4;
-
-    genTerrain();
-    SHOP_X = WORLD_W * SHOP_X_FRAC;
-    SHOP_GROUND_Y = terrainAt(SHOP_X) + 0.9;
-
-    for (let i = 0; i < HUMAN_COUNT; i++) humans.push(new Human(rand(0, WORLD_W)));
-    player = new Player();
-    cameraPos = vec2(player.pos.x, 2);
-    setHudVisible(true);
-    buildWave();
-}
-
-function doGameOver()
-{
-    if (gameOver) return;
-    gameOver = true; isPlaying = false;
-    setHudVisible(false);
-    showAlertDialog({
-        title: 'GAME OVER',
-        icon: '💥',
-        message: `Final score: ${score}\nWave reached: ${wave}\nMoney earned: $${money}`,
-        onOk: () => { clearSubmenuStack(); hideAllMenus(); startAttractMode(); showMenu('title'); },
-    });
-}
-
-function startAttractMode()
-{
-    score = 0; lives = 3; smartBombs = 3; wave = 1; nextExtra = EXTRA_LIFE_EVERY;
-    humansAlive = HUMAN_COUNT; planetDestroyed = false; mutantWavesLeft = 0;
-    enemies = []; bullets = []; humans = []; particles = []; pendingSpawns = [];
-    bombFlash = 0;
-    shakeTimer = new Timer(); spawnTimer = new Timer(); baiterTimer = new Timer();
-    isPlaying = false; gameOver = false; player = null;
-    money = 0; aiMode = 'combat'; shopLanded = false;
-    teleportCharges = 0; shieldCharges = 0;
-    AI_SPEED = 0.75; AI_REACT = 0.05; AI_BULLET_CAP = 4;
-
-    genTerrain();
-    SHOP_X = WORLD_W * SHOP_X_FRAC;
-    SHOP_GROUND_Y = terrainAt(SHOP_X) + 0.9;
-
-    for (let i = 0; i < HUMAN_COUNT; i++) humans.push(new Human(rand(0, WORLD_W)));
-    for (let i = 0; i < 4; i++) enemies.push(new Lander(rand(0, WORLD_W), SKY_TOP - rand(2, 6)));
-    for (let i = 0; i < 2; i++) enemies.push(new Mutant(rand(0, WORLD_W), rand(4, SKY_TOP - 2)));
-    cameraPos = vec2(rand(0, WORLD_W), 2);
-    setHudVisible(false);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Collisions
-function bulletHits()
-{
-    for (const b of bullets)
-    {
-        if (!b.life.active()) continue;
-        if (b.friendly)
-        {
-            for (const e of enemies)
-            {
+        ///////////////////////////////////////////////////////////////////////////////
+        // Smart bomb (AI uses automatically)
+        function doSmartBomb() {
+            if (smartBombs <= 0 || !player || player.dead) return;
+            smartBombs--;
+            bombFlash = 1;
+            sfxBomb.play();
+            shakeTimer.set(.5);
+            const halfView = getCameraSize().x / 2 + 2;
+            for (const e of enemies) {
                 if (e.dead) continue;
-                const dx = Math.abs(wrapDX(b.pos.x, e.pos.x));
-                const dy = Math.abs(b.pos.y - e.pos.y);
-                if (dx < (e.size.x + .35) / 2 && dy < (e.size.y + .15) / 2)
-                {
-                    e.hit(); b.life.set(0); break;
+                if (e.type === 'mine') {e.hit(); continue;}
+                if (Math.abs(wrapDX(e.pos.x, cameraPos.x)) <= halfView) e.hit();
+            }
+            for (const b of bullets)
+                if (!b.friendly && Math.abs(wrapDX(b.pos.x, cameraPos.x)) <= halfView)
+                    b.life.set(0);
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Hyperspace — gated on teleportCharges
+        function doHyperspace() {
+            if (!player || player.dead || player.hyperCool.active()) return;
+            if (teleportCharges <= 0) return;
+            teleportCharges--;
+            player.hyperCool.set(.4);
+            sfxHyper.play();
+            if (rand() < .15) {player.die(); return;}
+            player.pos = vec2(rand(0, WORLD_W), rand(0, SKY_TOP - 2));
+            player.velocity = vec2();
+            player.invincible.set(1.5);
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Shop
+        function refreshShopMenu() {
+            const m = getMenu('shop');
+            if (!m) return;
+            for (const upg of UPGRADES) {
+                const item = m.getItem('buy_' + upg.id);
+                if (!item) continue;
+                item.setLabel(`${upg.label}  [$${upg.cost}]`);
+                item.setDisabled(money < upg.cost);
+            }
+        }
+
+        function buyUpgrade(upg) {
+            if (money < upg.cost) return;
+            money -= upg.cost;
+            upg.apply();
+            refreshShopMenu();
+            sfxPickup.play();
+        }
+
+        function openShop() {
+            if (isMenuVisible()) return;
+            refreshShopMenu();
+            showMenu('shop');
+        }
+
+        function closeShop() {
+            aiMode = 'combat';
+            shopLanded = false;
+            hideMenu('shop');
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Wave management
+        function landersInWave() {return clamp(4 + wave, 5, 15);}
+        function buildWave() {
+            pendingSpawns = [];
+            if (planetDestroyed) {
+                const n = 8 + wave;
+                for (let i = 0; i < n; i++) pendingSpawns.push('mutant');
+                if (wave % 2 === 0) for (let i = 0; i < 2; i++) pendingSpawns.push('pod');
+            }
+            else {
+                const n = landersInWave();
+                for (let i = 0; i < n; i++) pendingSpawns.push('lander');
+                if (wave >= 2) for (let i = 0; i < min(wave - 1, 4); i++) pendingSpawns.push('pod');
+                if (wave >= 3) for (let i = 0; i < min(wave - 2, 3); i++) pendingSpawns.push('bomber');
+            }
+            baiterTimer.set(45 - clamp(wave * 2, 0, 25));
+            spawnTimer.set(0);
+        }
+
+        function spawnOne(type) {
+            let x;
+            do {x = rand(0, WORLD_W);} while (player && Math.abs(wrapDX(x, player.pos.x)) < 12);
+            if (type === 'lander') enemies.push(new Lander(x, SKY_TOP - rand(2, 5)));
+            else if (type === 'mutant') enemies.push(new Mutant(x, rand(SKY_TOP - 6, SKY_TOP - 1)));
+            else if (type === 'pod') enemies.push(new Pod(x, rand(2, SKY_TOP - 2)));
+            else if (type === 'bomber') enemies.push(new Bomber(x, rand(2, SKY_TOP - 2)));
+            else if (type === 'baiter') enemies.push(new Baiter(x, SKY_TOP - 3));
+        }
+
+        function landersOrMutantsLeft() {
+            return enemies.some(e => !e.dead && (e.type === 'lander' || e.type === 'mutant'));
+        }
+
+        function waveComplete() {
+            if (!planetDestroyed) addScore(humansAlive * 100 * wave);
+            wave++;
+            if (planetDestroyed) {mutantWavesLeft--; if (mutantWavesLeft <= 0) restorePlanet();}
+            buildWave();
+        }
+
+        function restorePlanet() {
+            planetDestroyed = false;
+            humansAlive = HUMAN_COUNT;
+            humans.length = 0;
+            for (let i = 0; i < HUMAN_COUNT; i++) humans.push(new Human(rand(0, WORLD_W)));
+        }
+
+        function checkPlanetDestroyed() {
+            if (humansAlive <= 0 && !planetDestroyed) {
+                planetDestroyed = true;
+                mutantWavesLeft = 3;
+                sfxAlarm.play();
+                for (const e of enemies) {
+                    if (e.dead || e.type !== 'lander') continue;
+                    enemies.push(new Mutant(e.pos.x, e.pos.y));
+                    e.dead = true;
                 }
             }
         }
-        else if (player && !player.dead && !player.invincible.active())
-        {
-            const dx = Math.abs(wrapDX(b.pos.x, player.pos.x));
-            const dy = Math.abs(b.pos.y - player.pos.y);
-            if (dx < (player.size.x + .35) / 2 && dy < (player.size.y + .15) / 2)
-            {
-                b.life.set(0); player.die();
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Game lifecycle
+        function startGame() {
+            score = 0; lives = 3; smartBombs = 3; wave = 1; nextExtra = EXTRA_LIFE_EVERY;
+            humansAlive = HUMAN_COUNT; planetDestroyed = false; mutantWavesLeft = 0;
+            enemies = []; bullets = []; humans = []; particles = []; pendingSpawns = [];
+            bombFlash = 0;
+            shakeTimer = new Timer(); spawnTimer = new Timer(); baiterTimer = new Timer();
+            gameOver = false; isPlaying = true;
+
+            // Auto-Defender state
+            money = 0;
+            aiMode = 'combat';
+            shopLanded = false;
+            teleportCharges = 0;
+            shieldCharges = 0;
+            AI_SPEED = 0.45;
+            AI_REACT = 0.05;
+            AI_BULLET_CAP = 4;
+
+            genTerrain();
+            SHOP_X = WORLD_W * SHOP_X_FRAC;
+            SHOP_GROUND_Y = terrainAt(SHOP_X) + 0.9;
+
+            for (let i = 0; i < HUMAN_COUNT; i++) humans.push(new Human(rand(0, WORLD_W)));
+            player = new Player();
+            cameraPos = vec2(player.pos.x, 2);
+            setHudVisible(true);
+            buildWave();
+        }
+
+        function doGameOver() {
+            if (gameOver) return;
+            gameOver = true; isPlaying = false;
+            setHudVisible(false);
+            showAlertDialog({
+                title: 'GAME OVER',
+                icon: '💥',
+                message: `Final score: ${score}\nWave reached: ${wave}\nMoney earned: $${money}`,
+                onOk: () => {clearSubmenuStack(); hideAllMenus(); startAttractMode(); showMenu('title');},
+            });
+        }
+
+        function startAttractMode() {
+            score = 0; lives = 3; smartBombs = 3; wave = 1; nextExtra = EXTRA_LIFE_EVERY;
+            humansAlive = HUMAN_COUNT; planetDestroyed = false; mutantWavesLeft = 0;
+            enemies = []; bullets = []; humans = []; particles = []; pendingSpawns = [];
+            bombFlash = 0;
+            shakeTimer = new Timer(); spawnTimer = new Timer(); baiterTimer = new Timer();
+            isPlaying = false; gameOver = false; player = null;
+            money = 0; aiMode = 'combat'; shopLanded = false;
+            teleportCharges = 0; shieldCharges = 0;
+            AI_SPEED = 0.45; AI_REACT = 0.05; AI_BULLET_CAP = 4;
+
+            genTerrain();
+            SHOP_X = WORLD_W * SHOP_X_FRAC;
+            SHOP_GROUND_Y = terrainAt(SHOP_X) + 0.9;
+
+            for (let i = 0; i < HUMAN_COUNT; i++) humans.push(new Human(rand(0, WORLD_W)));
+            for (let i = 0; i < 4; i++) enemies.push(new Lander(rand(0, WORLD_W), SKY_TOP - rand(2, 6)));
+            for (let i = 0; i < 2; i++) enemies.push(new Mutant(rand(0, WORLD_W), rand(4, SKY_TOP - 2)));
+            cameraPos = vec2(rand(0, WORLD_W), 2);
+            setHudVisible(false);
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Collisions
+        function bulletHits() {
+            for (const b of bullets) {
+                if (!b.life.active()) continue;
+                if (b.friendly) {
+                    for (const e of enemies) {
+                        if (e.dead) continue;
+                        const dx = Math.abs(wrapDX(b.pos.x, e.pos.x));
+                        const dy = Math.abs(b.pos.y - e.pos.y);
+                        if (dx < (e.size.x + .35) / 2 && dy < (e.size.y + .15) / 2) {
+                            e.hit(); b.life.set(0); break;
+                        }
+                    }
+                }
+                else if (player && !player.dead && !player.invincible.active()) {
+                    const dx = Math.abs(wrapDX(b.pos.x, player.pos.x));
+                    const dy = Math.abs(b.pos.y - player.pos.y);
+                    if (dx < (player.size.x + .35) / 2 && dy < (player.size.y + .15) / 2) {
+                        b.life.set(0); player.die();
+                    }
+                }
             }
         }
-    }
-}
 
-function enemyHitsPlayer()
-{
-    if (!player || player.dead || player.invincible.active()) return;
-    for (const e of enemies)
-    {
-        if (e.dead) continue;
-        const dx = Math.abs(wrapDX(e.pos.x, player.pos.x));
-        const dy = Math.abs(e.pos.y - player.pos.y);
-        if (dx < (e.size.x + player.size.x) / 2 && dy < (e.size.y + player.size.y) / 2)
-        {
-            if (e.type !== 'mine') e.hit(); else e.dead = true;
-            player.die();
-            return;
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// HUD
-function setHudVisible(v)
-{
-    const hud = getToolbar('hud');
-    if (hud) v ? hud.show() : hud.hide();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-async function gameInit()
-{
-    initSounds();
-    setSoundVolume(.6);
-    setMenuVisibilityCallback(v => paused = v && isPlaying);
-
-    const sound_select   = new Sound([.5,,910,,,.02,2,.07,-5,-33,,,,,,,,.25]);
-    const sound_activate = new Sound([.7,,30,.01,,.02,1,3.4,94,,,,,,,,,.67]);
-    setMenuSounds({
-        select:   () => sound_select.play(),
-        activate: () => sound_activate.play(),
-    });
-
-    createTitleMenu({
-        title: 'AUTO-DEFENDER',
-        subtitle: 'Your ship fights. You spend.',
-        playLabel: 'PLAY',
-        onPlay: startGame,
-        items: [
-            {type:'button', label:'HOW TO PLAY', onClick: () => pushMenu('howto')},
-            {type:'button', label:'OPTIONS',     onClick: () => pushMenu('options')},
-            {type:'button', label:'ABOUT',       onClick: () => pushMenu('about')},
-        ],
-        revealOnClick: false,
-    });
-
-    createMenu({
-        id: 'howto',
-        title: 'HOW TO PLAY',
-        onHide: popMenu,
-        items: [
-            {type:'text', text:
-                'Your ship flies and fights on its own.\n\n' +
-                'Q or SHOP button : order ship to land at the shop\n' +
-                'ESC              : pause\n\n' +
-                'Enemies drop money when killed.\n' +
-                'Saving a falling human gives $' + HUMAN_RESCUE_MONEY + '.\n\n' +
-                'At the shop, buy upgrades to make the AI pilot better.\n' +
-                'Survive as long as possible!'},
-            {type:'separator'},
-            {type:'button', label:'BACK', onClick: () => hideMenu('howto')},
-        ],
-    });
-
-    createMenu({
-        id: 'options',
-        title: 'OPTIONS',
-        onHide: popMenu,
-        items: [
-            {type:'slider', id:'volume', label:'VOLUME', value:.6, min:0, max:1,
-                persist:'autodefender.volume', onChange: v => setSoundVolume(v)},
-            {type:'separator'},
-            {type:'button', label:'FULLSCREEN', onClick: toggleFullscreen},
-            {type:'separator'},
-            {type:'button', label:'BACK', onClick: () => hideMenu('options')},
-        ],
-    });
-
-    createMenu({
-        id: 'about',
-        title: 'ABOUT',
-        onHide: popMenu,
-        items: [
-            {type:'text', text:'Auto-Defender — a LittleJS prototype. ' +
-                'Inspired by Williams\' Defender (1981) and Fantasy Zone (1986). ' +
-                'Your ship is AI-controlled. Your job: buy upgrades at the shop ' +
-                'to help it survive longer.'},
-            {type:'separator'},
-            {type:'button', label:'BACK', onClick: () => hideMenu('about')},
-        ],
-    });
-
-    createMenu({
-        id: 'pause',
-        title: 'PAUSED',
-        initialItemId: 'resume',
-        items: [
-            {type:'button', id:'resume', label:'RESUME',        onClick: () => hideMenu('pause')},
-            {type:'button',              label:'HOW TO PLAY',   onClick: () => pushMenu('howto')},
-            {type:'button',              label:'OPTIONS',        onClick: () => pushMenu('options')},
-            {type:'button', id:'quit',   label:'QUIT TO TITLE', onClick: () =>
-                showConfirmDialog({
-                    message: 'Quit to title?',
-                    onYes: () => { clearSubmenuStack(); hideAllMenus(); startAttractMode(); showMenu('title'); },
-                }),
-            },
-        ],
-    });
-
-    // Shop menu — created here, shown when ship lands
-    const shopItems = [];
-    shopItems.push({
-        type:'label', id:'shopMoney', text:'$0',
-        onUpdate: el => { el.textContent = `MONEY: $${money}`; },
-    });
-    shopItems.push({type:'separator'});
-    for (const upg of UPGRADES)
-        shopItems.push({
-            type:'button',
-            id: 'buy_' + upg.id,
-            label: `${upg.label}  [$${upg.cost}]`,
-            onClick: () => buyUpgrade(upg),
-        });
-    shopItems.push({type:'separator'});
-    shopItems.push({type:'button', label:'BACK TO BATTLE', onClick: closeShop});
-
-    createMenu({
-        id: 'shop',
-        title: '🏪 SHOP',
-        dismissable: false,
-        onHide: reason => { if (reason === 'dismiss') closeShop(); },
-        items: shopItems,
-    });
-
-    createToolbar({
-        id: 'hud',
-        anchor: 'top-right',
-        direction: 'horizontal',
-        items: [
-            {type:'button', id:'fs',   label:'⛶',    title:'Fullscreen', hideOnTouch:true, onClick: toggleFullscreen},
-            {type:'button', id:'shop', label:'🏪 Q',  title:'Go to shop', onClick: () => { if (isPlaying && !isMenuVisible()) aiMode = 'shop'; }},
-            {type:'button', id:'menu', label:'☰',    title:'Menu',        onClick: () => {
-                if (isMenuVisible()) { clearSubmenuStack(); hideAllMenus(); }
-                else showMenu('pause');
-            }},
-        ],
-    });
-
-    genStars();
-    startAttractMode();
-    showMenu('title');
-}
-
-///////////////////////////////////////////////////////////////////////////////
-function gameUpdate()
-{
-    if (isPlaying && bindPauseKey({when: () => isPlaying && !gameOver})) return;
-
-    if (player) player.update();
-
-    for (const e of enemies) if (!e.dead) e.update();
-    for (const h of humans)  if (!h.dead) h.update();
-    for (const b of bullets)
-    {
-        if (!b.life.active()) continue;
-        b.pos.x = wrapX(b.pos.x + b.vel.x);
-        b.pos.y += b.vel.y;
-    }
-    for (const p of particles)
-    {
-        if (!p.life.active()) continue;
-        p.pos.x = wrapX(p.pos.x + p.vel.x);
-        p.pos.y += p.vel.y;
-        p.vel = p.vel.scale(.92);
-    }
-
-    bulletHits();
-    enemyHitsPlayer();
-
-    enemies    = enemies.filter(e => !e.dead);
-    bullets    = bullets.filter(b => b.life.active());
-    particles  = particles.filter(p => p.life.active());
-
-    if (isPlaying)
-    {
-        // Q key → go to shop
-        if (keyWasPressed('KeyQ') && !isMenuVisible()) aiMode = 'shop';
-
-        // Wave / spawn
-        if (pendingSpawns.length && !spawnTimer.active())
-        {
-            spawnOne(pendingSpawns.shift());
-            spawnTimer.set(rand(.4, 1.2));
-        }
-        if (!pendingSpawns.length && !landersOrMutantsLeft() && player && !player.dead)
-            waveComplete();
-
-        if (!baiterTimer.active() && !planetDestroyed)
-        {
-            baiterTimer.set(15);
-            pendingSpawns.push('baiter');
+        function enemyHitsPlayer() {
+            if (!player || player.dead || player.invincible.active()) return;
+            for (const e of enemies) {
+                if (e.dead) continue;
+                const dx = Math.abs(wrapDX(e.pos.x, player.pos.x));
+                const dy = Math.abs(e.pos.y - player.pos.y);
+                if (dx < (e.size.x + player.size.x) / 2 && dy < (e.size.y + player.size.y) / 2) {
+                    if (e.type !== 'mine') e.hit(); else e.dead = true;
+                    player.die();
+                    return;
+                }
+            }
         }
 
-        // AI auto-bomb: use when 6+ enemies visible
-        if (player && !player.dead && smartBombs > 0 && !(frame % 90))
-        {
-            const halfView = getCameraSize().x / 2 + 2;
-            const visible = enemies.filter(e => !e.dead &&
-                Math.abs(wrapDX(e.pos.x, cameraPos.x)) <= halfView).length;
-            if (visible >= 6) doSmartBomb();
+        ///////////////////////////////////////////////////////////////////////////////
+        // HUD
+        function setHudVisible(v) {
+            const hud = getToolbar('hud');
+            if (hud) v ? hud.show() : hud.hide();
         }
 
-        // AI auto-teleport: use when cornered on last life
-        if (player && !player.dead && teleportCharges > 0 && lives === 1 &&
-            !player.invincible.active() && !(frame % 120))
-        {
-            const closeEnemies = enemies.filter(e => !e.dead &&
-                Math.abs(wrapDX(e.pos.x, player.pos.x)) < 6).length;
-            if (closeEnemies >= 3) doHyperspace();
+        ///////////////////////////////////////////////////////////////////////////////
+        async function gameInit() {
+            initSounds();
+            setSoundVolume(.6);
+            setMenuVisibilityCallback(v => paused = v && isPlaying);
+
+            const sound_select = new Sound([.5, , 910, , , .02, 2, .07, -5, -33, , , , , , , , .25]);
+            const sound_activate = new Sound([.7, , 30, .01, , .02, 1, 3.4, 94, , , , , , , , , .67]);
+            setMenuSounds({
+                select: () => sound_select.play(),
+                activate: () => sound_activate.play(),
+            });
+
+            createTitleMenu({
+                title: 'AUTO-DEFENDER',
+                subtitle: 'Your ship fights. You spend.',
+                playLabel: 'PLAY',
+                onPlay: startGame,
+                items: [
+                    {type: 'button', label: 'HOW TO PLAY', onClick: () => pushMenu('howto')},
+                    {type: 'button', label: 'OPTIONS', onClick: () => pushMenu('options')},
+                    {type: 'button', label: 'ABOUT', onClick: () => pushMenu('about')},
+                ],
+                revealOnClick: false,
+            });
+
+            createMenu({
+                id: 'howto',
+                title: 'HOW TO PLAY',
+                onHide: popMenu,
+                items: [
+                    {
+                        type: 'text', text:
+                            'Your ship flies and fights on its own.\n\n' +
+                            'Q or SHOP button : order ship to land at the shop\n' +
+                            'ESC              : pause\n\n' +
+                            'Enemies drop money when killed.\n' +
+                            'Saving a falling human gives $' + HUMAN_RESCUE_MONEY + '.\n\n' +
+                            'At the shop, buy upgrades to make the AI pilot better.\n' +
+                            'Survive as long as possible!'
+                    },
+                    {type: 'separator'},
+                    {type: 'button', label: 'BACK', onClick: () => hideMenu('howto')},
+                ],
+            });
+
+            createMenu({
+                id: 'options',
+                title: 'OPTIONS',
+                onHide: popMenu,
+                items: [
+                    {
+                        type: 'slider', id: 'volume', label: 'VOLUME', value: .6, min: 0, max: 1,
+                        persist: 'autodefender.volume', onChange: v => setSoundVolume(v)
+                    },
+                    {type: 'separator'},
+                    {type: 'button', label: 'FULLSCREEN', onClick: toggleFullscreen},
+                    {type: 'separator'},
+                    {type: 'button', label: 'BACK', onClick: () => hideMenu('options')},
+                ],
+            });
+
+            createMenu({
+                id: 'about',
+                title: 'ABOUT',
+                onHide: popMenu,
+                items: [
+                    {
+                        type: 'text', text: 'Auto-Defender — a LittleJS prototype. ' +
+                            'Inspired by Williams\' Defender (1981) and Fantasy Zone (1986). ' +
+                            'Your ship is AI-controlled. Your job: buy upgrades at the shop ' +
+                            'to help it survive longer.'
+                    },
+                    {type: 'separator'},
+                    {type: 'button', label: 'BACK', onClick: () => hideMenu('about')},
+                ],
+            });
+
+            createMenu({
+                id: 'pause',
+                title: 'PAUSED',
+                initialItemId: 'resume',
+                items: [
+                    {type: 'button', id: 'resume', label: 'RESUME', onClick: () => hideMenu('pause')},
+                    {type: 'button', label: 'HOW TO PLAY', onClick: () => pushMenu('howto')},
+                    {type: 'button', label: 'OPTIONS', onClick: () => pushMenu('options')},
+                    {
+                        type: 'button', id: 'quit', label: 'QUIT TO TITLE', onClick: () =>
+                            showConfirmDialog({
+                                message: 'Quit to title?',
+                                onYes: () => {clearSubmenuStack(); hideAllMenus(); startAttractMode(); showMenu('title');},
+                            }),
+                    },
+                ],
+            });
+
+            // Shop menu — created here, shown when ship lands
+            const shopItems = [];
+            shopItems.push({
+                type: 'label', id: 'shopMoney', text: '$0',
+                onUpdate: el => {el.textContent = `MONEY: $${money}`;},
+            });
+            shopItems.push({type: 'separator'});
+            for (const upg of UPGRADES)
+                shopItems.push({
+                    type: 'button',
+                    id: 'buy_' + upg.id,
+                    label: `${upg.label}  [$${upg.cost}]`,
+                    onClick: () => buyUpgrade(upg),
+                });
+            shopItems.push({type: 'separator'});
+            shopItems.push({type: 'button', label: 'BACK TO BATTLE', onClick: closeShop});
+
+            createMenu({
+                id: 'shop',
+                title: '🏪 SHOP',
+                dismissable: false,
+                onHide: reason => {if (reason === 'dismiss') closeShop();},
+                items: shopItems,
+            });
+
+            createToolbar({
+                id: 'hud',
+                anchor: 'top-right',
+                direction: 'horizontal',
+                items: [
+                    {type: 'button', id: 'fs', label: '⛶', title: 'Fullscreen', hideOnTouch: true, onClick: toggleFullscreen},
+                    {type: 'button', id: 'shop', label: '🏪 Q', title: 'Go to shop', onClick: () => {if (isPlaying && !isMenuVisible()) aiMode = 'shop';}},
+                    {
+                        type: 'button', id: 'menu', label: '☰', title: 'Menu', onClick: () => {
+                            if (isMenuVisible()) {clearSubmenuStack(); hideAllMenus();}
+                            else showMenu('pause');
+                        }
+                    },
+                ],
+            });
+
+            genStars();
+            startAttractMode();
+            showMenu('title');
         }
-    }
-    else
-    {
-        // Attract mode: keep scene populated
-        if (!spawnTimer.active() && enemies.length < 8)
-        {
-            spawnTimer.set(rand(2, 4));
-            const roll = rand();
-            if      (roll < .6) enemies.push(new Lander(rand(0, WORLD_W), SKY_TOP - rand(2, 6)));
-            else if (roll < .9) enemies.push(new Mutant(rand(0, WORLD_W), rand(4, SKY_TOP - 2)));
-            else                enemies.push(new Pod(rand(0, WORLD_W), rand(4, SKY_TOP - 4)));
+
+        ///////////////////////////////////////////////////////////////////////////////
+        function gameUpdate() {
+            if (isPlaying && bindPauseKey({when: () => isPlaying && !gameOver})) return;
+
+            if (player) player.update();
+
+            for (const e of enemies) if (!e.dead) e.update();
+            for (const h of humans) if (!h.dead) h.update();
+            for (const b of bullets) {
+                if (!b.life.active()) continue;
+                b.pos.x = wrapX(b.pos.x + b.vel.x);
+                b.pos.y += b.vel.y;
+            }
+            for (const p of particles) {
+                if (!p.life.active()) continue;
+                p.pos.x = wrapX(p.pos.x + p.vel.x);
+                p.pos.y += p.vel.y;
+                p.vel = p.vel.scale(.92);
+            }
+
+            bulletHits();
+            enemyHitsPlayer();
+
+            enemies = enemies.filter(e => !e.dead);
+            bullets = bullets.filter(b => b.life.active());
+            particles = particles.filter(p => p.life.active());
+
+            if (isPlaying) {
+                // Q key → go to shop
+                if (keyWasPressed('KeyQ') && !isMenuVisible()) aiMode = 'shop';
+
+                // Wave / spawn
+                if (pendingSpawns.length && !spawnTimer.active()) {
+                    spawnOne(pendingSpawns.shift());
+                    spawnTimer.set(rand(.4, 1.2));
+                }
+                if (!pendingSpawns.length && !landersOrMutantsLeft() && player && !player.dead)
+                    waveComplete();
+
+                if (!baiterTimer.active() && !planetDestroyed) {
+                    baiterTimer.set(15);
+                    pendingSpawns.push('baiter');
+                }
+
+                // AI auto-bomb: use when 6+ enemies visible
+                if (player && !player.dead && smartBombs > 0 && !(frame % 90)) {
+                    const halfView = getCameraSize().x / 2 + 2;
+                    const visible = enemies.filter(e => !e.dead &&
+                        Math.abs(wrapDX(e.pos.x, cameraPos.x)) <= halfView).length;
+                    if (visible >= 6) doSmartBomb();
+                }
+
+                // AI auto-teleport: use when cornered on last life
+                if (player && !player.dead && teleportCharges > 0 && lives === 1 &&
+                    !player.invincible.active() && !(frame % 120)) {
+                    const closeEnemies = enemies.filter(e => !e.dead &&
+                        Math.abs(wrapDX(e.pos.x, player.pos.x)) < 6).length;
+                    if (closeEnemies >= 3) doHyperspace();
+                }
+            }
+            else {
+                // Attract mode: keep scene populated
+                if (!spawnTimer.active() && enemies.length < 8) {
+                    spawnTimer.set(rand(2, 4));
+                    const roll = rand();
+                    if (roll < .6) enemies.push(new Lander(rand(0, WORLD_W), SKY_TOP - rand(2, 6)));
+                    else if (roll < .9) enemies.push(new Mutant(rand(0, WORLD_W), rand(4, SKY_TOP - 2)));
+                    else enemies.push(new Pod(rand(0, WORLD_W), rand(4, SKY_TOP - 4)));
+                }
+                if (humansAlive < HUMAN_COUNT && rand() < .005) {
+                    humans.push(new Human(rand(0, WORLD_W)));
+                    humansAlive++;
+                }
+            }
+
+            bombFlash = max(0, bombFlash - .04);
         }
-        if (humansAlive < HUMAN_COUNT && rand() < .005)
-        {
-            humans.push(new Human(rand(0, WORLD_W)));
-            humansAlive++;
+
+        ///////////////////////////////////////////////////////////////////////////////
+        function gameUpdatePost() {
+            let camX, camY;
+            if (player) {
+                const lead = 10;
+                const targetX = wrapX(player.pos.x + player.facing * lead);
+                const dx = wrapDX(targetX, cameraPos.x);
+                camX = cameraPos.x + dx * .04;
+                camY = 2 + clamp((player.pos.y - 2) * .25, -3, 3);
+            }
+            else {
+                camX = cameraPos.x + .05;
+                camY = 2;
+            }
+            if (shakeTimer.active()) {
+                const s = shakeTimer.getPercent();
+                const m = (1 - s) * .5;
+                camX += rand(-m, m);
+                camY += rand(-m, m);
+            }
+            cameraPos = vec2(camX, camY);
         }
-    }
 
-    bombFlash = max(0, bombFlash - .04);
-}
+        ///////////////////////////////////////////////////////////////////////////////
+        // Render helpers
+        function drawStars() {
+            const cs = getCameraSize();
+            const halfW = cs.x / 2 + 1;
+            const yMin = cameraPos.y - cs.y / 2 - 1;
+            const yMax = cameraPos.y + cs.y / 2 + 1;
+            for (const st of stars) {
+                if (st.y < yMin || st.y > yMax) continue;
+                const apparentX = st.x + cameraPos.x * (1 - st.depth);
+                const dx = wrapDX(apparentX, cameraPos.x);
+                if (Math.abs(dx) > halfW) continue;
+                const a = .6 + .4 * Math.sin(time * 2 + st.phase);
+                drawRect(vec2(cameraPos.x + dx, st.y), vec2(st.s, st.s), hsl(0, 0, st.b, a));
+            }
+        }
 
-///////////////////////////////////////////////////////////////////////////////
-function gameUpdatePost()
-{
-    let camX, camY;
-    if (player)
-    {
-        const lead = 10;
-        const targetX = wrapX(player.pos.x + player.facing * lead);
-        const dx = wrapDX(targetX, cameraPos.x);
-        camX = cameraPos.x + dx * .04;
-        camY = 2 + clamp((player.pos.y - 2) * .25, -3, 3);
-    }
-    else
-    {
-        camX = cameraPos.x + .05;
-        camY = 2;
-    }
-    if (shakeTimer.active())
-    {
-        const s = shakeTimer.getPercent();
-        const m = (1 - s) * .5;
-        camX += rand(-m, m);
-        camY += rand(-m, m);
-    }
-    cameraPos = vec2(camX, camY);
-}
+        function drawTerrain() {
+            const cs = getCameraSize();
+            const left = cameraPos.x - cs.x / 2 - 1;
+            const right = cameraPos.x + cs.x / 2 + 1;
+            const step = .5;
+            const points = [];
+            for (let x = left; x <= right; x += step)
+                points.push(vec2(camDrawX(x), terrainAt(x)));
+            const bottomY = -20;
+            const polyPts = [vec2(points[0].x, bottomY)];
+            for (const p of points) polyPts.push(p);
+            polyPts.push(vec2(points[points.length - 1].x, bottomY));
+            drawPoly(polyPts, hsl(.3, .35, .1));
+            for (let i = 1; i < points.length; i++)
+                drawLine(points[i - 1], points[i], .15, hsl(.3, .8, .55));
+        }
 
-///////////////////////////////////////////////////////////////////////////////
-// Render helpers
-function drawStars()
-{
-    const cs = getCameraSize();
-    const halfW = cs.x / 2 + 1;
-    const yMin = cameraPos.y - cs.y / 2 - 1;
-    const yMax = cameraPos.y + cs.y / 2 + 1;
-    for (const st of stars)
-    {
-        if (st.y < yMin || st.y > yMax) continue;
-        const apparentX = st.x + cameraPos.x * (1 - st.depth);
-        const dx = wrapDX(apparentX, cameraPos.x);
-        if (Math.abs(dx) > halfW) continue;
-        const a = .6 + .4 * Math.sin(time * 2 + st.phase);
-        drawRect(vec2(cameraPos.x + dx, st.y), vec2(st.s, st.s), hsl(0, 0, st.b, a));
-    }
-}
+        function drawShopZone() {
+            if (!SHOP_X) return;
+            const dp = vec2(camDrawX(SHOP_X), SHOP_GROUND_Y);
+            // Platform
+            drawRect(dp.add(vec2(0, -.25)), vec2(5, .5), hsl(.13, .6, .4));
+            // Beacon pylon
+            drawRect(dp.add(vec2(0, 1.5)), vec2(.3, 3), hsl(.13, .8, .6));
+            // Blinking top light
+            const blink = .6 + .4 * Math.sin(time * 4);
+            drawCircle(dp.add(vec2(0, 3.2)), .5, hsl(.13, 1, blink));
+            // Label
+            drawTextScreen('SHOP', worldToScreen(dp.add(vec2(0, 4.5))), 28, hsl(.13, 1, .9));
+            // Arrow indicator if AI is heading to shop
+            if (aiMode === 'shop' && player && !player.dead) {
+                const arrowBlink = Math.floor(time * 3) % 2;
+                if (arrowBlink)
+                    drawTextScreen('▼', worldToScreen(dp.add(vec2(0, 5.5))), 24, hsl(.13, 1, 1));
+            }
+        }
 
-function drawTerrain()
-{
-    const cs   = getCameraSize();
-    const left  = cameraPos.x - cs.x / 2 - 1;
-    const right = cameraPos.x + cs.x / 2 + 1;
-    const step  = .5;
-    const points = [];
-    for (let x = left; x <= right; x += step)
-        points.push(vec2(camDrawX(x), terrainAt(x)));
-    const bottomY = -20;
-    const polyPts = [vec2(points[0].x, bottomY)];
-    for (const p of points) polyPts.push(p);
-    polyPts.push(vec2(points[points.length-1].x, bottomY));
-    drawPoly(polyPts, hsl(.3, .35, .1));
-    for (let i = 1; i < points.length; i++)
-        drawLine(points[i-1], points[i], .15, hsl(.3, .8, .55));
-}
+        function drawBullets() {
+            for (const b of bullets) {
+                if (!b.life.active()) continue;
+                const dp = vec2(camDrawX(b.pos.x), b.pos.y);
+                const len = b.vel.length() * .8 + .3;
+                drawRect(dp, vec2(.18, len), b.color, b.vel.angle());
+                drawCircle(dp, .12, hsl(0, 0, 1));
+            }
+        }
 
-function drawShopZone()
-{
-    if (!SHOP_X) return;
-    const dp = vec2(camDrawX(SHOP_X), SHOP_GROUND_Y);
-    // Platform
-    drawRect(dp.add(vec2(0, -.25)), vec2(5, .5), hsl(.13, .6, .4));
-    // Beacon pylon
-    drawRect(dp.add(vec2(0, 1.5)), vec2(.3, 3), hsl(.13, .8, .6));
-    // Blinking top light
-    const blink = .6 + .4 * Math.sin(time * 4);
-    drawCircle(dp.add(vec2(0, 3.2)), .5, hsl(.13, 1, blink));
-    // Label
-    drawTextScreen('SHOP', worldToScreen(dp.add(vec2(0, 4.5))), 28, hsl(.13, 1, .9));
-    // Arrow indicator if AI is heading to shop
-    if (aiMode === 'shop' && player && !player.dead)
-    {
-        const arrowBlink = Math.floor(time * 3) % 2;
-        if (arrowBlink)
-            drawTextScreen('▼', worldToScreen(dp.add(vec2(0, 5.5))), 24, hsl(.13, 1, 1));
-    }
-}
+        function drawParticles() {
+            for (const p of particles) {
+                if (!p.life.active()) continue;
+                const a = 1 - p.life.getPercent();
+                const c = p.color.copy();
+                c.a = a;
+                drawRect(vec2(camDrawX(p.pos.x), p.pos.y), vec2(p.size, p.size), c);
+            }
+        }
 
-function drawBullets()
-{
-    for (const b of bullets)
-    {
-        if (!b.life.active()) continue;
-        const dp = vec2(camDrawX(b.pos.x), b.pos.y);
-        const len = b.vel.length() * .8 + .3;
-        drawRect(dp, vec2(.18, len), b.color, b.vel.angle());
-        drawCircle(dp, .12, hsl(0, 0, 1));
-    }
-}
+        function gameRender() {
+            drawStars();
+            drawTerrain();
+            drawShopZone();
+            for (const h of humans) if (!h.dead) h.render();
+            for (const e of enemies) if (!e.dead) e.render();
+            if (player) player.render();
+            drawBullets();
+            drawParticles();
+        }
 
-function drawParticles()
-{
-    for (const p of particles)
-    {
-        if (!p.life.active()) continue;
-        const a = 1 - p.life.getPercent();
-        const c = p.color.copy();
-        c.a = a;
-        drawRect(vec2(camDrawX(p.pos.x), p.pos.y), vec2(p.size, p.size), c);
-    }
-}
+        ///////////////////////////////////////////////////////////////////////////////
+        // Screen-space HUD
+        function drawRadar(ctx) {
+            const w = mainCanvasSize.x - 2 * RADAR_MARGIN;
+            const h = RADAR_H_SCREEN;
+            const x = RADAR_MARGIN;
+            const y = RADAR_MARGIN;
 
-function gameRender()
-{
-    drawStars();
-    drawTerrain();
-    drawShopZone();
-    for (const h of humans)  if (!h.dead) h.render();
-    for (const e of enemies) if (!e.dead) e.render();
-    if (player) player.render();
-    drawBullets();
-    drawParticles();
-}
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.55)';
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = '#0a8';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, w, h);
 
-///////////////////////////////////////////////////////////////////////////////
-// Screen-space HUD
-function drawRadar(ctx)
-{
-    const w = mainCanvasSize.x - 2 * RADAR_MARGIN;
-    const h = RADAR_H_SCREEN;
-    const x = RADAR_MARGIN;
-    const y = RADAR_MARGIN;
+            const camX = cameraPos.x;
+            const worldXToRadar = wx => {let d = wrapDX(wx, camX); return x + w / 2 + (d / WORLD_W) * w;};
+            const worldYToRadar = wy => {const t = (wy - (GROUND_Y - 2)) / (SKY_TOP - (GROUND_Y - 2)); return y + h - t * h;};
 
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = '#0a8';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, w, h);
+            // Terrain ridge
+            ctx.beginPath();
+            for (let px = 0; px <= w; px += 2) {
+                const wx = camX + (px - w / 2) / w * WORLD_W;
+                const py = worldYToRadar(terrainAt(wx));
+                px === 0 ? ctx.moveTo(x + px, py) : ctx.lineTo(x + px, py);
+            }
+            ctx.strokeStyle = '#283'; ctx.lineWidth = 1; ctx.stroke();
 
-    const camX = cameraPos.x;
-    const worldXToRadar = wx => { let d = wrapDX(wx, camX); return x + w / 2 + (d / WORLD_W) * w; };
-    const worldYToRadar = wy => { const t = (wy - (GROUND_Y - 2)) / (SKY_TOP - (GROUND_Y - 2)); return y + h - t * h; };
+            // Shop marker
+            if (SHOP_X) {
+                const sx = worldXToRadar(SHOP_X);
+                const sy = worldYToRadar(SHOP_GROUND_Y);
+                ctx.fillStyle = hsl(.13, 1, .7).toString();
+                ctx.fillRect(sx - 3, sy - 6, 6, 6);
+                ctx.fillStyle = '#fa0';
+                ctx.fillRect(sx - 1, sy - 8, 2, 2);
+            }
 
-    // Terrain ridge
-    ctx.beginPath();
-    for (let px = 0; px <= w; px += 2)
-    {
-        const wx = camX + (px - w / 2) / w * WORLD_W;
-        const py = worldYToRadar(terrainAt(wx));
-        px === 0 ? ctx.moveTo(x + px, py) : ctx.lineTo(x + px, py);
-    }
-    ctx.strokeStyle = '#283'; ctx.lineWidth = 1; ctx.stroke();
+            // Humans
+            ctx.fillStyle = '#fff';
+            for (const hh of humans) {if (hh.dead) continue; ctx.fillRect(worldXToRadar(hh.pos.x) - 1, worldYToRadar(hh.pos.y) - 1, 2, 3);}
 
-    // Shop marker
-    if (SHOP_X)
-    {
-        const sx = worldXToRadar(SHOP_X);
-        const sy = worldYToRadar(SHOP_GROUND_Y);
-        ctx.fillStyle = hsl(.13, 1, .7).toString();
-        ctx.fillRect(sx - 3, sy - 6, 6, 6);
-        ctx.fillStyle = '#fa0';
-        ctx.fillRect(sx - 1, sy - 8, 2, 2);
-    }
+            // Enemies
+            for (const e of enemies) {
+                if (e.dead) continue;
+                ctx.fillStyle = e.radarColor.toString();
+                ctx.fillRect(worldXToRadar(e.pos.x) - 2, worldYToRadar(e.pos.y) - 2, 4, 4);
+            }
 
-    // Humans
-    ctx.fillStyle = '#fff';
-    for (const hh of humans) { if (hh.dead) continue; ctx.fillRect(worldXToRadar(hh.pos.x) - 1, worldYToRadar(hh.pos.y) - 1, 2, 3); }
+            // Bullets
+            for (const b of bullets) {
+                if (!b.life.active()) continue;
+                ctx.fillStyle = b.friendly ? '#ff0' : '#f44';
+                ctx.fillRect(worldXToRadar(b.pos.x), worldYToRadar(b.pos.y), 1, 1);
+            }
 
-    // Enemies
-    for (const e of enemies)
-    {
-        if (e.dead) continue;
-        ctx.fillStyle = e.radarColor.toString();
-        ctx.fillRect(worldXToRadar(e.pos.x) - 2, worldYToRadar(e.pos.y) - 2, 4, 4);
-    }
+            // Player
+            if (player && !player.dead) {
+                ctx.fillStyle = '#ff0';
+                const px = worldXToRadar(player.pos.x);
+                const py = worldYToRadar(player.pos.y);
+                ctx.beginPath();
+                if (player.facing > 0) {ctx.moveTo(px + 6, py); ctx.lineTo(px - 3, py - 4); ctx.lineTo(px - 3, py + 4);}
+                else {ctx.moveTo(px - 6, py); ctx.lineTo(px + 3, py - 4); ctx.lineTo(px + 3, py + 4);}
+                ctx.closePath(); ctx.fill();
+            }
 
-    // Bullets
-    for (const b of bullets)
-    {
-        if (!b.life.active()) continue;
-        ctx.fillStyle = b.friendly ? '#ff0' : '#f44';
-        ctx.fillRect(worldXToRadar(b.pos.x), worldYToRadar(b.pos.y), 1, 1);
-    }
+            // Viewport indicator
+            const cs = getCameraSize();
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
+            ctx.strokeRect(x + w / 2 + (-cs.x / 2 / WORLD_W) * w, y, (cs.x / WORLD_W) * w, h);
+            ctx.restore();
+        }
 
-    // Player
-    if (player && !player.dead)
-    {
-        ctx.fillStyle = '#ff0';
-        const px = worldXToRadar(player.pos.x);
-        const py = worldYToRadar(player.pos.y);
-        ctx.beginPath();
-        if (player.facing > 0) { ctx.moveTo(px+6,py); ctx.lineTo(px-3,py-4); ctx.lineTo(px-3,py+4); }
-        else                   { ctx.moveTo(px-6,py); ctx.lineTo(px+3,py-4); ctx.lineTo(px+3,py+4); }
-        ctx.closePath(); ctx.fill();
-    }
+        function drawHud(ctx) {
+            ctx.save();
+            ctx.textBaseline = 'top';
+            ctx.font = 'bold 28px monospace';
 
-    // Viewport indicator
-    const cs = getCameraSize();
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
-    ctx.strokeRect(x + w/2 + (-cs.x/2 / WORLD_W)*w, y, (cs.x/WORLD_W)*w, h);
-    ctx.restore();
-}
+            // Score
+            ctx.fillStyle = '#0fc';
+            ctx.textAlign = 'left';
+            ctx.fillText(String(score).padStart(6, '0'), RADAR_MARGIN, RADAR_MARGIN + RADAR_H_SCREEN + 8);
 
-function drawHud(ctx)
-{
-    ctx.save();
-    ctx.textBaseline = 'top';
-    ctx.font = 'bold 28px monospace';
+            // Money
+            ctx.fillStyle = '#fa0';
+            ctx.fillText('$' + money, RADAR_MARGIN, RADAR_MARGIN + RADAR_H_SCREEN + 42);
 
-    // Score
-    ctx.fillStyle = '#0fc';
-    ctx.textAlign = 'left';
-    ctx.fillText(String(score).padStart(6, '0'), RADAR_MARGIN, RADAR_MARGIN + RADAR_H_SCREEN + 8);
+            // Lives (ship icons)
+            ctx.fillStyle = '#cfc';
+            for (let i = 0; i < lives - 1; i++) {
+                const lx = RADAR_MARGIN + 180 + i * 22;
+                const ly = RADAR_MARGIN + RADAR_H_SCREEN + 14;
+                ctx.fillRect(lx, ly + 6, 18, 4);
+                ctx.fillRect(lx + 12, ly + 4, 6, 8);
+            }
 
-    // Money
-    ctx.fillStyle = '#fa0';
-    ctx.fillText('$' + money, RADAR_MARGIN, RADAR_MARGIN + RADAR_H_SCREEN + 42);
+            // Smart bombs
+            ctx.fillStyle = '#f80';
+            for (let i = 0; i < smartBombs; i++) {
+                const bx = RADAR_MARGIN + 180 + i * 16;
+                const by = RADAR_MARGIN + RADAR_H_SCREEN + 38;
+                ctx.beginPath(); ctx.arc(bx + 5, by + 5, 5, 0, Math.PI * 2); ctx.fill();
+            }
 
-    // Lives (ship icons)
-    ctx.fillStyle = '#cfc';
-    for (let i = 0; i < lives - 1; i++)
-    {
-        const lx = RADAR_MARGIN + 180 + i * 22;
-        const ly = RADAR_MARGIN + RADAR_H_SCREEN + 14;
-        ctx.fillRect(lx, ly + 6, 18, 4);
-        ctx.fillRect(lx + 12, ly + 4, 6, 8);
-    }
+            // Teleport charges
+            ctx.fillStyle = '#8ff';
+            ctx.font = 'bold 22px monospace';
+            for (let i = 0; i < teleportCharges; i++)
+                ctx.fillText('⌖', RADAR_MARGIN + 180 + i * 24, RADAR_MARGIN + RADAR_H_SCREEN + 58);
 
-    // Smart bombs
-    ctx.fillStyle = '#f80';
-    for (let i = 0; i < smartBombs; i++)
-    {
-        const bx = RADAR_MARGIN + 180 + i * 16;
-        const by = RADAR_MARGIN + RADAR_H_SCREEN + 38;
-        ctx.beginPath(); ctx.arc(bx+5, by+5, 5, 0, Math.PI*2); ctx.fill();
-    }
+            // Shield charges
+            ctx.fillStyle = '#55f';
+            for (let i = 0; i < shieldCharges; i++)
+                ctx.fillText('◈', RADAR_MARGIN + 180 + i * 24 + 8, RADAR_MARGIN + RADAR_H_SCREEN + 80);
 
-    // Teleport charges
-    ctx.fillStyle = '#8ff';
-    ctx.font = 'bold 22px monospace';
-    for (let i = 0; i < teleportCharges; i++)
-        ctx.fillText('⌖', RADAR_MARGIN + 180 + i * 24, RADAR_MARGIN + RADAR_H_SCREEN + 58);
+            // Right side: wave + humans
+            ctx.font = 'bold 22px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#fff';
+            ctx.fillText(`WAVE ${wave}`, mainCanvasSize.x - RADAR_MARGIN, RADAR_MARGIN + RADAR_H_SCREEN + 8);
+            ctx.fillStyle = planetDestroyed ? '#f44' : '#fff';
+            ctx.fillText(`HUMANS ${humansAlive}`, mainCanvasSize.x - RADAR_MARGIN, RADAR_MARGIN + RADAR_H_SCREEN + 36);
 
-    // Shield charges
-    ctx.fillStyle = '#55f';
-    for (let i = 0; i < shieldCharges; i++)
-        ctx.fillText('◈', RADAR_MARGIN + 180 + i * 24 + 8, RADAR_MARGIN + RADAR_H_SCREEN + 80);
+            // AI mode indicator
+            if (aiMode === 'shop') {
+                ctx.fillStyle = '#fa0';
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 24px monospace';
+                ctx.fillText('→ HEADING TO SHOP', mainCanvasSize.x / 2, RADAR_MARGIN + RADAR_H_SCREEN + 8);
+            }
 
-    // Right side: wave + humans
-    ctx.font = 'bold 22px monospace';
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#fff';
-    ctx.fillText(`WAVE ${wave}`, mainCanvasSize.x - RADAR_MARGIN, RADAR_MARGIN + RADAR_H_SCREEN + 8);
-    ctx.fillStyle = planetDestroyed ? '#f44' : '#fff';
-    ctx.fillText(`HUMANS ${humansAlive}`, mainCanvasSize.x - RADAR_MARGIN, RADAR_MARGIN + RADAR_H_SCREEN + 36);
+            if (planetDestroyed) {
+                ctx.fillStyle = '#f44';
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 22px monospace';
+                ctx.fillText(`PLANET DESTROYED — MUTANT WAVES LEFT: ${mutantWavesLeft}`,
+                    mainCanvasSize.x / 2, RADAR_MARGIN + RADAR_H_SCREEN + 70);
+            }
 
-    // AI mode indicator
-    if (aiMode === 'shop')
-    {
-        ctx.fillStyle = '#fa0';
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 24px monospace';
-        ctx.fillText('→ HEADING TO SHOP', mainCanvasSize.x / 2, RADAR_MARGIN + RADAR_H_SCREEN + 8);
-    }
+            ctx.restore();
+        }
 
-    if (planetDestroyed)
-    {
-        ctx.fillStyle = '#f44';
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 22px monospace';
-        ctx.fillText(`PLANET DESTROYED — MUTANT WAVES LEFT: ${mutantWavesLeft}`,
-            mainCanvasSize.x / 2, RADAR_MARGIN + RADAR_H_SCREEN + 70);
-    }
+        function gameRenderPost() {
+            if (!isPlaying) return;
+            const ctx = mainContext;
+            drawRadar(ctx);
+            drawHud(ctx);
+            if (bombFlash > 0) {
+                ctx.save();
+                ctx.fillStyle = `rgba(255,255,255,${bombFlash})`;
+                ctx.fillRect(0, 0, mainCanvasSize.x, mainCanvasSize.y);
+                ctx.restore();
+            }
+        }
 
-    ctx.restore();
-}
+        ///////////////////////////////////////////////////////////////////////////////
+        engineInit(gameInit, gameUpdate, gameUpdatePost, gameRender, gameRenderPost);
+    </script>
+</body>
 
-function gameRenderPost()
-{
-    if (!isPlaying) return;
-    const ctx = mainContext;
-    drawRadar(ctx);
-    drawHud(ctx);
-    if (bombFlash > 0)
-    {
-        ctx.save();
-        ctx.fillStyle = `rgba(255,255,255,${bombFlash})`;
-        ctx.fillRect(0, 0, mainCanvasSize.x, mainCanvasSize.y);
-        ctx.restore();
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-engineInit(gameInit, gameUpdate, gameUpdatePost, gameRender, gameRenderPost);
-</script></body></html>
+</html>
