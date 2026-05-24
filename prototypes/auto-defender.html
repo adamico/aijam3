@@ -62,6 +62,7 @@
 
         // Auto-Defender additions
         let money;
+let bombKill = false; // true while doSmartBomb() is processing hits
         let aiMode;          // 'combat' | 'shop'
         let shopLanded;
         let teleportCharges, shieldCharges;
@@ -69,12 +70,18 @@
         let SHOP_X, SHOP_GROUND_Y;
 
         const UPGRADES = [
-            {id: 'speed', label: 'SPEED UP', cost: 200, apply: () => {AI_SPEED = min(AI_SPEED + 0.05, 1.2); AI_REACT = min(AI_REACT + 0.005, 0.1);}},
-            {id: 'teleport', label: 'TELEPORT CHARGE', cost: 150, apply: () => {teleportCharges++;}},
-            {id: 'bomb', label: 'SMART BOMB', cost: 175, apply: () => {smartBombs++;}},
-            {id: 'shield', label: 'SHIELD CHARGE', cost: 250, apply: () => {shieldCharges++;}},
-            {id: 'life', label: 'EXTRA LIFE', cost: 500, apply: () => {lives++;}},
-            {id: 'bulletcap', label: 'BULLET CAP +1', cost: 300, apply: () => {AI_BULLET_CAP = min(AI_BULLET_CAP + 1, 8);}},
+            {id: 'speed',     label: 'SPEED UP',        baseCost: 200, cost: 200, bought: 0,
+                apply(u) {AI_SPEED = min(AI_SPEED + 0.05, 1.2); AI_REACT = min(AI_REACT + 0.005, 0.1); u.bought++; u.cost = Math.floor(u.baseCost * Math.pow(1.5, u.bought));}},
+            {id: 'teleport',  label: 'TELEPORT CHARGE', baseCost: 150, cost: 150, bought: 0,
+                apply()  {teleportCharges++;}},
+            {id: 'bomb',      label: 'SMART BOMB',       baseCost: 175, cost: 175, bought: 0,
+                apply()  {smartBombs++;}},
+            {id: 'shield',    label: 'SHIELD CHARGE',    baseCost: 250, cost: 250, bought: 0,
+                apply()  {shieldCharges++;}},
+            {id: 'life',      label: 'EXTRA LIFE',       baseCost: 500, cost: 500, bought: 0,
+                apply()  {lives++;}},
+            {id: 'bulletcap', label: 'BULLET CAP +1',    baseCost: 300, cost: 300, bought: 0,
+                apply(u) {AI_BULLET_CAP = min(AI_BULLET_CAP + 1, 8); u.bought++; u.cost = Math.floor(u.baseCost * Math.pow(1.6, u.bought));}},
         ];
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -289,8 +296,9 @@
                 if (absdy < 1.0 && Math.sign(this.velocity.y) !== Math.sign(dy))
                     this.velocity.y *= 0.4; // damp overshoot
 
-                // Fire — threshold scales with target size
-                const fireY = target.size ? max(2.5, target.size.y * 2.5) : 2.5;
+                // Fire — threshold scales with target size + minimap imprecision jitter
+                const jitter = rand(-1.2, 1.2);
+                const fireY = (target.size ? max(2.5, target.size.y * 2.5) : 2.5) + jitter;
                 if (this.facing === side && absdy < fireY && absDx >= DANGER_X && absDx < 25) {
                     this.fire();
                     this.stallTimer.set(2); // reset stall on shot
@@ -326,7 +334,19 @@
 
             aiUpdate() {
                 // 1. Shop mode
-                if (aiMode === 'shop') {this.avoidDanger(); this.goToShop(); return;}
+                if (aiMode === 'shop') {
+                    this.avoidDanger();
+                    this.goToShop();
+                    // Opportunistic fire — shoot anything aligned without changing course
+                    for (const e of enemies) {
+                        if (e.dead || e.type === 'mine' || e.type === 'swarmer') continue;
+                        const dx = wrapDX(e.pos.x, this.pos.x);
+                        const dy = e.pos.y - this.pos.y;
+                        if (Math.sign(dx) === this.facing && Math.abs(dy) < 2.5 && Math.abs(dx) < 20)
+                        { this.fire(); break; }
+                    }
+                    return;
+                }
 
                 // 2. Holding human — descend to rescue (ground collision triggers dropHuman)
                 if (this.holding) {
@@ -349,16 +369,16 @@
                 for (const e of enemies) {
                     if (!e.dead && e.type === 'lander' && e.carrying) {carrier = e; break;}
                 }
-                if (carrier) {this.engageEnemy(carrier); return;}
+                if (carrier) {this.stallTimer.set(2); this.engageEnemy(carrier); return;}
 
                 // 5. Kill nearest non-swarmer enemy
                 let target = null, bestDist = 1e9;
                 for (const e of enemies) {
-                    if (e.dead || e.type === 'swarmer') continue;
+                    if (e.dead || e.type === 'swarmer' || e.type === 'mine') continue;
                     const d = Math.abs(wrapDX(e.pos.x, this.pos.x)) + Math.abs(e.pos.y - this.pos.y) * 2;
                     if (d < bestDist) {bestDist = d; target = e;}
                 }
-                if (target) {this.engageEnemy(target); return;}
+                if (target) {if (!this.stallTimer.active()) this.stallTimer.set(2); this.engageEnemy(target); return;}
 
                 // 5b. Only swarmers left — use smart bomb if available, else ignore
                 const swarmersLeft = enemies.some(e => !e.dead && e.type === 'swarmer');
@@ -640,7 +660,8 @@
                 }
                 this.pos.x = wrapX(this.pos.x + this.velocity.x);
                 this.pos.y += this.velocity.y;
-                if (player && !player.dead && !this.shootCool.active()) {
+                if (player && !player.dead && !this.shootCool.active() &&
+                    Math.abs(wrapDX(this.pos.x, cameraPos.x)) < getCameraSize().x / 2 + 1) {
                     this.shootCool.set(rand(2, 5));
                     const dx = wrapDX(player.pos.x, this.pos.x);
                     const dy = player.pos.y - this.pos.y;
@@ -651,8 +672,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += this.moneyDrop;
-                addScore(this.scoreValue);
+                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 if (this.carrying) {
                     addScore(500);
                     this.carrying.heldBy = null;
@@ -707,7 +728,8 @@
                 const g = terrainAt(this.pos.x) + .8;
                 if (this.pos.y < g) {this.pos.y = g; this.velocity.y = Math.abs(this.velocity.y);}
                 if (this.pos.y > SKY_TOP) {this.pos.y = SKY_TOP; this.velocity.y = -Math.abs(this.velocity.y);}
-                if (player && !player.dead && !this.shootCool.active()) {
+                if (player && !player.dead && !this.shootCool.active() &&
+                    Math.abs(wrapDX(this.pos.x, cameraPos.x)) < getCameraSize().x / 2 + 1) {
                     this.shootCool.set(rand(.8, 2));
                     const dx = wrapDX(player.pos.x, this.pos.x);
                     const dy = player.pos.y - this.pos.y;
@@ -718,8 +740,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += this.moneyDrop;
-                addScore(this.scoreValue);
+                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 spark(this.pos, 14, this.color, .5, .8);
                 sfxExplode.play(this.pos, .5);
                 this.dead = true;
@@ -766,8 +788,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += this.moneyDrop;
-                addScore(this.scoreValue);
+                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 spark(this.pos, 16, this.color, .6, .9);
                 sfxExplode.play(this.pos, .5);
                 this.dead = true;
@@ -841,8 +863,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += this.moneyDrop;
-                addScore(this.scoreValue);
+                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 spark(this.pos, 24, this.color, .7, 1.0);
                 sfxExplode.play(this.pos, .6);
                 for (let i = 0; i < 4; i++)
@@ -891,8 +913,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += this.moneyDrop;
-                addScore(this.scoreValue);
+                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 spark(this.pos, 8, this.color, .5, .6);
                 sfxExplode.play(this.pos, .3, 1.5);
                 this.dead = true;
@@ -929,7 +951,8 @@
                 this.pos.x = wrapX(this.pos.x + this.velocity.x);
                 this.pos.y += this.velocity.y;
                 this.pos.y = clamp(this.pos.y, terrainAt(this.pos.x) + 1.5, SKY_TOP - .5);
-                if (player && !player.dead && !this.shootCool.active()) {
+                if (player && !player.dead && !this.shootCool.active() &&
+                    Math.abs(wrapDX(this.pos.x, cameraPos.x)) < getCameraSize().x / 2 + 1) {
                     this.shootCool.set(rand(.6, 1.4));
                     const dx = wrapDX(player.pos.x, this.pos.x);
                     const dy = player.pos.y - this.pos.y;
@@ -940,8 +963,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += this.moneyDrop;
-                addScore(this.scoreValue);
+                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 spark(this.pos, 14, this.color, .6, .8);
                 sfxExplode.play(this.pos, .5);
                 this.dead = true;
@@ -975,11 +998,13 @@
             sfxBomb.play();
             shakeTimer.set(.5);
             const halfView = getCameraSize().x / 2 + 2;
+            bombKill = true;
             for (const e of enemies) {
                 if (e.dead) continue;
                 if (e.type === 'mine') {e.hit(); continue;}
                 if (Math.abs(wrapDX(e.pos.x, cameraPos.x)) <= halfView) e.hit();
             }
+            bombKill = false;
             for (const b of bullets)
                 if (!b.friendly && Math.abs(wrapDX(b.pos.x, cameraPos.x)) <= halfView)
                     b.life.set(0);
@@ -1015,7 +1040,7 @@
         function buyUpgrade(upg) {
             if (money < upg.cost) return;
             money -= upg.cost;
-            upg.apply();
+            upg.apply(upg);
             refreshShopMenu();
             sfxPickup.play();
         }
@@ -1112,6 +1137,7 @@
             AI_SPEED = 0.45;
             AI_REACT = 0.05;
             AI_BULLET_CAP = 4;
+            for (const u of UPGRADES) {u.bought = 0; u.cost = u.baseCost;}
 
             genTerrain();
             SHOP_X = WORLD_W * SHOP_X_FRAC;
