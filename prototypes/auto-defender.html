@@ -472,7 +472,8 @@
                 h.pos = vec2(this.pos.x, terrainAt(this.pos.x) + .4);
                 this.holding = null;
                 addScore(500);
-                money += HUMAN_RESCUE_MONEY;
+                const lostHumans = HUMAN_COUNT - humansAlive;
+                money += HUMAN_RESCUE_MONEY + lostHumans * 50;
                 sfxSaved.play();
             }
 
@@ -573,12 +574,12 @@
             update() {
                 if (this.dead || this.heldBy) return;
                 if (this.falling) {
-                    this.velocity.y -= .03;
+                    this.velocity.y -= .018;
                     this.pos.y += this.velocity.y;
                     const g = terrainAt(this.pos.x) + .4;
                     if (this.pos.y <= g) {
                         this.pos.y = g;
-                        if (this.velocity.y < -.35) {
+                        if (this.velocity.y < -.42) {
                             this.dead = true;
                             humansAlive--;
                             spark(this.pos, 8, hsl(0, 1, .6), .3, .6);
@@ -1286,7 +1287,7 @@
                             'Q or SHOP button : order ship to land at the shop\n' +
                             'ESC              : pause\n\n' +
                             'Enemies drop money when killed.\n' +
-                            'Saving a falling human gives $' + HUMAN_RESCUE_MONEY + '.\n\n' +
+                            'Saving a falling human gives $' + HUMAN_RESCUE_MONEY + ' (plus $50 per lost human).\n\n' +
                             'At the shop, buy upgrades to make the AI pilot better.\n' +
                             'Survive as long as possible!'
                     },
