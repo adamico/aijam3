@@ -14,6 +14,10 @@ The game mechanic that runs automatically without direct player input. The core 
 ### Goal State
 A win or lose condition that gives the player a measurable target. Prototypes must have a goal state so lever effectiveness can be evaluated.
 
+### Cornered
+A state where the Auto-Execution AI is surrounded by multiple imminent threats in close proximity, prompting defensive maneuvers like teleportation.
+
+
 ### Avoid
 - "direct control" — use "lever" instead
 - "idle game" — the player is active (configuring), not idle

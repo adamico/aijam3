@@ -1439,12 +1439,27 @@
                     if (visible >= 6) doSmartBomb();
                 }
 
-                // AI auto-teleport: use when cornered on last life
-                if (player && !player.dead && teleportCharges > 0 && lives === 1 &&
-                    !player.invincible.active() && !(frame % 120)) {
-                    const closeEnemies = enemies.filter(e => !e.dead &&
-                        Math.abs(wrapDX(e.pos.x, player.pos.x)) < 6).length;
-                    if (closeEnemies >= 3) doHyperspace();
+                // AI auto-teleport: use when cornered
+                if (player && !player.dead && teleportCharges > 0 &&
+                    !player.invincible.active() && !(frame % 15)) {
+                    
+                    let threats = 0;
+                    for (const e of enemies) {
+                        if (!e.dead) {
+                            const dx = wrapDX(e.pos.x, player.pos.x);
+                            const dy = e.pos.y - player.pos.y;
+                            if (dx * dx + dy * dy < 64) threats++;
+                        }
+                    }
+                    for (const b of bullets) {
+                        if (!b.friendly && b.life.active()) {
+                            const dx = wrapDX(b.pos.x, player.pos.x);
+                            const dy = b.pos.y - player.pos.y;
+                            if (dx * dx + dy * dy < 64) threats++;
+                        }
+                    }
+
+                    if (threats >= 3) doHyperspace();
                 }
             }
             else {
