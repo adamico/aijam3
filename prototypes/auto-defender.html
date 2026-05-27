@@ -76,19 +76,23 @@
                 apply(u) {AI_SPEED = min(AI_SPEED + 0.05, 1.2); AI_REACT = min(AI_REACT + 0.005, 0.1); u.bought++; u.cost = Math.floor(u.baseCost * Math.pow(1.5, u.bought));}
             },
             {
-                id: 'teleport', label: 'TELEPORT CHARGE', baseCost: 150, cost: 150, bought: 0,
+                id: 'teleport', label: 'TELEPORT CHARGE', baseCost: 150, cost: 150,
+                owned: () => teleportCharges,
                 apply() {teleportCharges++;}
             },
             {
-                id: 'bomb', label: 'SMART BOMB', baseCost: 175, cost: 175, bought: 0,
+                id: 'bomb', label: 'SMART BOMB', baseCost: 175, cost: 175,
+                owned: () => smartBombs,
                 apply() {smartBombs++;}
             },
             {
-                id: 'shield', label: 'SHIELD CHARGE', baseCost: 250, cost: 250, bought: 0,
+                id: 'shield', label: 'SHIELD CHARGE', baseCost: 250, cost: 250,
+                owned: () => shieldCharges,
                 apply() {shieldCharges++;}
             },
             {
-                id: 'life', label: 'EXTRA LIFE', baseCost: 500, cost: 500, bought: 0,
+                id: 'life', label: 'EXTRA LIFE', baseCost: 500, cost: 500,
+                owned: () => lives,
                 apply() {lives++;}
             },
             {
@@ -670,8 +674,9 @@
                         return;
                     }
                 }
-                this.pos.x = wrapX(this.pos.x + this.velocity.x);
-                this.pos.y += this.velocity.y;
+                const em = 1 + (wave - 1) * 0.1;
+                this.pos.x = wrapX(this.pos.x + this.velocity.x * em);
+                this.pos.y += this.velocity.y * em;
                 if (player && !player.dead && !this.shootCool.active() &&
                     Math.abs(wrapDX(this.pos.x, cameraPos.x)) < getCameraSize().x / 2 + 1) {
                     this.shootCool.set(rand(2, 5));
@@ -735,8 +740,9 @@
                     const dy = player.pos.y - this.pos.y;
                     this.velocity = vec2(dx, dy).normalize(.1).add(vec2(rand(-.05, .05), rand(-.05, .05)));
                 }
-                this.pos.x = wrapX(this.pos.x + this.velocity.x);
-                this.pos.y += this.velocity.y;
+                const em = 1 + (wave - 1) * 0.1;
+                this.pos.x = wrapX(this.pos.x + this.velocity.x * em);
+                this.pos.y += this.velocity.y * em;
                 const g = terrainAt(this.pos.x) + .8;
                 if (this.pos.y < g) {this.pos.y = g; this.velocity.y = Math.abs(this.velocity.y);}
                 if (this.pos.y > SKY_TOP) {this.pos.y = SKY_TOP; this.velocity.y = -Math.abs(this.velocity.y);}
@@ -789,8 +795,9 @@
 
             update() {
                 this.velocity.y = Math.sin(time * 1.3 + this.pos.x) * .03;
-                this.pos.x = wrapX(this.pos.x + this.velocity.x);
-                this.pos.y += this.velocity.y;
+                const em = 1 + (wave - 1) * 0.1;
+                this.pos.x = wrapX(this.pos.x + this.velocity.x * em);
+                this.pos.y += this.velocity.y * em;
                 this.pos.y = clamp(this.pos.y, terrainAt(this.pos.x) + 3, SKY_TOP - 1);
                 if (!this.mineTimer.active()) {
                     this.mineTimer.set(rand(1, 2.5));
@@ -867,8 +874,9 @@
             }
 
             update() {
-                this.pos.x = wrapX(this.pos.x + this.velocity.x);
-                this.pos.y += this.velocity.y;
+                const em = 1 + (wave - 1) * 0.1;
+                this.pos.x = wrapX(this.pos.x + this.velocity.x * em);
+                this.pos.y += this.velocity.y * em;
                 if (this.pos.y < terrainAt(this.pos.x) + 2) this.velocity.y = Math.abs(this.velocity.y);
                 if (this.pos.y > SKY_TOP - 1) this.velocity.y = -Math.abs(this.velocity.y);
             }
@@ -916,8 +924,9 @@
                     const dy = player.pos.y - this.pos.y;
                     this.velocity = vec2(dx, dy).normalize(.13).add(vec2(rand(-.05, .05), rand(-.05, .05)));
                 }
-                this.pos.x = wrapX(this.pos.x + this.velocity.x);
-                this.pos.y += this.velocity.y;
+                const em = 1 + (wave - 1) * 0.1;
+                this.pos.x = wrapX(this.pos.x + this.velocity.x * em);
+                this.pos.y += this.velocity.y * em;
                 const g = terrainAt(this.pos.x) + .6;
                 if (this.pos.y < g) {this.pos.y = g; this.velocity.y = Math.abs(this.velocity.y);}
                 if (this.pos.y > SKY_TOP) {this.pos.y = SKY_TOP; this.velocity.y = -Math.abs(this.velocity.y);}
@@ -960,8 +969,9 @@
                     const dy = player.pos.y - this.pos.y;
                     this.velocity.y = clamp(dy * .04, -.15, .15);
                 }
-                this.pos.x = wrapX(this.pos.x + this.velocity.x);
-                this.pos.y += this.velocity.y;
+                const em = 1 + (wave - 1) * 0.1;
+                this.pos.x = wrapX(this.pos.x + this.velocity.x * em);
+                this.pos.y += this.velocity.y * em;
                 this.pos.y = clamp(this.pos.y, terrainAt(this.pos.x) + 1.5, SKY_TOP - .5);
                 if (player && !player.dead && !this.shootCool.active() &&
                     Math.abs(wrapDX(this.pos.x, cameraPos.x)) < getCameraSize().x / 2 + 1) {
@@ -993,12 +1003,6 @@
         // Score
         function addScore(n) {
             score += n;
-            while (score >= nextExtra && nextExtra < 1_000_000) {
-                lives++;
-                smartBombs++;
-                nextExtra += EXTRA_LIFE_EVERY;
-                sfxExtraLife.play();
-            }
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -1042,6 +1046,9 @@
             const m = getMenu('shop');
             if (!m) return;
             for (const upg of UPGRADES) {
+                if (upg.owned) {
+                    upg.cost = Math.floor(upg.baseCost * Math.pow(1.5, upg.owned()));
+                }
                 const item = m.getItem('buy_' + upg.id);
                 if (!item) continue;
                 item.setLabel(`${upg.label}  [$${upg.cost}]`);
