@@ -86,17 +86,17 @@
                 apply() {smartBombs++;}
             },
             {
-                id: 'shield', label: 'SHIELD CHARGE', baseCost: 250, cost: 250,
+                id: 'shield', label: 'SHIELD CHARGE', baseCost: 200, cost: 200,
                 owned: () => shieldCharges,
                 apply() {shieldCharges++;}
             },
             {
-                id: 'life', label: 'EXTRA LIFE', baseCost: 500, cost: 500,
+                id: 'life', label: 'EXTRA LIFE', baseCost: 250, cost: 250,
                 owned: () => lives,
                 apply() {lives++;}
             },
             {
-                id: 'bulletcap', label: 'BULLET CAP +1', baseCost: 300, cost: 300, bought: 0,
+                id: 'bulletcap', label: 'BULLET CAP +1', baseCost: 150, cost: 150, bought: 0,
                 apply(u) {AI_BULLET_CAP = min(AI_BULLET_CAP + 1, 8); u.bought++; u.cost = Math.floor(u.baseCost * Math.pow(1.6, u.bought));}
             },
         ];
