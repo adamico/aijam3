@@ -16,10 +16,7 @@ const PLAYER_CONFIG = {
   accelNormal: 10,         // frames to reach target
   accelCharging: 20,       // frames to reach target
   accelBurst: 1,           // frames to reach target
-  accelBurnout: 5,         // frames to reach target
-  cooldownFrames: 20,      // frames between shots
-  cooldownMin: 8,          // min frames (warm bonus cap)
-  cooldownBonus: 0.6       // warm zone fire rate multiplier
+  accelBurnout: 5          // frames to reach target
 };
 
 // Grid layout derived from play area
@@ -32,8 +29,6 @@ const GRID_START_Y_OFFSET = LEVEL_SIZE.y - 6;
 // Weapon temperature constants
 const TEMP_PER_SHOT = 10;
 const TEMP_COOLING_RATE = 0.6;
-const TEMP_WARM_MIN = 40;
-const TEMP_WARM_MAX = 70;
 const TEMP_OVERHEAT = 100;
 
 // Enemy configurations (frame values converted to seconds)
