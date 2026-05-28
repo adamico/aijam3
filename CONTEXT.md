@@ -18,6 +18,10 @@ A win or lose condition that gives the player a measurable target. Prototypes mu
 A state where the Auto-Execution AI is surrounded by multiple imminent threats in close proximity, prompting defensive maneuvers like teleportation.
 
 
+### Prototype Location Rule
+
+All prototype files (HTML, JS, assets, docs) **must** live under `prototypes/<name>/`. Never place prototype files in `LittleJS-AI/games/` or other subdirectories. The `LittleJS-AI/` submodule is read-only reference material.
+
 ### Avoid
 - "direct control" — use "lever" instead
 - "idle game" — the player is active (configuring), not idle
