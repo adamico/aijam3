@@ -111,6 +111,11 @@ function gameInit() {
     currentLevel = 1;
     gameOver = false;
     titleScreen = false;
+
+    // Initialize wave state and spawn initial enemies
+    waveState = 'combat';
+    spawnEnemyGrid();
+    treasureSpawnTimer.set(ENEMY_CONFIGS.treasure.spawnInterval);
 }
 
 function gameUpdate() {
