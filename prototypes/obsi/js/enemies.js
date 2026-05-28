@@ -1,15 +1,55 @@
 /* eslint-disable no-undef, no-unused-vars */
 class Shooter extends RectObject {
-  constructor(pos, gridRow, gridCol) {
+  constructor(pos, gridRow, gridCol, entryStyle, isEntering) {
     super(pos, vec2(2.3, 1.6), rgb(.95, .2, .2)); // Red, invader-like
     this.gridRow = gridRow;
     this.gridCol = gridCol;
     this.health = ENEMY_CONFIGS.shooter.health;
     this.shootTimer = new Timer();
     this.renderOrder = 5;
+    this.isEntering = isEntering || false;
+    this.entryStyle = entryStyle || 'from_top';
+    this.gridPos = pos.copy();
+    this.entryStartPos = null;
+    this.entryTimer = new Timer();
+
+    if (this.isEntering) {
+      this.entryStartPos = this.computeOffScreenPos();
+      this.pos = this.entryStartPos.copy();
+      this.entryTimer.set(0.4);
+    }
+  }
+
+  computeOffScreenPos() {
+    const offScreenDist = 5;
+    let style = this.entryStyle;
+
+    // Resolve random to one of the three directions
+    if (style === 'random') {
+      const options = ['from_top', 'from_left', 'from_right'];
+      style = options[Math.floor(rand(0, 3))];
+      this.entryStyle = style; // Store resolved style
+    }
+
+    if (style === 'from_top') {
+      return vec2(this.gridPos.x, this.gridPos.y + offScreenDist);
+    } else if (style === 'from_left') {
+      return vec2(this.gridPos.x - offScreenDist, this.gridPos.y);
+    } else if (style === 'from_right') {
+      return vec2(this.gridPos.x + offScreenDist, this.gridPos.y);
+    }
+    return this.gridPos.copy();
   }
 
   update() {
+    if (this.isEntering) {
+      this.pos = lerp(this.entryStartPos, this.gridPos, 1 - (this.entryTimer.time / 0.4));
+
+      if (this.entryTimer.elapsed()) {
+        this.pos = this.gridPos.copy();
+        this.isEntering = false;
+      }
+    }
     // Movement handled by formation - just wait for shoot timer
   }
 
@@ -31,19 +71,61 @@ class Shooter extends RectObject {
 }
 
 class Diver extends RectObject {
-  constructor(pos, gridRow, gridCol) {
+  constructor(pos, gridRow, gridCol, entryStyle, isEntering) {
     super(pos, vec2(2.3, 1.6), rgb(.25, .85, .95)); // Cyan
     this.gridRow = gridRow;
     this.gridCol = gridCol;
     this.health = ENEMY_CONFIGS.diver.health;
+    this.gridPos = pos.copy();
     this.originalPos = pos.copy();
     this.isDiving = false;
     this.targetX = pos.x;
     this.diveRateTimer = new Timer();
     this.renderOrder = 5;
+    this.isEntering = isEntering || false;
+    this.entryStyle = entryStyle || 'from_top';
+    this.entryStartPos = null;
+    this.entryTimer = new Timer();
+
+    if (this.isEntering) {
+      this.entryStartPos = this.computeOffScreenPos();
+      this.pos = this.entryStartPos.copy();
+      this.entryTimer.set(0.4);
+    }
+  }
+
+  computeOffScreenPos() {
+    const offScreenDist = 5;
+    let style = this.entryStyle;
+
+    if (style === 'random') {
+      const options = ['from_top', 'from_left', 'from_right'];
+      style = options[Math.floor(rand(0, 3))];
+      this.entryStyle = style;
+    }
+
+    if (style === 'from_top') {
+      return vec2(this.gridPos.x, this.gridPos.y + offScreenDist);
+    } else if (style === 'from_left') {
+      return vec2(this.gridPos.x - offScreenDist, this.gridPos.y);
+    } else if (style === 'from_right') {
+      return vec2(this.gridPos.x + offScreenDist, this.gridPos.y);
+    }
+    return this.gridPos.copy();
   }
 
   update() {
+    if (this.isEntering) {
+      this.pos = lerp(this.entryStartPos, this.gridPos, 1 - (this.entryTimer.time / 0.4));
+
+      if (this.entryTimer.elapsed()) {
+        this.pos = this.gridPos.copy();
+        this.originalPos = this.gridPos.copy();
+        this.isEntering = false;
+      }
+      return;
+    }
+
     if (this.isDiving) {
       // Dive toward target, then return
       const diveSpeed = ENEMY_CONFIGS.diver.diveSpeed * 0.1; // Scale to world units
@@ -97,12 +179,54 @@ class Diver extends RectObject {
 }
 
 class Reflector extends RectObject {
-  constructor(pos, gridRow, gridCol) {
+  constructor(pos, gridRow, gridCol, entryStyle, isEntering) {
     super(pos, vec2(2.3, 1.6), rgb(.95, .95, .2)); // Yellow
     this.gridRow = gridRow;
     this.gridCol = gridCol;
     this.health = ENEMY_CONFIGS.reflector.health;
     this.renderOrder = 5;
+    this.isEntering = isEntering || false;
+    this.entryStyle = entryStyle || 'from_top';
+    this.gridPos = pos.copy();
+    this.entryStartPos = null;
+    this.entryTimer = new Timer();
+
+    if (this.isEntering) {
+      this.entryStartPos = this.computeOffScreenPos();
+      this.pos = this.entryStartPos.copy();
+      this.entryTimer.set(0.4);
+    }
+  }
+
+  computeOffScreenPos() {
+    const offScreenDist = 5;
+    let style = this.entryStyle;
+
+    if (style === 'random') {
+      const options = ['from_top', 'from_left', 'from_right'];
+      style = options[Math.floor(rand(0, 3))];
+      this.entryStyle = style;
+    }
+
+    if (style === 'from_top') {
+      return vec2(this.gridPos.x, this.gridPos.y + offScreenDist);
+    } else if (style === 'from_left') {
+      return vec2(this.gridPos.x - offScreenDist, this.gridPos.y);
+    } else if (style === 'from_right') {
+      return vec2(this.gridPos.x + offScreenDist, this.gridPos.y);
+    }
+    return this.gridPos.copy();
+  }
+
+  update() {
+    if (this.isEntering) {
+      this.pos = lerp(this.entryStartPos, this.gridPos, 1 - (this.entryTimer.time / 0.4));
+
+      if (this.entryTimer.elapsed()) {
+        this.pos = this.gridPos.copy();
+        this.isEntering = false;
+      }
+    }
   }
 
   render() {
@@ -121,7 +245,7 @@ class Reflector extends RectObject {
 }
 
 class Absorber extends RectObject {
-  constructor(pos, gridRow, gridCol) {
+  constructor(pos, gridRow, gridCol, entryStyle, isEntering) {
     super(pos, vec2(2.3, 1.6), rgb(.3, .3, .95)); // Dark blue
     this.gridRow = gridRow;
     this.gridCol = gridCol;
@@ -129,6 +253,37 @@ class Absorber extends RectObject {
     this.storedCount = 0;
     this.spitTimer = new Timer();
     this.renderOrder = 5;
+    this.isEntering = isEntering || false;
+    this.entryStyle = entryStyle || 'from_top';
+    this.gridPos = pos.copy();
+    this.entryStartPos = null;
+    this.entryTimer = new Timer();
+
+    if (this.isEntering) {
+      this.entryStartPos = this.computeOffScreenPos();
+      this.pos = this.entryStartPos.copy();
+      this.entryTimer.set(0.4);
+    }
+  }
+
+  computeOffScreenPos() {
+    const offScreenDist = 5;
+    let style = this.entryStyle;
+
+    if (style === 'random') {
+      const options = ['from_top', 'from_left', 'from_right'];
+      style = options[Math.floor(rand(0, 3))];
+      this.entryStyle = style;
+    }
+
+    if (style === 'from_top') {
+      return vec2(this.gridPos.x, this.gridPos.y + offScreenDist);
+    } else if (style === 'from_left') {
+      return vec2(this.gridPos.x - offScreenDist, this.gridPos.y);
+    } else if (style === 'from_right') {
+      return vec2(this.gridPos.x + offScreenDist, this.gridPos.y);
+    }
+    return this.gridPos.copy();
   }
 
   absorb() {
@@ -155,6 +310,16 @@ class Absorber extends RectObject {
   }
 
   update() {
+    if (this.isEntering) {
+      this.pos = lerp(this.entryStartPos, this.gridPos, 1 - (this.entryTimer.time / 0.4));
+
+      if (this.entryTimer.elapsed()) {
+        this.pos = this.gridPos.copy();
+        this.isEntering = false;
+      }
+      return;
+    }
+
     if (this.storedCount > 0) {
       if (this.spitTimer.isSet() && this.spitTimer.elapsed()) this.spit();
     }
