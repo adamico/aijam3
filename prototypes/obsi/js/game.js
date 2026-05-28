@@ -69,6 +69,8 @@ let transitionTimer = new Timer();
 let bossDefeatedTimer = new Timer();
 let cycleTransitionTimer = new Timer();
 let spawnQueue = [];
+let currentClearedMsg = '';
+let currentPrepareMsg = '';
 
 // Formation state
 let formationDir = 1;
@@ -127,6 +129,8 @@ function spawnEnemyGrid() {
 
   // Parse DSL and build spawn queue
   const parsedWave = parseWaveDSL(rawDef);
+  currentClearedMsg = parsedWave.cleared;
+  currentPrepareMsg = parsedWave.prepare;
   const queue = buildSpawnQueue(parsedWave);
   spawnQueue = queue;
 
@@ -401,6 +405,17 @@ function gameRender() {
 }
 
 function gameRenderPost() {
+  // Interwave overlay during transition
+  if (waveState === 'transition' && currentClearedMsg && currentPrepareMsg) {
+    const centerX = mainCanvasSize.x / 2;
+    const centerY = mainCanvasSize.y / 2;
+    const clearedY = centerY - 30;
+    const prepareY = centerY + 20;
+
+    drawTextScreen(currentClearedMsg, vec2(centerX, clearedY), 32, rgb(.1, .9, .1));
+    drawTextScreen(currentPrepareMsg, vec2(centerX, prepareY), 28, rgb(.95, .95, .95));
+  }
+
   // HUD
   const hudY = 30;
   const color = rgb(.2, .95, .25);
