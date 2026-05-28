@@ -47,7 +47,7 @@ const TEMP_OVERHEAT = 100;
 const ENEMY_CONFIGS = {
   shooter: { shootRate: 1, score: 16, health: 1 },          // 60 frames → 1 second
   shooterElite: { shootRate: 0.7, score: 32, health: 2, aimed: true },
-  diver: { diveSpeed: 2, diveRate: 2, score: 32, health: 2 }, // 120 frames → 2 seconds
+  diver: { diveSpeed: 3, diveRate: 2, score: 32, health: 2 }, // 120 frames → 2 seconds
   diverElite: { diveSpeed: 1.6, diveRate: 1.6, score: 64, health: 4 },
   reflector: { score: 160, health: 3 },
   reflectorElite: { score: 320, health: 5 },

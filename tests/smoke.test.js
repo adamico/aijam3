@@ -11,10 +11,16 @@ function makeDiver(overrides = {}) {
 }
 
 describe("tickDiver", () => {
-  it("timer elapsed + rand < diveChance → isDiving true, targetX set to playerX", () => {
-    const next = tickDiver(makeDiver({ diveTimer: 0 }), 0.1, 0.8, 3);
+  it("trigger with chasesPlayerX=true → targetX = playerX", () => {
+    const next = tickDiver(makeDiver({ diveTimer: 0, chasesPlayerX: true, originalPosX: 5 }), 0.1, 0.8, 3);
     expect(next.isDiving).toBe(true);
     expect(next.targetX).toBe(3);
+  });
+
+  it("trigger with chasesPlayerX=false → targetX = originalPosX (straight drop)", () => {
+    const next = tickDiver(makeDiver({ diveTimer: 0, chasesPlayerX: false, originalPosX: 7 }), 0.1, 0.8, 3);
+    expect(next.isDiving).toBe(true);
+    expect(next.targetX).toBe(7);
   });
 
   it("timer elapsed + rand >= diveChance → stays false, timer reset to 0.5", () => {
