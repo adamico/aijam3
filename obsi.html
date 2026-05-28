@@ -160,6 +160,7 @@ class Player extends RectObject
         this.renderOrder = 10;
 
         // Input and timers
+        this.entryTimer = new Timer();
         this.chargeTimer = new Timer();
         this.burnoutTimer = new Timer();
         this.speedBurstTimer = new Timer();
@@ -231,10 +232,14 @@ class Player extends RectObject
         // Pre-entry: no movement, input disabled
         this.targetVelX = 0;
         this.currentVelX = 0;
-
-        // Immediately transition to pacifist (no enemies entering yet)
-        this.state = 'pacifist';
-        this.pacifistTimer.set(30);
+        const progress = 1 - clamp(this.entryTimer.get() / 60, 0, 1);
+        this.pos.y = lerp(progress, -2, playerY);
+        if (this.entryTimer.elapsed())
+        {
+            this.pos.y = playerY;
+            this.state = 'pacifist';
+            this.pacifistTimer.set(30);
+        }
     }
 
     updateExiting()
@@ -788,7 +793,9 @@ function gameInit()
     cameraScale = 16;
 
     // Create player
-    player = new Player(vec2(levelSize.x/2, playerY));
+    player = new Player(vec2(levelSize.x/2, -2));
+    player.state = 'pre_entry';
+    player.entryTimer.set(60);
 
     // Initialize HUD
     score = 0;
@@ -1015,7 +1022,9 @@ function updateWaveFSM()
             treasureSpawnTimer = ENEMY_CONFIGS.treasure.spawnInterval;
             if (player)
             {
+                player.pos = vec2(levelSize.x/2, -2);
                 player.state = 'pre_entry';
+                player.entryTimer.set(60);
             }
         }
     }
