@@ -1,3 +1,5 @@
 #2: Scaffolded obsi.html by copying spaceInvaders.html and stripping out barriers, UFO, multi-input switching, keyboard directional movement, and marching sounds. Wired up engineInit callbacks with blank playfield rendering at 960x540 with black background and HUD placeholders for score, lives, and level. Player renders but has no input handling yet.
 
 #3: Implemented auto-movement and basic shooting. Player ship auto-moves horizontally at fixed speed, bouncing off left and right edges. Auto-shoots bullets upward every 20 frames. Bullets travel upward and destroy when off-screen. No keyboard/mouse input affects movement.
+
+#4: Implemented full Player FSM with 6 states (moving, charging, charged, speed_burst, burnout, pacifist) and Magic Combo input system. Mouse click controls: tap reverses direction, hold to charge (slows to 0.2x speed), charged state at 1s (resumes 1x speed), release charged for charged shot + speed burst (4x speed), hold too long triggers burnout (2x speed, locked input). Uses LittleJS Timer class for timed transitions and velocity acceleration/deceleration.
