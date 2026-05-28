@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseWaveDSL, buildSpawnQueue, WAVE_DEFINITIONS } from "../js/constants.js";
+import { parseWaveDSL, buildSpawnQueue, calcDifficulty, WAVE_DEFINITIONS } from "../js/constants.js";
 
 describe("parseWaveDSL", () => {
   it("parses valid DSL string from WAVE_DEFINITIONS", () => {
@@ -63,5 +63,43 @@ describe("buildSpawnQueue", () => {
     // First row with enemies is row 0, first col is col 1 (pattern: .p...p...p)
     expect(firstEntry.row).toBe(0);
     expect(firstEntry.col).toBe(1);
+  });
+});
+
+describe("calcDifficulty", () => {
+  it("returns baseline multiplier for wave 1", () => {
+    const difficulty = calcDifficulty(1);
+
+    expect(difficulty).toHaveProperty("shootRate");
+    expect(difficulty).toHaveProperty("formationSpeed");
+    expect(difficulty).toHaveProperty("diveChance");
+
+    // Wave 1: baseFactor = 0.8, formationSpeedMult = 0.8 * 0.2 = 0.16
+    // formationSpeed = 0.08 * 0.16 = 0.0128
+    expect(difficulty.formationSpeed).toBeCloseTo(0.0128, 3);
+  });
+
+  it("returns larger multipliers for higher waves", () => {
+    const diff1 = calcDifficulty(1);
+    const diff10 = calcDifficulty(10);
+    const diff20 = calcDifficulty(20);
+
+    expect(diff10.formationSpeed).toBeGreaterThan(diff1.formationSpeed);
+    expect(diff20.formationSpeed).toBeGreaterThan(diff10.formationSpeed);
+    expect(diff10.diveChance).toBeGreaterThan(diff1.diveChance);
+  });
+
+  it("returns no NaN or Infinity for waves 1-20", () => {
+    for (let wave = 1; wave <= 20; wave++) {
+      const difficulty = calcDifficulty(wave);
+
+      expect(Number.isNaN(difficulty.shootRate)).toBe(false);
+      expect(Number.isNaN(difficulty.formationSpeed)).toBe(false);
+      expect(Number.isNaN(difficulty.diveChance)).toBe(false);
+
+      expect(Number.isFinite(difficulty.shootRate)).toBe(true);
+      expect(Number.isFinite(difficulty.formationSpeed)).toBe(true);
+      expect(Number.isFinite(difficulty.diveChance)).toBe(true);
+    }
   });
 });

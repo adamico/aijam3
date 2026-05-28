@@ -190,4 +190,22 @@ function buildSpawnQueue(waveDef) {
   return queue;
 }
 
-export { WAVE_DEFINITIONS, parseWaveDSL, buildSpawnQueue };
+const BASE_FORMATION_SPEED = 0.08;
+
+function calcDifficulty(waveN) {
+  const c = Math.floor((waveN - 1) / 10) + 1; // Cycle number
+  const w = Math.min(waveN, 10); // Linear phase
+  const l = waveN > 10 ? Math.sqrt(waveN - 10) : 0; // Sqrt phase
+
+  const baseFactor = 0.8 + (w - 1) * 0.2 + l * 0.1; // Range [0.8, 2.0+]
+  const shootRateMult = Math.min(baseFactor, 2.5); // Cap at 2.5x
+  const formationSpeedMult = Math.min(baseFactor * 0.2, 3.5); // Faster scaling
+
+  return {
+    shootRate: Math.max(20, ENEMY_CONFIGS.shooter.shootRate / shootRateMult),
+    formationSpeed: BASE_FORMATION_SPEED * formationSpeedMult,
+    diveChance: Math.min(0.8 + (waveN - 1) * 0.05, 1.0),
+  };
+}
+
+export { WAVE_DEFINITIONS, parseWaveDSL, buildSpawnQueue, calcDifficulty };
