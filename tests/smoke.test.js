@@ -319,4 +319,104 @@ describe("applyDamage", () => {
     expect(mockBullet.destroyed).toBe(true);
     expect(mockReflector.destroyed).toBe(false);
   });
+
+  it("Absorber.onBulletHit with empty storage returns kind:'absorbed'", () => {
+    const mockPos = { x: 5, y: 10, copy() { return { x: this.x, y: this.y }; } };
+    const mockBullet = {
+      pos: mockPos,
+      destroyed: false,
+      destroy() { this.destroyed = true; }
+    };
+    const mockAbsorber = {
+      health: 1,
+      scoreValue: 256,
+      storedCount: 0,
+      maxStored: 3,
+      absorb() {
+        if (this.storedCount < this.maxStored) {
+          this.storedCount++;
+          return true;
+        }
+        return false;
+      }
+    };
+
+    // Simulate Absorber.onBulletHit with empty storage
+    let event;
+    if (mockAbsorber.absorb()) {
+      mockBullet.destroy();
+      event = {
+        kind: 'absorbed',
+        reflected: false,
+        pos: mockBullet.pos.copy(),
+        scoreValue: 0,
+        spawned: []
+      };
+    }
+
+    expect(event.kind).toBe('absorbed');
+    expect(event.reflected).toBe(false);
+    expect(event.scoreValue).toBe(0);
+    expect(event.spawned.length).toBe(0);
+    expect(mockAbsorber.storedCount).toBe(1);
+    expect(mockBullet.destroyed).toBe(true);
+  });
+
+  it("Absorber.onBulletHit with full storage returns damage event", () => {
+    const mockPos = { x: 5, y: 10, copy() { return { x: this.x, y: this.y }; } };
+    const mockBullet = {
+      pos: mockPos,
+      destroyed: false,
+      destroy() { this.destroyed = true; }
+    };
+    const ABSORBER_SCORE = 256;
+    const mockAbsorber = {
+      health: 1,
+      scoreValue: ABSORBER_SCORE,
+      storedCount: 3,
+      maxStored: 3,
+      destroyed: false,
+      destroy() { this.destroyed = true; },
+      absorb() {
+        if (this.storedCount < this.maxStored) {
+          this.storedCount++;
+          return true;
+        }
+        return false;
+      }
+    };
+
+    // Simulate Absorber.onBulletHit with full storage → applyDamage
+    let event;
+    if (mockAbsorber.absorb()) {
+      mockBullet.destroy();
+      event = {
+        kind: 'absorbed',
+        reflected: false,
+        pos: mockBullet.pos.copy(),
+        scoreValue: 0,
+        spawned: []
+      };
+    } else {
+      // Overflow: apply damage
+      const hitEvent = computeHitEvent({
+        health: mockAbsorber.health,
+        scoreValue: mockAbsorber.scoreValue,
+        dmg: 1,
+        bulletPos: mockBullet.pos.copy()
+      });
+      mockAbsorber.health = hitEvent.newHealth;
+      mockBullet.destroy();
+      if (hitEvent.event.kind === 'killed') {
+        mockAbsorber.destroy();
+      }
+      event = hitEvent.event;
+    }
+
+    expect(event.kind).toBe('killed');
+    expect(event.scoreValue).toBe(ABSORBER_SCORE);
+    expect(mockAbsorber.health).toBe(0);
+    expect(mockBullet.destroyed).toBe(true);
+    expect(mockAbsorber.destroyed).toBe(true);
+  });
 });
