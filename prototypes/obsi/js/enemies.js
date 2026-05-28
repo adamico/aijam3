@@ -135,6 +135,9 @@ class Absorber extends RectObject {
     if (this.storedCount < ENEMY_CONFIGS.absorber.maxStored) {
       this.storedCount++;
       this.spitTimer.set(ENEMY_CONFIGS.absorber.spitDelay);
+      return true;
+    } else {
+      return false;
     }
   }
 
@@ -153,12 +156,7 @@ class Absorber extends RectObject {
 
   update() {
     if (this.storedCount > 0) {
-      if (this.spitTimer.isSet() && this.spitTimer.elapsed()) {
-        this.spit();
-      }
-      else if (this.storedCount >= ENEMY_CONFIGS.absorber.maxStored) {
-        this.spit();
-      }
+      if (this.spitTimer.isSet() && this.spitTimer.elapsed()) this.spit();
     }
   }
 
