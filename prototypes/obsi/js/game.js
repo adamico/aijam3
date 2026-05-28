@@ -55,11 +55,11 @@ function calcDifficulty(waveN) {
 
   const baseFactor = 0.8 + (w - 1) * 0.2 + l * 0.1; // Range [0.8, 2.0+]
   const shootRateMult = Math.min(baseFactor, 2.5); // Cap at 2.5x
-  const formationSpeedMult = Math.min(baseFactor * 1.5, 3.5); // Faster scaling
+  const formationSpeedMult = Math.min(baseFactor * 0.2, 3.5); // Faster scaling
 
   return {
     shootRate: Math.max(20, ENEMY_CONFIGS.shooter.shootRate / shootRateMult),
-    formationSpeed: 0.08 * formationSpeedMult,
+    formationSpeed: formationSpeed * formationSpeedMult,
     diveChance: Math.min(0.8 + (waveN - 1) * 0.05, 1.0),
   };
 }
@@ -259,11 +259,6 @@ function updateFormation() {
   // Check for wall hit
   if ((formationDir < 0 && minX < 0 + 1) || (formationDir > 0 && maxX > LEVEL_SIZE.x - 1)) {
     formationDir *= -1;
-    // Drop formation
-    for (const e of enemies)
-      e.pos.y -= 1;
-    // Speed up slightly
-    formationSpeed = Math.min(formationSpeed * 1.1, 0.5);
   }
 
   // Move formation
