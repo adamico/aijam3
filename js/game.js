@@ -362,9 +362,9 @@ function renderShootTemperature() {
 
     // Temperature fill color gradient
     let fillColor;
-    if (player.temperature < TEMP_WARM_MIN)
+    if (player.temperature < 40)
       fillColor = 'rgb(100, 150, 255)'; // Blue (cool)
-    else if (player.temperature < TEMP_WARM_MAX)
+    else if (player.temperature < 70)
       fillColor = 'rgb(255, 200, 100)'; // Orange (warm)
     else
       fillColor = 'rgb(255, 100, 100)'; // Red (hot/overheat)

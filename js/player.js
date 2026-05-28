@@ -14,7 +14,6 @@ class Player extends RectObject {
         this.burnoutTimer = new Timer();
         this.speedBurstTimer = new Timer();
         this.pacifistTimer = new Timer();
-        this.cooldown = new Timer();
 
         // Magic Combo state
         this.holdTime = 0;
@@ -89,19 +88,6 @@ class Player extends RectObject {
         // Target speed for moving state
         this.targetVelX = this.dirX * PLAYER_CONFIG.speed;
         this.accelerateVelocity(PLAYER_CONFIG.accelNormal);
-
-        // Auto-shoot with temperature-based fire-rate bonus
-        if (!this.cooldown.active()) {
-            bullets.push(new Bullet(this.pos.add(vec2(0, 0.5)), vec2(0, 0.8)));
-            this.temperature += TEMP_PER_SHOT;
-
-            // Set next cooldown
-            let cooldownDuration = PLAYER_CONFIG.cooldownFrames / 60;
-            if (this.temperature >= TEMP_WARM_MIN && this.temperature <= TEMP_WARM_MAX) {
-                cooldownDuration = max(PLAYER_CONFIG.cooldownMin / 60, cooldownDuration * PLAYER_CONFIG.cooldownBonus);
-            }
-            this.cooldown.set(cooldownDuration);
-        }
 
         // Magic Combo input
         if (btnPressed()) {
@@ -187,7 +173,6 @@ class Player extends RectObject {
         if (this.pacifistTimer.elapsed()) {
             // Resume normal state
             this.state = 'moving';
-            this.cooldown.set(0);
         }
     }
 
