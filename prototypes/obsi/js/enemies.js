@@ -410,6 +410,21 @@ class Absorber extends RectObject {
       }
     }
   }
+
+  onBulletHit(b) {
+    if (this.absorb()) {
+      b.destroy();
+      return {
+        kind: 'absorbed',
+        reflected: false,
+        pos: b.pos.copy(),
+        scoreValue: 0,
+        spawned: []
+      };
+    } else {
+      return applyDamage(this, b);
+    }
+  }
 }
 
 class Boss extends RectObject {
