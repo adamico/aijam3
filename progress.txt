@@ -1,1 +1,3 @@
 #2: Scaffolded obsi.html by copying spaceInvaders.html and stripping out barriers, UFO, multi-input switching, keyboard directional movement, and marching sounds. Wired up engineInit callbacks with blank playfield rendering at 960x540 with black background and HUD placeholders for score, lives, and level. Player renders but has no input handling yet.
+
+#3: Implemented auto-movement and basic shooting. Player ship auto-moves horizontally at fixed speed, bouncing off left and right edges. Auto-shoots bullets upward every 20 frames. Bullets travel upward and destroy when off-screen. No keyboard/mouse input affects movement.
