@@ -202,18 +202,11 @@ class Player extends RectObject {
     render() {
         if (!this.destroyed) {
             const p = this.pos;
-            const s = .22;
-            drawRect(p.add(vec2(0, .3)), vec2(s, s * 2), this.color);
-            drawRect(p, vec2(s * 7, s * 3), this.color);
-            drawRect(p.add(vec2(-1.1, -.3)), vec2(s * 2, s), this.color);
-            drawRect(p.add(vec2(1.1, -.3)), vec2(s * 2, s), this.color);
+            drawTile(p, vec2(3.2, 3.2), sprites.player);
 
-            // Diegetic barrel at nose
+            // Diegetic barrel temperature indicator
             const barrelColor = this.getBarrelColor();
-            const barrelPos = p.add(vec2(0, 0.5));
-            const barrelWidth = 0.15;
-            const barrelHeight = 0.6;
-            drawRect(barrelPos, vec2(barrelWidth, barrelHeight), barrelColor);
+            drawRect(p.add(vec2(0, 0.5)), vec2(0.15, 0.6), barrelColor);
         }
     }
 
