@@ -13,3 +13,5 @@
 #8: Implemented Diver enemy with diving behavior. Divers sit in formation (odd rows), periodically break out and dive toward player position. Return to original formation slot after reaching player Y level. Diver-player collision causes life loss. Dive chance and speed scale with difficulty. Mixed Diver (cyan) and Shooter (red) grid formation.
 
 #9: Implemented Reflector and Absorber enemies. Reflector (yellow) reflects player bullets downward as enemy projectiles and takes 3 hits to destroy. Absorber (dark blue) absorbs bullets up to maxStored, displays count, spits in spread pattern on maxStored or spitDelay. Spawning: row 0=shooter, 1=diver, 2=reflector, 3=absorber, 4=shooter. Updated scoring to reflect each enemy type value.
+
+#10: Implemented Treasure mini-boss. Spawns every 30s during combat, bounces diagonally around screen with pool-ball physics, high health (50), awards large score bonus (500) on defeat. Only one treasure active at a time, does not count toward wave clear. Distinctive gold sprite.
