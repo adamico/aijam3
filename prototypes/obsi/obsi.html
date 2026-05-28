@@ -362,10 +362,14 @@
                 if (this.pos.x - halfSize <= playMin.x) {
                     this.pos.x = playMin.x + halfSize;
                     this.currentVelX = 0;
+                    this.dirX *= -1;
+                    this.targetVelX *= -1;
                 }
                 if (this.pos.x + halfSize >= playMax.x) {
                     this.pos.x = playMax.x - halfSize;
                     this.currentVelX = 0;
+                    this.dirX *= -1;
+                    this.targetVelX *= -1;
                 }
             }
 
