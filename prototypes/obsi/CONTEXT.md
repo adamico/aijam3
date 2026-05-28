@@ -15,7 +15,13 @@ The grid of enemies that moves as a unit. Dimensions derived from play area widt
 A single `PLAYER_CONFIG` object holding speed multipliers, size, and base tuning values. Speed values are expressed as `{ speed, speedCharging, speedBurst, speedBurnout }` where the latter three are multipliers of `speed`.
 
 **Magic Combo**
-The player's input mechanic: tap = direction reverse, hold = charge, hold-to-full = charged state, release-from-charged = burst fire + speed burst.
+The player's input mechanic: tap (press + release before charge threshold) = fires bullet + reverses direction; hold = charge, hold-to-full = charged state, release-from-charged = fires charged bullet + speed burst + reverses direction.
+
+**Auto-Shoot**
+[OBSOLETE] Removed in #18. Previously fired bullets automatically every ~20 frames while in `moving` state. Replaced by tap-to-shoot mechanic. Cooldown timer and warm-zone fire-rate bonus also removed.
+
+**Weapon Temperature**
+Heat mechanic tracking player weapon usage. Each tap-release or charged-bullet fires increments temperature by `TEMP_PER_SHOT` (10). Passive cooling reduces temperature by `TEMP_COOLING_RATE` (0.6) per frame. Temperature reaches overheat threshold at `TEMP_OVERHEAT` (100), triggering automatic `burnout` state and locking input. No warm-zone fire-rate bonus — overheat is the sole spam limiter.
 
 **State machine (Player)**
 The player's behavioral FSM: `pre_entry → pacifist → moving ↔ charging ↔ charged → speed_burst → moving`, with `burnout` reachable from `moving`/`charged` on overheat.
