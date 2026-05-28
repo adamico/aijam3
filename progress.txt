@@ -1,0 +1,1 @@
+#2: Scaffolded obsi.html by copying spaceInvaders.html and stripping out barriers, UFO, multi-input switching, keyboard directional movement, and marching sounds. Wired up engineInit callbacks with blank playfield rendering at 960x540 with black background and HUD placeholders for score, lives, and level. Player renders but has no input handling yet.
