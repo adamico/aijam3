@@ -83,14 +83,6 @@ class Player extends RectObject {
         // Exiting: no movement, input disabled
         this.targetVelX = 0;
         this.currentVelX = 0;
-
-        // After a brief exit animation, prepare for next wave
-        if (frame % 30 === 0) {
-            // Reset for next wave
-            this.pos = vec2(LEVEL_SIZE.x / 2, PLAYER_Y);
-            this.state = 'moving';
-            this.temperature = 0;
-        }
     }
 
     updateMoving() {
