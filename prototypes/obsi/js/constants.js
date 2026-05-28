@@ -34,9 +34,13 @@ const TEMP_OVERHEAT = 100;
 // Enemy configurations (frame values converted to seconds)
 const ENEMY_CONFIGS = {
   shooter: { shootRate: 1, score: 16, health: 1 },          // 60 frames → 1 second
+  shooterElite: { shootRate: 0.7, score: 32, health: 2, aimed: true },
   diver: { diveSpeed: 2, diveRate: 2, score: 32, health: 2 }, // 120 frames → 2 seconds
+  diverElite: { diveSpeed: 1.6, diveRate: 1.6, score: 64, health: 4 },
   reflector: { score: 160, health: 3 },
+  reflectorElite: { score: 320, health: 5 },
   absorber: { maxStored: 3, spitDelay: 1, score: 256, health: 1 }, // 60 frames → 1 second
+  absorberElite: { maxStored: 3, spitDelay: 0.5, score: 512, health: 2, spread: true },
   treasure: { health: 50, score: 500, spawnInterval: 30 },    // 1800 frames → 30 seconds
   boss: { health: 50, score: 800 },
 };
