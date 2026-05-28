@@ -285,6 +285,14 @@ class Reflector extends RectObject {
       drawRect(p.add(vec2(0.5, -.6)), vec2(s, s * 2), this.color);
     }
   }
+
+  onBulletHit(b) {
+    const mirroredBullet = new EnemyBullet(b.pos.copy(), vec2(b.vel.x, b.vel.y * -1));
+    const event = applyDamage(this, b);
+    event.reflected = true;
+    event.spawned = [mirroredBullet];
+    return event;
+  }
 }
 
 class Absorber extends RectObject {
