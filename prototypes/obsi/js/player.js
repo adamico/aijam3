@@ -104,7 +104,9 @@ class Player extends RectObject {
         this.accelerateVelocity(PLAYER_CONFIG.accelCharging);
 
         if (btnReleased()) {
-            // Tap: reverse direction and continue moving
+            // Tap: fire bullet, reverse direction and continue moving
+            bullets.push(new Bullet(this.pos.add(vec2(0, 0.5)), vec2(0, 0.8)));
+            this.temperature += TEMP_PER_SHOT;
             this.dirX *= -1;
             this.state = 'moving';
             this.pacifistTimer.set(0.5);
