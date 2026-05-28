@@ -99,7 +99,7 @@ class Player extends RectObject {
         this.accelerateVelocity(PLAYER_CONFIG.accelNormal);
 
         // Auto-shoot with temperature-based fire-rate bonus
-        if (!this.cooldown.isSet()) {
+        if (!this.cooldown.active()) {
             bullets.push(new Bullet(this.pos.add(vec2(0, 0.5)), vec2(0, 0.8)));
             this.temperature += TEMP_PER_SHOT;
 
