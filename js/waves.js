@@ -147,41 +147,31 @@ function spawnEnemy(queueEntry) {
   const startY = GRID_START_Y_OFFSET;
   const pos = vec2(startX + col * GRID_SPACING.x, startY - row * GRID_SPACING.y);
 
+  const isElite = eType === eType.toUpperCase() && eType !== 'B' && eType !== 'E';
+
   let enemy;
-  switch (eType) {
+  switch (eType.toLowerCase()) {
     case 'p':
-    case 'E':
-      enemy = new Shooter(pos, row, col, style, true);
-      break;
-    case 'P':
-      enemy = new Shooter(pos, row, col, style, true);
+    case 'e':
+      enemy = new Shooter(pos, row, col, style, true, isElite);
       break;
     case 'k':
-      enemy = new Diver(pos, row, col, style, true);
-      break;
-    case 'K':
-      enemy = new Diver(pos, row, col, style, true);
+      enemy = new Diver(pos, row, col, style, true, isElite);
       break;
     case 'r':
-      enemy = new Reflector(pos, row, col, style, true);
-      break;
-    case 'R':
-      enemy = new Reflector(pos, row, col, style, true);
+      enemy = new Reflector(pos, row, col, style, true, isElite);
       break;
     case 'a':
-      enemy = new Absorber(pos, row, col, style, true);
+      enemy = new Absorber(pos, row, col, style, true, isElite);
       break;
-    case 'A':
-      enemy = new Absorber(pos, row, col, style, true);
-      break;
-    case 'B':
+    case 'b':
       boss = new Boss(pos);
       return;
     case 'g':
       enemy = new Treasure(pos);
       break;
     default:
-      enemy = new Shooter(pos, row, col, style, true);
+      enemy = new Shooter(pos, row, col, style, true, false);
       break;
   }
 

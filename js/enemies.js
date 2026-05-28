@@ -1,10 +1,14 @@
 /* eslint-disable no-undef, no-unused-vars */
 class Shooter extends RectObject {
-  constructor(pos, gridRow, gridCol, entryStyle, isEntering) {
+  constructor(pos, gridRow, gridCol, entryStyle, isEntering, isElite) {
     super(pos, vec2(2.3, 1.6), rgb(.95, .2, .2)); // Red, invader-like
     this.gridRow = gridRow;
     this.gridCol = gridCol;
-    this.health = ENEMY_CONFIGS.shooter.health;
+    this.isElite = isElite || false;
+    const cfg = this.isElite ? ENEMY_CONFIGS.shooterElite : ENEMY_CONFIGS.shooter;
+    this.health = cfg.health;
+    this.shootRate = cfg.shootRate;
+    this.aimed = cfg.aimed || false;
     this.shootTimer = new Timer();
     this.renderOrder = 5;
     this.isEntering = isEntering || false;
@@ -71,11 +75,15 @@ class Shooter extends RectObject {
 }
 
 class Diver extends RectObject {
-  constructor(pos, gridRow, gridCol, entryStyle, isEntering) {
+  constructor(pos, gridRow, gridCol, entryStyle, isEntering, isElite) {
     super(pos, vec2(2.3, 1.6), rgb(.25, .85, .95)); // Cyan
     this.gridRow = gridRow;
     this.gridCol = gridCol;
-    this.health = ENEMY_CONFIGS.diver.health;
+    this.isElite = isElite || false;
+    const cfg = this.isElite ? ENEMY_CONFIGS.diverElite : ENEMY_CONFIGS.diver;
+    this.health = cfg.health;
+    this.diveSpeed = cfg.diveSpeed;
+    this.diveRate = cfg.diveRate;
     this.gridPos = pos.copy();
     this.originalPos = pos.copy();
     this.isDiving = false;
@@ -128,7 +136,7 @@ class Diver extends RectObject {
 
     if (this.isDiving) {
       // Dive toward target, then return
-      const diveSpeed = ENEMY_CONFIGS.diver.diveSpeed * 0.1; // Scale to world units
+      const diveSpeed = this.diveSpeed * 0.1; // Scale to world units
       const targetY = PLAYER_Y + 0.5; // Dive to player level
 
       if (this.pos.y > targetY) {
@@ -143,7 +151,7 @@ class Diver extends RectObject {
           // Back at formation
           this.pos = this.originalPos.copy();
           this.isDiving = false;
-          this.diveRateTimer.set(ENEMY_CONFIGS.diver.diveRate);
+          this.diveRateTimer.set(this.diveRate);
         }
       }
     }
@@ -154,7 +162,7 @@ class Diver extends RectObject {
         if (rand() < difficulty.diveChance) {
           this.isDiving = true;
           this.targetX = player ? player.pos.x : LEVEL_SIZE.x / 2;
-          this.diveRateTimer.set(ENEMY_CONFIGS.diver.diveRate);
+          this.diveRateTimer.set(this.diveRate);
         }
         else {
           this.diveRateTimer.set(0.5); // Check again in 0.5 seconds
@@ -179,11 +187,13 @@ class Diver extends RectObject {
 }
 
 class Reflector extends RectObject {
-  constructor(pos, gridRow, gridCol, entryStyle, isEntering) {
+  constructor(pos, gridRow, gridCol, entryStyle, isEntering, isElite) {
     super(pos, vec2(2.3, 1.6), rgb(.95, .95, .2)); // Yellow
     this.gridRow = gridRow;
     this.gridCol = gridCol;
-    this.health = ENEMY_CONFIGS.reflector.health;
+    this.isElite = isElite || false;
+    const cfg = this.isElite ? ENEMY_CONFIGS.reflectorElite : ENEMY_CONFIGS.reflector;
+    this.health = cfg.health;
     this.renderOrder = 5;
     this.isEntering = isEntering || false;
     this.entryStyle = entryStyle || 'from_top';
@@ -245,11 +255,15 @@ class Reflector extends RectObject {
 }
 
 class Absorber extends RectObject {
-  constructor(pos, gridRow, gridCol, entryStyle, isEntering) {
+  constructor(pos, gridRow, gridCol, entryStyle, isEntering, isElite) {
     super(pos, vec2(2.3, 1.6), rgb(.3, .3, .95)); // Dark blue
     this.gridRow = gridRow;
     this.gridCol = gridCol;
-    this.health = ENEMY_CONFIGS.absorber.health;
+    this.isElite = isElite || false;
+    const cfg = this.isElite ? ENEMY_CONFIGS.absorberElite : ENEMY_CONFIGS.absorber;
+    this.health = cfg.health;
+    this.spitDelay = cfg.spitDelay;
+    this.spread = cfg.spread || false;
     this.storedCount = 0;
     this.spitTimer = new Timer();
     this.renderOrder = 5;
@@ -287,9 +301,10 @@ class Absorber extends RectObject {
   }
 
   absorb() {
-    if (this.storedCount < ENEMY_CONFIGS.absorber.maxStored) {
+    const maxStored = ENEMY_CONFIGS.absorber.maxStored;
+    if (this.storedCount < maxStored) {
       this.storedCount++;
-      this.spitTimer.set(ENEMY_CONFIGS.absorber.spitDelay);
+      this.spitTimer.set(this.spitDelay);
       return true;
     } else {
       return false;
@@ -297,15 +312,25 @@ class Absorber extends RectObject {
   }
 
   spit() {
-    if (this.storedCount > 0) {
-      const spreadAngle = PI / 8;
-      for (let i = 0; i < this.storedCount; i++) {
-        const angle = -PI / 2 + (i - (this.storedCount - 1) / 2) * spreadAngle;
-        const vel = vec2(Math.cos(angle) * 0.3, Math.sin(angle) * 0.6);
+    if (this.storedCount <= 0) return;
+
+    if (this.spread) {
+      // Elite: spit all simultaneously as 3-bullet spread
+      for (let i = -1; i <= 1; i++) {
+        const vel = vec2(i * 0.3, -0.6);
         enemyBullets.push(new EnemyBullet(this.pos.copy(), vel));
       }
       this.storedCount = 0;
       this.spitTimer.set(0);
+    } else {
+      // Normal: spit one bullet straight down
+      enemyBullets.push(new EnemyBullet(this.pos.copy(), vec2(0, -0.6)));
+      this.storedCount--;
+      if (this.storedCount > 0) {
+        this.spitTimer.set(this.spitDelay);
+      } else {
+        this.spitTimer.set(0);
+      }
     }
   }
 
