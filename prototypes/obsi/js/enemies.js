@@ -1,4 +1,20 @@
 /* eslint-disable no-undef, no-unused-vars */
+
+function applyDamage(target, bullet, dmg = 1) {
+  const event = computeHitEvent({
+    health: target.health,
+    scoreValue: target.scoreValue,
+    dmg,
+    bulletPos: bullet.pos.copy(),
+  });
+  target.health = event.newHealth;
+  bullet.destroy();
+  if (event.event.kind === 'killed') {
+    target.destroy();
+  }
+  return event.event;
+}
+
 class Shooter extends RectObject {
   constructor(pos, gridRow, gridCol, entryStyle, isEntering, isElite) {
     super(pos, vec2(2.3, 1.6), rgb(.95, .2, .2)); // Red, invader-like
@@ -7,6 +23,7 @@ class Shooter extends RectObject {
     this.isElite = isElite || false;
     const cfg = this.isElite ? ENEMY_CONFIGS.shooterElite : ENEMY_CONFIGS.shooter;
     this.health = cfg.health;
+    this.scoreValue = cfg.score;
     this.shootRate = cfg.shootRate;
     this.aimed = cfg.aimed || false;
     this.shootTimer = new Timer();
@@ -72,6 +89,10 @@ class Shooter extends RectObject {
       drawRect(p.add(vec2(0.8, -.5)), vec2(s, s * 2), this.color);
     }
   }
+
+  onBulletHit(b) {
+    return applyDamage(this, b);
+  }
 }
 
 class Diver extends RectObject {
@@ -82,6 +103,7 @@ class Diver extends RectObject {
     this.isElite = isElite || false;
     const cfg = this.isElite ? ENEMY_CONFIGS.diverElite : ENEMY_CONFIGS.diver;
     this.health = cfg.health;
+    this.scoreValue = cfg.score;
     this.diveSpeed = cfg.diveSpeed;
     this.diveRate = cfg.diveRate;
     this.gridPos = pos.copy();
@@ -190,6 +212,10 @@ class Diver extends RectObject {
       drawRect(p.add(vec2(0.6, -.5)), vec2(s * 2, s), this.color);
     }
   }
+
+  onBulletHit(b) {
+    return applyDamage(this, b);
+  }
 }
 
 class Reflector extends RectObject {
@@ -200,6 +226,7 @@ class Reflector extends RectObject {
     this.isElite = isElite || false;
     const cfg = this.isElite ? ENEMY_CONFIGS.reflectorElite : ENEMY_CONFIGS.reflector;
     this.health = cfg.health;
+    this.scoreValue = cfg.score;
     this.renderOrder = 5;
     this.isEntering = isEntering || false;
     this.entryStyle = entryStyle || 'from_top';
@@ -268,6 +295,7 @@ class Absorber extends RectObject {
     this.isElite = isElite || false;
     const cfg = this.isElite ? ENEMY_CONFIGS.absorberElite : ENEMY_CONFIGS.absorber;
     this.health = cfg.health;
+    this.scoreValue = cfg.score;
     this.spitDelay = cfg.spitDelay;
     this.spread = cfg.spread || false;
     this.storedCount = 0;
@@ -384,6 +412,7 @@ class Boss extends RectObject {
     this.cycle = Math.floor((waveN - 1) / 10) + 1;
     this.baseBossHp = ENEMY_CONFIGS.boss.health;
     this.health = this.baseBossHp * (0.5 + this.cycle * 0.3); // Scale health by cycle
+    this.scoreValue = ENEMY_CONFIGS.boss.score;
     this.renderOrder = 5;
   }
 
@@ -429,6 +458,10 @@ class Boss extends RectObject {
       drawRect(p.add(vec2(2, -.5)), vec2(s * 2, s * 2), this.color);
     }
   }
+
+  onBulletHit(b) {
+    return applyDamage(this, b);
+  }
 }
 
 class Treasure extends RectObject {
@@ -436,6 +469,7 @@ class Treasure extends RectObject {
     super(pos, vec2(3, 3), rgb(.95, .85, .2)); // Gold/yellow
     this.vel = vec2(0.2 + rand(0, 0.1), 0.2 + rand(0, 0.1));
     this.health = ENEMY_CONFIGS.treasure.health;
+    this.scoreValue = ENEMY_CONFIGS.treasure.score;
     this.renderOrder = 7;
   }
 
@@ -467,5 +501,9 @@ class Treasure extends RectObject {
       drawRect(p.add(vec2(0, -.7)), vec2(s, s), this.color);
       drawRect(p.add(vec2(1, -.6)), vec2(s, s), this.color);
     }
+  }
+
+  onBulletHit(b) {
+    return applyDamage(this, b);
   }
 }
