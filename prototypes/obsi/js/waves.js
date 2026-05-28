@@ -79,3 +79,64 @@ function parseWaveDSL(raw) {
     prepare
   };
 }
+
+function buildSpawnQueue(waveDef) {
+  const { entities, pattern } = waveDef;
+
+  // Collect all non-empty cells as { eType, row, col }
+  const positions = [];
+  for (let row = 0; row < entities.length; row++) {
+    for (let col = 0; col < entities[row].length; col++) {
+      const char = entities[row][col];
+      if (char !== '.') {
+        positions.push({ eType: char, row, col });
+      }
+    }
+  }
+
+  // Sort by order type
+  if (pattern.order === 'row_major') {
+    positions.sort((a, b) => {
+      if (a.row !== b.row) return a.row - b.row;
+      return a.col - b.col;
+    });
+  }
+  else if (pattern.order === 'col_major') {
+    positions.sort((a, b) => {
+      if (a.col !== b.col) return a.col - b.col;
+      return a.row - b.row;
+    });
+  }
+  else if (pattern.order === 'spiral') {
+    // Sort by Manhattan distance from center (5, 2) for 11×5 grid
+    const centerCol = 5;
+    const centerRow = 2;
+    positions.sort((a, b) => {
+      const distA = Math.abs(a.col - centerCol) + Math.abs(a.row - centerRow);
+      const distB = Math.abs(b.col - centerCol) + Math.abs(b.row - centerRow);
+      return distA - distB;
+    });
+  }
+
+  // Build spawn queue with entry styles and timers
+  const queue = positions.map((pos, index) => {
+    let style = pattern.entry;
+
+    // Resolve alternating entry style to left/right based on column parity
+    if (pattern.entry === 'alternating') {
+      style = pos.col % 2 === 0 ? 'from_left' : 'from_right';
+    }
+
+    const spawnTimer = (pattern.base + index * pattern.inc) / 60;
+
+    return {
+      eType: pos.eType,
+      row: pos.row,
+      col: pos.col,
+      style,
+      spawnTimer
+    };
+  });
+
+  return queue;
+}
