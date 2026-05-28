@@ -333,6 +333,7 @@ function updateFormation() {
     const randomCol = Math.floor(Math.random() * GRID_COLS);
     let lowestEnemy = null;
     for (const e of enemies) {
+      if (e instanceof Diver) continue;
       if (e.gridCol === randomCol && (!lowestEnemy || e.pos.y < lowestEnemy.pos.y))
         lowestEnemy = e;
     }
