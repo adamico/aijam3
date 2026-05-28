@@ -15,3 +15,5 @@
 #9: Implemented Reflector and Absorber enemies. Reflector (yellow) reflects player bullets downward as enemy projectiles and takes 3 hits to destroy. Absorber (dark blue) absorbs bullets up to maxStored, displays count, spits in spread pattern on maxStored or spitDelay. Spawning: row 0=shooter, 1=diver, 2=reflector, 3=absorber, 4=shooter. Updated scoring to reflect each enemy type value.
 
 #10: Implemented Treasure mini-boss. Spawns every 30s during combat, bounces diagonally around screen with pool-ball physics, high health (50), awards large score bonus (500) on defeat. Only one treasure active at a time, does not count toward wave clear. Distinctive gold sprite.
+
+#11: Implemented Boss wave (v1 stub). Every 10th wave spawns single Boss instead of grid. Boss moves side-to-side, fires 3-bullet spread downward. Health and fire rate scale with cycle number (every 10 waves). Boss defeat triggers celebration → cycle_transition → next cycle. Difficulty increases each cycle. Game loops indefinitely through 10-wave cycles.
