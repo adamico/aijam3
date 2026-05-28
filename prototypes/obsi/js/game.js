@@ -1,4 +1,56 @@
 /* eslint-disable no-undef, no-unused-vars */
+const sprites = {};
+
+function paintPlayer(ctx) {
+    const cx = 250, cy = 290;
+    ctx.fillStyle = '#1ae6f0';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 195);
+    ctx.lineTo(cx - 14, cy - 125);
+    ctx.lineTo(cx - 40, cy - 50);
+    ctx.lineTo(cx - 38, cy + 55);
+    ctx.lineTo(cx, cy + 38);
+    ctx.lineTo(cx + 38, cy + 55);
+    ctx.lineTo(cx + 40, cy - 50);
+    ctx.lineTo(cx + 14, cy - 125);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#0a6080';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.fillStyle = '#0ebbcc';
+    ctx.beginPath();
+    ctx.moveTo(cx - 35, cy - 20);
+    ctx.lineTo(cx - 160, cy + 55);
+    ctx.lineTo(cx - 38, cy + 40);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + 35, cy - 20);
+    ctx.lineTo(cx + 160, cy + 55);
+    ctx.lineTo(cx + 38, cy + 40);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(200,245,255,0.4)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 195);
+    ctx.lineTo(cx - 14, cy - 125);
+    ctx.lineTo(cx + 14, cy - 125);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#80f0ff';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - 10, 16, 26, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#0a6080';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#ff5520';
+    ctx.fillRect(cx - 16, cy + 42, 32, 14);
+}
+
 // engine settings
 debugWatermark = false;
 showEngineVersion = false;
@@ -95,6 +147,8 @@ function spawnEnemyGrid() {
 
 // Game loop
 function gameInit() {
+  initDrawToTexture();
+  sprites.player = drawToTexture(0, paintPlayer, 'cyan delta-wing player ship with integrated barrel spike');
   setCanvasFixedSize(CANVAS_SIZE);
   setCameraPos(LEVEL_SIZE.scale(.5));
   cameraScale = CAMERA_SCALE;
