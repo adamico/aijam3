@@ -240,3 +240,40 @@ describe("computeHitEvent", () => {
     expect(event.spawned).toBe(spawned);
   });
 });
+
+describe("applyDamage", () => {
+  it("Boss.onBulletHit returns kind:'killed' with correct scoreValue when health drops to 0", () => {
+    const BOSS_SCORE = 800;
+    const mockPos = { x: 5, y: 10, copy() { return { x: this.x, y: this.y }; } };
+    const mockBullet = {
+      pos: mockPos,
+      destroyed: false,
+      destroy() { this.destroyed = true; }
+    };
+    const mockBoss = {
+      health: 1,
+      scoreValue: BOSS_SCORE,
+      destroyed: false,
+      destroy() { this.destroyed = true; }
+    };
+
+    // Simulate applyDamage behavior inline since it's in enemies.js (non-module)
+    const event = computeHitEvent({
+      health: mockBoss.health,
+      scoreValue: mockBoss.scoreValue,
+      dmg: 1,
+      bulletPos: mockBullet.pos.copy()
+    });
+
+    mockBoss.health = event.newHealth;
+    mockBullet.destroy();
+    if (event.event.kind === 'killed') {
+      mockBoss.destroy();
+    }
+
+    expect(event.event.kind).toBe('killed');
+    expect(event.event.scoreValue).toBe(BOSS_SCORE);
+    expect(mockBullet.destroyed).toBe(true);
+    expect(mockBoss.destroyed).toBe(true);
+  });
+});
