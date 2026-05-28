@@ -181,60 +181,24 @@ function gameUpdate() {
   // Update enemies
   enemies = enemies.filter(e => !e.destroyed);
 
-  // Bullet-treasure collision
-  for (const bullet of bullets) {
-    if (bullet.destroyed || !treasure) continue;
-    if (isOverlapping(bullet.pos, bullet.size, treasure.pos, treasure.size)) {
-      bullet.destroy();
-      treasure.health--;
-      if (treasure.health <= 0) {
-        treasure.destroy();
-        score += ENEMY_CONFIGS.treasure.score;
-        hiScore = max(hiScore, score);
-      }
-    }
-  }
-
-  // Bullet-enemy collisions
+  // Unified bullet-target collision with HitEvent fanout
   for (const bullet of bullets) {
     if (bullet.destroyed) continue;
-    for (const enemy of enemies) {
-      if (enemy.destroyed) continue;
-      if (isOverlapping(bullet.pos, bullet.size, enemy.pos, enemy.size)) {
-        if (enemy instanceof Reflector) {
-          // Reflect the bullet
-          bullet.vel.y *= -1;
-          bullets.push(new EnemyBullet(bullet.pos.copy(), bullet.vel));
-          bullet.destroy();
-          enemy.health--;
-        }
-        else if (enemy instanceof Absorber) {
-          // Absorb the bullet
-          bullet.destroy();
-          if (enemy.absorb()) {
-            break;
-          } else {
-            enemy.health--;
-          }
-        }
-        else {
-          // Normal bullet hit
-          bullet.destroy();
-          enemy.health--;
-        }
-
-        // Check if enemy defeated
-        if (!enemy.destroyed && enemy.health <= 0) {
-          enemy.destroy();
-          let scoreValue = ENEMY_CONFIGS.shooter.score;
-          if (enemy instanceof Diver) scoreValue = ENEMY_CONFIGS.diver.score;
-          else if (enemy instanceof Reflector) scoreValue = ENEMY_CONFIGS.reflector.score;
-          else if (enemy instanceof Absorber) scoreValue = ENEMY_CONFIGS.absorber.score;
-          score += scoreValue;
-          hiScore = max(hiScore, score);
-        }
-        break;
+    for (const target of [...enemies, boss, treasure].filter(Boolean)) {
+      if (target.destroyed) continue;
+      if (!isOverlapping(bullet.pos, bullet.size, target.pos, target.size)) continue;
+      const ev = target.onBulletHit(bullet);
+      playHitSound(ev);
+      spawnHitParticles(ev);
+      score += ev.scoreValue;
+      hiScore = max(hiScore, score);
+      enemyBullets.push(...ev.spawned);
+      if (target === boss && ev.kind === 'killed') {
+        waveState = 'boss_defeated';
+        bossDefeatedTimer.set(3);
+        boss = null;
       }
+      break;
     }
   }
 
@@ -270,29 +234,9 @@ function gameUpdate() {
     }
   }
 
-  // Boss or formation movement
-  if (waveState === 'combat') {
-    if (boss) {
-      // Check boss-bullet collision
-      for (const bullet of bullets) {
-        if (bullet.destroyed || !boss) continue;
-        if (isOverlapping(bullet.pos, bullet.size, boss.pos, boss.size)) {
-          bullet.destroy();
-          boss.health--;
-          if (boss.health <= 0) {
-            score += ENEMY_CONFIGS.boss.score;
-            hiScore = max(hiScore, score);
-            waveState = 'boss_defeated';
-            bossDefeatedTimer.set(3);
-            boss.destroy();
-            boss = null;
-          }
-        }
-      }
-    }
-    else if (enemies.length > 0) {
-      updateFormation();
-    }
+  // Formation movement (boss collision handled in unified loop above)
+  if (waveState === 'combat' && !boss && enemies.length > 0) {
+    updateFormation();
   }
 
   // Wave FSM
