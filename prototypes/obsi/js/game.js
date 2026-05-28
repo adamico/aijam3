@@ -301,9 +301,13 @@ function updateFormation() {
     formationDir *= -1;
   }
 
-  // Move formation
-  for (const e of enemies)
-    e.pos.x += formationDir * formationSpeed;
+  // Move formation (keep slot tracking in sync so divers return to current slot)
+  for (const e of enemies) {
+    const dx = formationDir * formationSpeed;
+    e.pos.x += dx;
+    e.gridPos.x += dx;
+    if (e.originalPos) e.originalPos.x += dx;
+  }
 
   // Enemy shooting
   const difficulty = calcDifficulty(waveN);

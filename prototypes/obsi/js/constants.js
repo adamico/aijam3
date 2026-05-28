@@ -207,5 +207,3 @@ function calcDifficulty(waveN) {
     diveChance: Math.min(0.8 + (waveN - 1) * 0.05, 1.0),
   };
 }
-
-export { WAVE_DEFINITIONS, parseWaveDSL, buildSpawnQueue, calcDifficulty };

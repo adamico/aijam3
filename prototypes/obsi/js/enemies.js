@@ -87,8 +87,10 @@ class Diver extends RectObject {
     this.gridPos = pos.copy();
     this.originalPos = pos.copy();
     this.isDiving = false;
+    this.divePhase = null;
     this.targetX = pos.x;
     this.diveRateTimer = new Timer();
+    this.diveRateTimer.set(this.diveRate);
     this.renderOrder = 5;
     this.isEntering = isEntering || false;
     this.entryStyle = entryStyle || 'from_top';
@@ -139,18 +141,21 @@ class Diver extends RectObject {
       const diveSpeed = this.diveSpeed * 0.1; // Scale to world units
       const targetY = PLAYER_Y + 0.5; // Dive to player level
 
-      if (this.pos.y > targetY) {
+      if (this.divePhase !== 'ascending') {
         // Descending
         this.pos.y -= diveSpeed;
         this.pos.x = lerp(this.pos.x, this.targetX, 0.05); // Smooth X approach
+        if (this.pos.y <= targetY) this.divePhase = 'ascending';
       }
       else {
-        // Ascending back to formation
+        // Ascending back to formation — track drifted slot X
         this.pos.y += diveSpeed * 0.5; // Slower ascent
+        this.pos.x = lerp(this.pos.x, this.originalPos.x, 0.05);
         if (this.pos.y >= this.originalPos.y) {
           // Back at formation
           this.pos = this.originalPos.copy();
           this.isDiving = false;
+          this.divePhase = null;
           this.diveRateTimer.set(this.diveRate);
         }
       }
@@ -161,6 +166,7 @@ class Diver extends RectObject {
         const difficulty = calcDifficulty(waveN);
         if (rand() < difficulty.diveChance) {
           this.isDiving = true;
+          this.divePhase = 'descending';
           this.targetX = player ? player.pos.x : LEVEL_SIZE.x / 2;
           this.diveRateTimer.set(this.diveRate);
         }
