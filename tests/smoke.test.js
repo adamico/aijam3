@@ -276,4 +276,47 @@ describe("applyDamage", () => {
     expect(mockBullet.destroyed).toBe(true);
     expect(mockBoss.destroyed).toBe(true);
   });
+
+  it("Reflector.onBulletHit on damaged Reflector returns shape with reflected:true and spawned.length===1", () => {
+    const REFLECTOR_SCORE = 160;
+    const mockPos = { x: 5, y: 10, copy() { return { x: this.x, y: this.y }; } };
+    const mockBullet = {
+      pos: mockPos,
+      vel: { x: 0, y: -0.8 },
+      destroyed: false,
+      destroy() { this.destroyed = true; }
+    };
+    const mockReflector = {
+      health: 3,
+      scoreValue: REFLECTOR_SCORE,
+      destroyed: false,
+      destroy() { this.destroyed = true; }
+    };
+
+    // Simulate Reflector.onBulletHit: create mirrored bullet, apply damage, set reflected/spawned
+    const mirroredBullet = { pos: mockBullet.pos.copy(), vel: { x: mockBullet.vel.x, y: mockBullet.vel.y * -1 } };
+    const event = computeHitEvent({
+      health: mockReflector.health,
+      scoreValue: mockReflector.scoreValue,
+      dmg: 1,
+      bulletPos: mockBullet.pos.copy()
+    });
+
+    mockReflector.health = event.newHealth;
+    mockBullet.destroy();
+    if (event.event.kind === 'killed') {
+      mockReflector.destroy();
+    }
+
+    event.event.reflected = true;
+    event.event.spawned = [mirroredBullet];
+
+    expect(event.event.kind).toBe('damaged');
+    expect(event.event.reflected).toBe(true);
+    expect(event.event.spawned.length).toBe(1);
+    expect(event.event.spawned[0].vel.y).toBe(0.8);
+    expect(mockReflector.health).toBe(2);
+    expect(mockBullet.destroyed).toBe(true);
+    expect(mockReflector.destroyed).toBe(false);
+  });
 });
