@@ -140,3 +140,65 @@ function buildSpawnQueue(waveDef) {
 
   return queue;
 }
+
+function spawnEnemy(queueEntry) {
+  const { eType, row, col, style } = queueEntry;
+  const startX = LEVEL_SIZE.x / 2 - GRID_WIDTH / 2;
+  const startY = GRID_START_Y_OFFSET;
+  const pos = vec2(startX + col * GRID_SPACING.x, startY - row * GRID_SPACING.y);
+
+  let enemy;
+  switch (eType) {
+    case 'p':
+    case 'E':
+      enemy = new Shooter(pos, row, col, style, true);
+      break;
+    case 'P':
+      enemy = new Shooter(pos, row, col, style, true);
+      break;
+    case 'k':
+      enemy = new Diver(pos, row, col, style, true);
+      break;
+    case 'K':
+      enemy = new Diver(pos, row, col, style, true);
+      break;
+    case 'r':
+      enemy = new Reflector(pos, row, col, style, true);
+      break;
+    case 'R':
+      enemy = new Reflector(pos, row, col, style, true);
+      break;
+    case 'a':
+      enemy = new Absorber(pos, row, col, style, true);
+      break;
+    case 'A':
+      enemy = new Absorber(pos, row, col, style, true);
+      break;
+    case 'B':
+      boss = new Boss(pos);
+      return;
+    case 'g':
+      enemy = new Treasure(pos);
+      break;
+    default:
+      enemy = new Shooter(pos, row, col, style, true);
+      break;
+  }
+
+  if (enemy) {
+    enemies.push(enemy);
+  }
+}
+
+function processSpawnQueue(dt) {
+  for (let i = spawnQueue.length - 1; i >= 0; i--) {
+    const entry = spawnQueue[i];
+    entry.spawnTimer -= dt;
+
+    if (entry.spawnTimer <= 0) {
+      spawnEnemy(entry);
+      spawnQueue.splice(i, 1);
+    }
+  }
+}
+

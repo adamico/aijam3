@@ -68,6 +68,7 @@ let waveState = 'transition';
 let transitionTimer = new Timer();
 let bossDefeatedTimer = new Timer();
 let cycleTransitionTimer = new Timer();
+let spawnQueue = [];
 
 // Formation state
 let formationDir = 1;
@@ -117,32 +118,22 @@ function calcDifficulty(waveN) {
 function spawnEnemyGrid() {
   boss = null;
   isBossWave = waveN % 10 === 0;
+  enemies = [];
+  spawnQueue = [];
 
-  if (isBossWave) {
-    // Boss wave - spawn single boss
-    enemies = [];
-    boss = new Boss(vec2(LEVEL_SIZE.x / 2, LEVEL_SIZE.y - 5));
-  }
-  else {
-    // Normal wave - spawn grid
-    enemies = [];
-    formationDir = 1;
-    formationSpeed = calcDifficulty(waveN).formationSpeed;
-    formationShootTimer.set(0);
+  // Get wave definition (cycle through 10 wave definitions)
+  const waveIndex = ((waveN - 1) % 10);
+  const rawDef = WAVE_DEFINITIONS[waveIndex];
 
-    const startX = LEVEL_SIZE.x / 2 - GRID_WIDTH / 2;
-    const startY = GRID_START_Y_OFFSET;
+  // Parse DSL and build spawn queue
+  const parsedWave = parseWaveDSL(rawDef);
+  const queue = buildSpawnQueue(parsedWave);
+  spawnQueue = queue;
 
-    for (let r = 0; r < GRID_ROWS; r++)
-      for (let c = 0; c < GRID_COLS; c++) {
-        const pos = vec2(startX + c * GRID_SPACING.x, startY - r * GRID_SPACING.y);
-        // Spawn mix: row 0 = shooter, row 1 = diver, row 2 = reflector, row 3 = absorber, row 4 = shooter
-        if (r === 1) enemies.push(new Diver(pos, r, c));
-        else if (r === 2) enemies.push(new Reflector(pos, r, c));
-        else if (r === 3) enemies.push(new Absorber(pos, r, c));
-        else enemies.push(new Shooter(pos, r, c));
-      }
-  }
+  // Initialize formation state
+  formationDir = 1;
+  formationSpeed = calcDifficulty(waveN).formationSpeed;
+  formationShootTimer.set(0);
 }
 
 // Game loop
@@ -176,6 +167,11 @@ function gameUpdate() {
   // Update bullets and remove destroyed ones
   bullets = bullets.filter(b => !b.destroyed);
   enemyBullets = enemyBullets.filter(b => !b.destroyed);
+
+  // Process spawn queue during combat
+  if (waveState === 'combat') {
+    processSpawnQueue(timeDelta);
+  }
 
   // Update treasure
   if (treasure && treasure.destroyed)
