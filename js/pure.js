@@ -142,3 +142,16 @@ export function calcDifficulty(waveN) {
     diveChance: Math.min(0.8 + (waveN - 1) * 0.05, 1.0),
   };
 }
+
+export function computeHitEvent({ health, scoreValue, dmg, bulletPos, reflected = false, spawned = [] }) {
+  const newHealth = health - dmg;
+  const kind = newHealth > 0 ? 'damaged' : 'killed';
+  const event = {
+    kind,
+    reflected,
+    pos: bulletPos,
+    scoreValue: kind === 'killed' ? scoreValue : 0,
+    spawned,
+  };
+  return { newHealth, event };
+}

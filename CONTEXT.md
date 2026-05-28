@@ -37,3 +37,6 @@ Flat `ENEMY_CONFIGS` object in `constants.js` holding per-type balance values. F
 
 **Module system**
 Sequential `<script>` tags, global scope. Matches LittleJS's own loading model. No ES module imports/exports.
+
+**HitEvent**
+The canonical result of a bullet striking a target. Shape: `{ kind, reflected, pos, scoreValue, spawned }`. `kind` is `'damaged'` (target survived), `'killed'` (target destroyed), or `'absorbed'` (damage negated). `scoreValue` is only non-zero for `kind: 'killed'` hits. `reflected` and `spawned` indicate post-hit behavior (reflection/splitting). Computed by pure function `computeHitEvent` from target health, damage amount, and hit metadata.

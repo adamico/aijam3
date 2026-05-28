@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseWaveDSL, buildSpawnQueue, calcDifficulty, WAVE_DEFINITIONS, tickDiver } from "../js/pure.js";
+import { parseWaveDSL, buildSpawnQueue, calcDifficulty, WAVE_DEFINITIONS, tickDiver, computeHitEvent } from "../js/pure.js";
 
 function makeDiver(overrides = {}) {
   return {
@@ -184,5 +184,59 @@ describe("calcDifficulty", () => {
       expect(Number.isFinite(difficulty.formationSpeed)).toBe(true);
       expect(Number.isFinite(difficulty.diveChance)).toBe(true);
     }
+  });
+});
+
+describe("computeHitEvent", () => {
+  it("survives hit → kind: damaged, scoreValue: 0", () => {
+    const { newHealth, event } = computeHitEvent({
+      health: 10,
+      scoreValue: 100,
+      dmg: 3,
+      bulletPos: { x: 5, y: 6 },
+    });
+    expect(newHealth).toBe(7);
+    expect(event.kind).toBe("damaged");
+    expect(event.scoreValue).toBe(0);
+  });
+
+  it("health reaches 0 → kind: killed, scoreValue passed through", () => {
+    const { newHealth, event } = computeHitEvent({
+      health: 5,
+      scoreValue: 100,
+      dmg: 5,
+      bulletPos: { x: 5, y: 6 },
+    });
+    expect(newHealth).toBe(0);
+    expect(event.kind).toBe("killed");
+    expect(event.scoreValue).toBe(100);
+  });
+
+  it("health drops below 0 → kind: killed, scoreValue passed through", () => {
+    const { newHealth, event } = computeHitEvent({
+      health: 5,
+      scoreValue: 50,
+      dmg: 12,
+      bulletPos: { x: 5, y: 6 },
+    });
+    expect(newHealth).toBe(-7);
+    expect(event.kind).toBe("killed");
+    expect(event.scoreValue).toBe(50);
+  });
+
+  it("passes through reflected, spawned, pos unchanged", () => {
+    const bulletPos = { x: 3, y: 4 };
+    const spawned = [{ type: "bullet1" }];
+    const { event } = computeHitEvent({
+      health: 10,
+      scoreValue: 100,
+      dmg: 5,
+      bulletPos,
+      reflected: true,
+      spawned,
+    });
+    expect(event.pos).toBe(bulletPos);
+    expect(event.reflected).toBe(true);
+    expect(event.spawned).toBe(spawned);
   });
 });
