@@ -47,7 +47,7 @@ class Shooter extends RectObject {
 
   update() {
     if (this.isEntering) {
-      this.pos = lerp(this.entryStartPos, this.gridPos, 1 - (this.entryTimer.time / 0.4));
+      this.pos = this.entryStartPos.lerp(this.gridPos, 1 - (this.entryTimer.time / 0.4));
 
       if (this.entryTimer.elapsed()) {
         this.pos = this.gridPos.copy();
@@ -124,7 +124,7 @@ class Diver extends RectObject {
 
   update() {
     if (this.isEntering) {
-      this.pos = lerp(this.entryStartPos, this.gridPos, 1 - (this.entryTimer.time / 0.4));
+      this.pos = this.entryStartPos.lerp(this.gridPos, 1 - (this.entryTimer.time / 0.4));
 
       if (this.entryTimer.elapsed()) {
         this.pos = this.gridPos.copy();
@@ -230,7 +230,7 @@ class Reflector extends RectObject {
 
   update() {
     if (this.isEntering) {
-      this.pos = lerp(this.entryStartPos, this.gridPos, 1 - (this.entryTimer.time / 0.4));
+      this.pos = this.entryStartPos.lerp(this.gridPos, 1 - (this.entryTimer.time / 0.4));
 
       if (this.entryTimer.elapsed()) {
         this.pos = this.gridPos.copy();
@@ -336,7 +336,7 @@ class Absorber extends RectObject {
 
   update() {
     if (this.isEntering) {
-      this.pos = lerp(this.entryStartPos, this.gridPos, 1 - (this.entryTimer.time / 0.4));
+      this.pos = this.entryStartPos.lerp(this.gridPos, 1 - (this.entryTimer.time / 0.4));
 
       if (this.entryTimer.elapsed()) {
         this.pos = this.gridPos.copy();

@@ -1,27 +1,31 @@
 /* eslint-disable no-undef, no-unused-vars */
 
+/* Pico8 definitions
+wave_definitions = {
+   ".p...p...p,..p.p.p.p.,.p.p...p.p,..p.p.p.p.,.p...p...p.|c|       \^o050\f8wave 1 cleared!,pREPARE fOR wAVE 2",
+   "...p...p...,..p.ppp.p.,.k.k.k.k.k,p...p.p...p,.p..p.p..p.|c|       \^o050\f8wave 2 cleared!,pREPARE fOR wAVE 3",
+   "..p.p.p.p.,.prk.k.krp,..p.p.p.p.,.prk...krp,..p.....p..|l|       \^o050\f8wave 3 cleared!,pREPARE fOR wAVE 4",
+   "...p...p..,k..p...p..k,.k.r.p.r.k.,..k.p.p.k..,...a...a...|c|       \^o050\f8wave 4 cleared!,pREPARE fOR wAVE 5",
+   "...p.p.p..,.pkpp.ppkp,p..r.p.r..p,..papkpap,.k.......k.|s|       \^o050\f8wave 5 cleared!,pREPARE fOR wAVE 6",
+   ".p.p.p.p.p,..krp.prk.,.k.p.k.p.k,..a.k.k.a.,.p.p...p.p.|c|       \^o050\f8wave 6 cleared!,pREPARE fOR wAVE 7",
+   "...k.P.k..,p.a.kpk.Ap,.RprpkprpR,p.k.ApA.kp,...k.p.k..|l|       \^o050\f8wave 7 cleared!,pREPARE fOR wAVE 8",
+   "...r.k.r..,.Kpap.papK,pr...a...rp,.Pkp.p.pkP,.k.p.p.p.k|s|       \^o050\f8wave 8 cleared!,pREPARE fOR wAVE 9",
+   "P.p.pPp.p.P,p.Rp.K.pR.p,pKk.rEr.kKp,p..A.k.A..p,pRpKpEpKpRp|c|       \^o050\f8wave 9 cleared!,pREPARE fOR bOSS fIGHT!",
+   ".....B.....|c| ",
+}
+*/
+
 const WAVE_DEFINITIONS = [
-  // Wave 1: Introduction - simple shooters
-  "p.p.p.p.p,p.p.p.p.p,p.p.p.p.p,...........,..........|c|Wave 1 cleared!,Prepare for wave 2",
-  ".p.p.p.p.,p.p.p.p.p,p.p.p.p.p,...........,..........|c|Wave 2 cleared!,Prepare for wave 3",
-
-  // Wave 3: Introduction to divers
-  "..p.p.p..,p.p.p.p.p,...........,...........,..........|c|Wave 3 cleared!,Prepare for wave 4",
-  "p.k.k.k.p,k.k.k.k.k,p.k.k.k.p,...........,..........|c|Wave 4 cleared!,Prepare for wave 5",
-
-  // Wave 5: Reflectors introduced
-  "r...r...r,r...r...r,...........,...........,..........|c|Wave 5 cleared!,Prepare for wave 6",
-  "p.r.p.r.p,r.p.r.p.r,p.r.p.r.p,...........,..........|c|Wave 6 cleared!,Prepare for wave 7",
-
-  // Wave 7: Absorbers and mix
-  "a...a...a,a...a...a,...........,...........,..........|c|Wave 7 cleared!,Prepare for wave 8",
-  "p.k.r.a.p,k.r.a.p.k,r.a.p.k.r,...........,..........|l|Wave 8 cleared!,Prepare for wave 9",
-
-  // Wave 9: Elite variants challenge
-  "P.K.R.A.P,K.R.A.P.K,R.A.P.K.R,...........,..........|c|Wave 9 cleared!,Prepare for boss",
-
-  // Wave 10: Boss wave
-  "....B....,.........,.........,.........,.........|c|Boss defeated!,Cycle complete"
+  ".p...p...p,..p.p.p.p.,.p.p...p.p,..p.p.p.p.,.p...p...p.|c|Wave 1 cleared!,Prepare for wave 2",
+  "...p...p...,..p.ppp.p.,.k.k.k.k.k,p...p.p...p,.p..p.p..p.|c|Wave 2 cleared!,Prepare for wave 3",
+  "..p.p.p.p.,.prk.k.krp,..p.p.p.p.,.prk...krp,..p.....p..|l|Wave 3 cleared!,Prepare for wave 4",
+  "...p...p..,k..p...p..k,.k.r.p.r.k.,..k.p.p.k..,...a...a...|c|Wave 4 cleared!,Prepare for wave 5",
+  "...p.p.p..,.pkpp.ppkp,p..r.p.r..p,..papkpap,.k.......k.|s|Wave 5 cleared!,Prepare for wave 6",
+  ".p.p.p.p.p,..krp.prk.,.k.p.k.p.k,..a.k.k.a.,.p.p...p.p.|c|Wave 6 cleared!,Prepare for wave 7",
+  "...k.P.k..,p.a.kpk.Ap,.RprpkprpR,p.k.ApA.kp,...k.p.k..|l|Wave 7 cleared!,Prepare for wave 8",
+  "...r.k.r..,.Kpap.papK,pr...a...rp,.Pkp.p.pkP,.k.p.p.p.k|s|Wave 8 cleared!,Prepare for wave 9",
+  "P.p.pPp.p.P,p.Rp.K.pR.p,pKk.rEr.kKp,p..A.k.A..p,pRpKpEpKpRp|c|Wave 9 cleared!,Prepare for boss fight",
+  ".....B.....,.........,.........,.........,.........|c|Boss defeated!,Cycle complete",
 ];
 
 function parseWaveDSL(raw) {
@@ -39,22 +43,16 @@ function parseWaveDSL(raw) {
   if (rows.length !== 5) {
     throw new Error(`Invalid grid: expected 5 rows, got ${rows.length}`);
   }
-  const entities = rows.map(row => row.split(''));
+  const entities = rows.map(row => {
+    const chars = row.split('');
+    while (chars.length < 11) chars.push('.');
+    return chars.slice(0, 11);
+  });
 
-  // Validate grid dimensions
-  for (let i = 0; i < entities.length; i++) {
-    if (entities[i].length !== 11) {
-      throw new Error(`Invalid grid row ${i}: expected 11 chars, got ${entities[i].length}`);
-    }
-  }
-
-  // Parse messages
-  const msgs = msgPair.split(',');
-  if (msgs.length !== 2) {
-    throw new Error(`Invalid message pair: expected 2 comma-separated messages, got ${msgs.length}`);
-  }
-  const cleared = msgs[0].trim();
-  const prepare = msgs[1].trim();
+  // Parse messages — split on first comma only
+  const commaIdx = msgPair.indexOf(',');
+  const cleared = (commaIdx >= 0 ? msgPair.slice(0, commaIdx) : msgPair).trim();
+  const prepare = (commaIdx >= 0 ? msgPair.slice(commaIdx + 1) : '').trim();
 
   // Set pattern defaults
   let pattern;
@@ -191,4 +189,3 @@ function processSpawnQueue(dt) {
     }
   }
 }
-
