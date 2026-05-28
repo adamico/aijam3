@@ -149,7 +149,7 @@ class Diver extends RectObject {
       }
       else {
         // Ascending back to formation — track drifted slot X
-        this.pos.y += diveSpeed * 0.5; // Slower ascent
+        this.pos.y += diveSpeed * 1.5;
         this.pos.x = lerp(this.pos.x, this.originalPos.x, 0.05);
         if (this.pos.y >= this.originalPos.y) {
           // Back at formation
@@ -167,7 +167,7 @@ class Diver extends RectObject {
         if (rand() < difficulty.diveChance) {
           this.isDiving = true;
           this.divePhase = 'descending';
-          this.targetX = player ? player.pos.x : LEVEL_SIZE.x / 2;
+          this.targetX = (this.isElite && player) ? player.pos.x : this.originalPos.x;
           this.diveRateTimer.set(this.diveRate);
         }
         else {

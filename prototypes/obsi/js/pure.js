@@ -117,7 +117,7 @@ export function tickDiver(state, randValue, diveChance, playerX = state.original
       if (randValue < diveChance) {
         s.isDiving = true;
         s.divePhase = 'descending';
-        s.targetX = playerX;
+        s.targetX = s.chasesPlayerX ? playerX : s.originalPosX;
         s.diveTimer = s.diveRate;
       } else {
         s.diveTimer = 0.5;
