@@ -51,7 +51,7 @@
         let humansAlive, planetDestroyed, mutantWavesLeft;
         let isPlaying, gameOver;
         let player;
-        let enemies, bullets, humans, particles;
+        let enemies, bullets, humans, particles, moneyDrops;
         let terrain;
         let stars;
         let baiterTimer;
@@ -204,6 +204,26 @@
         // Bullet
         function spawnBullet(pos, vel, friendly, color, life = 1.0) {
             bullets.push({pos: pos.copy(), vel: vel.copy(), friendly, life: new Timer(life), color});
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // Money Drop Spawner
+        function spawnMoneyDrops(pos, totalValue) {
+            const denominations = [1000, 500, 200, 100, 50, 20, 10];
+            let remaining = totalValue;
+            for (const denom of denominations) {
+                while (remaining >= denom) {
+                    const vx = rand(-0.15, 0.15);
+                    const vy = rand(0.1, 0.3);
+                    moneyDrops.push(new MoneyDrop(pos, vec2(vx, vy), denom));
+                    remaining -= denom;
+                }
+            }
+            if (remaining > 0) {
+                const vx = rand(-0.15, 0.15);
+                const vy = rand(0.1, 0.3);
+                moneyDrops.push(new MoneyDrop(pos, vec2(vx, vy), remaining));
+            }
         }
 
         ///////////////////////////////////////////////////////////////////////////////
@@ -400,6 +420,22 @@
                 const swarmersLeft = enemies.some(e => !e.dead && e.type === 'swarmer');
                 if (swarmersLeft && smartBombs > 0) {doSmartBomb(); return;}
 
+                // 5.5. Seek out and collect nearest money drop
+                let nearestDrop = null, bestDropDist = 1e9;
+                for (const d of moneyDrops) {
+                    if (d.dead) continue;
+                    const dist = Math.abs(wrapDX(d.pos.x, this.pos.x)) + Math.abs(d.pos.y - this.pos.y);
+                    if (dist < bestDropDist) {
+                        bestDropDist = dist;
+                        nearestDrop = d;
+                    }
+                }
+                if (nearestDrop) {
+                    this.avoidDanger();
+                    this.flyToward(nearestDrop.pos);
+                    return;
+                }
+
                 // 6. Patrol near humans
                 const liveH = humans.filter(h => !h.dead && !h.heldBy && !h.falling);
                 if (liveH.length) {
@@ -548,6 +584,58 @@
         }
 
         ///////////////////////////////////////////////////////////////////////////////
+        // Money Drop
+        class MoneyDrop {
+            constructor(pos, vel, value) {
+                this.pos = pos.copy();
+                this.vel = vel.copy();
+                this.value = value;
+                this.lifeTimer = new Timer(rand(10, 15));
+                this.dead = false;
+            }
+
+            update() {
+                if (this.dead) return;
+                
+                // Physics: apply gravity
+                this.vel.y -= 0.012; // gravity coefficient
+                
+                // Update position
+                this.pos.x = wrapX(this.pos.x + this.vel.x);
+                this.pos.y += this.vel.y;
+
+                // Bounce / ground clamp
+                const ground = terrainAt(this.pos.x) + 0.4;
+                if (this.pos.y <= ground) {
+                    this.pos.y = ground;
+                    this.vel.y = 0;
+                    this.vel.x *= 0.85; // ground friction
+                }
+
+                // Check despawn
+                if (this.lifeTimer.elapsed()) {
+                    this.dead = true;
+                }
+            }
+
+            render() {
+                if (this.dead) return;
+                
+                // Blink when life is low (last 3 seconds)
+                const lifeLeft = this.lifeTimer.getPercent(); // 0 when spawned, 1 when done
+                const timeLeft = (1 - lifeLeft) * 15; // approximate time left based on 15 max
+                if (timeLeft < 3 && (Math.floor(time * 15) % 2)) return;
+
+                const dp = dpos(this.pos);
+                // Draw green coin rectangle
+                drawRect(dp, vec2(0.8, 0.8), hsl(0.33, 1, 0.45));
+                
+                // Render '$' symbol in center
+                drawText('$', dp, 0.6, hsl(0, 0, 1), 0.08, hsl(0, 0, 0), 'center');
+            }
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////
         // Human figure
         function drawHumanFigure(p) {
             const dp = dpos(p);
@@ -690,7 +778,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                const value = bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                if (value > 0) spawnMoneyDrops(this.pos, value);
                 addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 if (this.carrying) {
                     addScore(500);
@@ -759,7 +848,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                const value = bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                if (value > 0) spawnMoneyDrops(this.pos, value);
                 addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 spark(this.pos, 14, this.color, .5, .8);
                 sfxExplode.play(this.pos, .5);
@@ -808,7 +898,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                const value = bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                if (value > 0) spawnMoneyDrops(this.pos, value);
                 addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 spark(this.pos, 16, this.color, .6, .9);
                 sfxExplode.play(this.pos, .5);
@@ -884,7 +975,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                const value = bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                if (value > 0) spawnMoneyDrops(this.pos, value);
                 addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 spark(this.pos, 24, this.color, .7, 1.0);
                 sfxExplode.play(this.pos, .6);
@@ -935,7 +1027,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                const value = bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                if (value > 0) spawnMoneyDrops(this.pos, value);
                 addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 spark(this.pos, 8, this.color, .5, .6);
                 sfxExplode.play(this.pos, .3, 1.5);
@@ -986,7 +1079,8 @@
 
             hit() {
                 if (this.dead) return;
-                money += bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                const value = bombKill ? Math.floor(this.moneyDrop / 2) : this.moneyDrop;
+                if (value > 0) spawnMoneyDrops(this.pos, value);
                 addScore(bombKill ? Math.floor(this.scoreValue / 2) : this.scoreValue);
                 spark(this.pos, 14, this.color, .6, .8);
                 sfxExplode.play(this.pos, .5);
@@ -1143,7 +1237,7 @@
         function startGame() {
             score = 0; lives = 3; smartBombs = 3; wave = 1; nextExtra = EXTRA_LIFE_EVERY;
             humansAlive = HUMAN_COUNT; planetDestroyed = false; mutantWavesLeft = 0;
-            enemies = []; bullets = []; humans = []; particles = []; pendingSpawns = [];
+            enemies = []; bullets = []; humans = []; particles = []; pendingSpawns = []; moneyDrops = [];
             bombFlash = 0;
             shakeTimer = new Timer(); spawnTimer = new Timer(); baiterTimer = new Timer();
             gameOver = false; isPlaying = true;
@@ -1185,7 +1279,7 @@
         function startAttractMode() {
             score = 0; lives = 3; smartBombs = 3; wave = 1; nextExtra = EXTRA_LIFE_EVERY;
             humansAlive = HUMAN_COUNT; planetDestroyed = false; mutantWavesLeft = 0;
-            enemies = []; bullets = []; humans = []; particles = []; pendingSpawns = [];
+            enemies = []; bullets = []; humans = []; particles = []; pendingSpawns = []; moneyDrops = [];
             bombFlash = 0;
             shakeTimer = new Timer(); spawnTimer = new Timer(); baiterTimer = new Timer();
             isPlaying = false; gameOver = false; player = null;
@@ -1412,12 +1506,29 @@
                 p.vel = p.vel.scale(.92);
             }
 
+            for (const d of moneyDrops) if (!d.dead) d.update();
+
             bulletHits();
             enemyHitsPlayer();
+
+            // Collision check: Player collects money drops
+            if (player && !player.dead) {
+                for (const d of moneyDrops) {
+                    if (d.dead) continue;
+                    const dx = Math.abs(wrapDX(player.pos.x, d.pos.x));
+                    const dy = Math.abs(player.pos.y - d.pos.y);
+                    if (dx < 1.2 && dy < 1.2) {
+                        money += d.value;
+                        d.dead = true;
+                        sfxPickup.play();
+                    }
+                }
+            }
 
             enemies = enemies.filter(e => !e.dead);
             bullets = bullets.filter(b => b.life.active());
             particles = particles.filter(p => p.life.active());
+            moneyDrops = moneyDrops.filter(d => !d.dead);
 
             if (isPlaying) {
                 // Q key → toggle shop autopilot
@@ -1591,6 +1702,7 @@
             drawShopZone();
             for (const h of humans) if (!h.dead) h.render();
             for (const e of enemies) if (!e.dead) e.render();
+            for (const d of moneyDrops) if (!d.dead) d.render();
             if (player) player.render();
             drawBullets();
             drawParticles();
