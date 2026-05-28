@@ -4,8 +4,6 @@ debugWatermark = false;
 showEngineVersion = false;
 debugKey = 'Backquote';
 
-let renderTemperature = false;
-
 // Global game state
 let player;
 let bullets = [];
@@ -346,42 +344,6 @@ function gameUpdatePost() {
   setCameraPos(LEVEL_SIZE.scale(.5));
 }
 
-function renderShootTemperature() {
-  // Temperature bar (below player)
-  const color = rgb(.2, .95, .25);
-  if (player) {
-    const barX = mainCanvasSize.x / 2;
-    const barY = mainCanvasSize.y - 60;
-    const barWidth = 200;
-    const barHeight = 12;
-    const tempPercent = clamp(player.temperature / TEMP_OVERHEAT, 0, 1);
-
-    // Background
-    mainContext.fillStyle = 'rgba(50, 50, 50, 0.8)';
-    mainContext.fillRect(barX - barWidth / 2, barY, barWidth, barHeight);
-
-    // Temperature fill color gradient
-    let fillColor;
-    if (player.temperature < 40)
-      fillColor = 'rgb(100, 150, 255)'; // Blue (cool)
-    else if (player.temperature < 70)
-      fillColor = 'rgb(255, 200, 100)'; // Orange (warm)
-    else
-      fillColor = 'rgb(255, 100, 100)'; // Red (hot/overheat)
-
-    mainContext.fillStyle = fillColor;
-    mainContext.fillRect(barX - barWidth / 2, barY, barWidth * tempPercent, barHeight);
-
-    // Border
-    mainContext.strokeStyle = 'rgb(200, 200, 200)';
-    mainContext.lineWidth = 1;
-    mainContext.strokeRect(barX - barWidth / 2, barY, barWidth, barHeight);
-
-    // Temperature label
-    drawTextScreen(`TEMP ${Math.floor(player.temperature)}`, vec2(barX, barY - 15), 16, color);
-  }
-}
-
 function gameRender() {
   // Black playfield background
   drawRect(cameraPos, LEVEL_SIZE.add(vec2(20, 20)), rgb(0, 0, 0));
@@ -413,8 +375,6 @@ function gameRenderPost() {
     mainContext.fillRect(px - 16, py + 2, 6, 4);
     mainContext.fillRect(px + 10, py + 2, 6, 4);
   }
-
-  if (renderTemperature) renderShootTemperature();
 
   // Wave indicator at bottom right
   let waveLabel = `WAVE ${waveN}`;
