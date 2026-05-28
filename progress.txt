@@ -3,3 +3,5 @@
 #3: Implemented auto-movement and basic shooting. Player ship auto-moves horizontally at fixed speed, bouncing off left and right edges. Auto-shoots bullets upward every 20 frames. Bullets travel upward and destroy when off-screen. No keyboard/mouse input affects movement.
 
 #4: Implemented full Player FSM with 6 states (moving, charging, charged, speed_burst, burnout, pacifist) and Magic Combo input system. Mouse click controls: tap reverses direction, hold to charge (slows to 0.2x speed), charged state at 1s (resumes 1x speed), release charged for charged shot + speed burst (4x speed), hold too long triggers burnout (2x speed, locked input). Uses LittleJS Timer class for timed transitions and velocity acceleration/deceleration.
+
+#5: Implemented weapon temperature system. Auto-shooting raises temperature 10 per shot, passive cooling 0.6 per frame. Warm zone (40-70 temp) gives fire-rate bonus. Overheat at 100+ temp triggers burnout state automatically. Added HUD temperature bar with color gradient: blue=cool, orange=warm, red=overheat.
