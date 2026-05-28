@@ -15,68 +15,7 @@ wave_definitions = {
 }
 */
 
-const WAVE_DEFINITIONS = [
-  ".p...p...p,..p.p.p.p.,.p.p...p.p,..p.p.p.p.,.p...p...p.|c|Wave 1 cleared!,Prepare for wave 2",
-  "...p...p...,..p.ppp.p.,.k.k.k.k.k,p...p.p...p,.p..p.p..p.|c|Wave 2 cleared!,Prepare for wave 3",
-  "..p.p.p.p.,.prk.k.krp,..p.p.p.p.,.prk...krp,..p.....p..|l|Wave 3 cleared!,Prepare for wave 4",
-  "...p...p..,k..p...p..k,.k.r.p.r.k.,..k.p.p.k..,...a...a...|c|Wave 4 cleared!,Prepare for wave 5",
-  "...p.p.p..,.pkpp.ppkp,p..r.p.r..p,..papkpap,.k.......k.|s|Wave 5 cleared!,Prepare for wave 6",
-  ".p.p.p.p.p,..krp.prk.,.k.p.k.p.k,..a.k.k.a.,.p.p...p.p.|c|Wave 6 cleared!,Prepare for wave 7",
-  "...k.P.k..,p.a.kpk.Ap,.RprpkprpR,p.k.ApA.kp,...k.p.k..|l|Wave 7 cleared!,Prepare for wave 8",
-  "...r.k.r..,.Kpap.papK,pr...a...rp,.Pkp.p.pkP,.k.p.p.p.k|s|Wave 8 cleared!,Prepare for wave 9",
-  "P.p.pPp.p.P,p.Rp.K.pR.p,pKk.rEr.kKp,p..A.k.A..p,pRpKpEpKpRp|c|Wave 9 cleared!,Prepare for boss fight",
-  ".....B.....,.........,.........,.........,.........|c|Boss defeated!,Cycle complete",
-];
-
-function parseWaveDSL(raw) {
-  const parts = raw.split('|');
-  if (parts.length !== 3) {
-    throw new Error(`Invalid DSL format: expected 3 pipe-delimited parts, got ${parts.length}`);
-  }
-
-  const gridStr = parts[0];
-  const patternCode = parts[1];
-  const msgPair = parts[2];
-
-  // Parse grid
-  const rows = gridStr.split(',');
-  if (rows.length !== 5) {
-    throw new Error(`Invalid grid: expected 5 rows, got ${rows.length}`);
-  }
-  const entities = rows.map(row => {
-    const chars = row.split('');
-    while (chars.length < 11) chars.push('.');
-    return chars.slice(0, 11);
-  });
-
-  // Parse messages — split on first comma only
-  const commaIdx = msgPair.indexOf(',');
-  const cleared = (commaIdx >= 0 ? msgPair.slice(0, commaIdx) : msgPair).trim();
-  const prepare = (commaIdx >= 0 ? msgPair.slice(commaIdx + 1) : '').trim();
-
-  // Set pattern defaults
-  let pattern;
-  switch (patternCode) {
-    case 'c':
-      pattern = { order: 'row_major', entry: 'from_top', base: 0, inc: 2 };
-      break;
-    case 'l':
-      pattern = { order: 'col_major', entry: 'alternating', base: 0, inc: 2 };
-      break;
-    case 's':
-      pattern = { order: 'spiral', entry: 'random', base: 0, inc: 2 };
-      break;
-    default:
-      throw new Error(`Invalid pattern code: ${patternCode}`);
-  }
-
-  return {
-    entities,
-    pattern,
-    cleared,
-    prepare
-  };
-}
+// WAVE_DEFINITIONS and parseWaveDSL are now in constants.js
 
 function buildSpawnQueue(waveDef) {
   const { entities, pattern } = waveDef;
