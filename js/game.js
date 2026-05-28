@@ -174,8 +174,11 @@ function gameUpdate() {
         else if (enemy instanceof Absorber) {
           // Absorb the bullet
           bullet.destroy();
-          enemy.absorb();
-          break;
+          if (enemy.absorb()) {
+            break;
+          } else {
+            enemy.health--;
+          }
         }
         else {
           // Normal bullet hit
