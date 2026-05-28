@@ -256,6 +256,20 @@ function gameUpdate() {
     }
   }
 
+  // Player-treasure collision
+  if (player && !player.destroyed && treasure) {
+    if (isOverlapping(player.pos, player.size, treasure.pos, treasure.size)) {
+      // Player loses a life
+      lives--;
+      if (lives <= 0) {
+        gameOver = true;
+      }
+      treasure.destroy();
+      score += ENEMY_CONFIGS.treasure.score;
+      hiScore = max(hiScore, score);
+    }
+  }
+
   // Boss or formation movement
   if (waveState === 'combat') {
     if (boss) {
