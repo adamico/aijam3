@@ -207,6 +207,35 @@ class Player extends RectObject {
             drawRect(p, vec2(s * 7, s * 3), this.color);
             drawRect(p.add(vec2(-1.1, -.3)), vec2(s * 2, s), this.color);
             drawRect(p.add(vec2(1.1, -.3)), vec2(s * 2, s), this.color);
+
+            // Diegetic barrel at nose
+            const barrelColor = this.getBarrelColor();
+            const barrelPos = p.add(vec2(0, 0.5));
+            const barrelWidth = 0.15;
+            const barrelHeight = 0.6;
+            drawRect(barrelPos, vec2(barrelWidth, barrelHeight), barrelColor);
+        }
+    }
+
+    getBarrelColor() {
+        const tempPercent = clamp(this.temperature / TEMP_OVERHEAT, 0, 1);
+
+        // 0-40% of overheat: green -> yellow
+        // 40-100% of overheat: yellow -> red
+        if (tempPercent < 0.4) {
+            const segment = tempPercent / 0.4;
+            return rgb(
+                lerp(segment, 0, 1),      // R: 0 to 1
+                1,                        // G: stays 1
+                0                         // B: 0
+            );
+        } else {
+            const segment = (tempPercent - 0.4) / 0.6;
+            return rgb(
+                1,                        // R: stays 1
+                lerp(segment, 1, 0),      // G: 1 to 0
+                0                         // B: 0
+            );
         }
     }
 }
