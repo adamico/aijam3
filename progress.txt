@@ -11,3 +11,5 @@
 #7: Implemented Shooter enemy, ENEMY_CONFIGS object, and difficulty scaling. Created calcDifficulty(waveN) function for wave-based scaling. Spawns 5x11 grid of shooters that move side-to-side, drop on wall, speed up as count falls. Shooters fire downward from column lowest alive. Bullet-enemy collision detection with score awarding. Formation speed scales with difficulty.
 
 #8: Implemented Diver enemy with diving behavior. Divers sit in formation (odd rows), periodically break out and dive toward player position. Return to original formation slot after reaching player Y level. Diver-player collision causes life loss. Dive chance and speed scale with difficulty. Mixed Diver (cyan) and Shooter (red) grid formation.
+
+#9: Implemented Reflector and Absorber enemies. Reflector (yellow) reflects player bullets downward as enemy projectiles and takes 3 hits to destroy. Absorber (dark blue) absorbs bullets up to maxStored, displays count, spits in spread pattern on maxStored or spitDelay. Spawning: row 0=shooter, 1=diver, 2=reflector, 3=absorber, 4=shooter. Updated scoring to reflect each enemy type value.
