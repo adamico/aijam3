@@ -13,3 +13,4 @@ local/
 
 # runtime data from skills (per-session scratch dirs)
 .claude/skills/*/sessions/
+.ralph.conf
