@@ -224,18 +224,10 @@ class Player extends RectObject {
         // 40-100% of overheat: yellow -> red
         if (tempPercent < 0.4) {
             const segment = tempPercent / 0.4;
-            return rgb(
-                lerp(segment, 0, 1),      // R: 0 to 1
-                1,                        // G: stays 1
-                0                         // B: 0
-            );
+            return rgb(lerp(0, 1, segment), 1, 0);
         } else {
             const segment = (tempPercent - 0.4) / 0.6;
-            return rgb(
-                1,                        // R: stays 1
-                lerp(segment, 1, 0),      // G: 1 to 0
-                0                         // B: 0
-            );
+            return rgb(1, lerp(1, 0, segment), 0);
         }
     }
 }
