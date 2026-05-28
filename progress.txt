@@ -7,3 +7,5 @@
 #5: Implemented weapon temperature system. Auto-shooting raises temperature 10 per shot, passive cooling 0.6 per frame. Warm zone (40-70 temp) gives fire-rate bonus. Overheat at 100+ temp triggers burnout state automatically. Added HUD temperature bar with color gradient: blue=cool, orange=warm, red=overheat.
 
 #6: Implemented Wave FSM with transition/combat/boss_defeated/cycle_transition states. Wired Wave FSM to Player FSM: wave start puts player in pre_entry, immediately transitions to pacifist/moving. Wave clear triggers player exiting. Wave counter increments, boss waves every 10th wave (10, 20, 30...). Added wave number to HUD with boss label.
+
+#7: Implemented Shooter enemy, ENEMY_CONFIGS object, and difficulty scaling. Created calcDifficulty(waveN) function for wave-based scaling. Spawns 5x11 grid of shooters that move side-to-side, drop on wall, speed up as count falls. Shooters fire downward from column lowest alive. Bullet-enemy collision detection with score awarding. Formation speed scales with difficulty.
