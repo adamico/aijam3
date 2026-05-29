@@ -1,5 +1,7 @@
 // ES module export shim — pure functions only, no LittleJS deps.
 // Used by tests. Browser loads constants.js (classic script) instead.
+// RULE: Every function in this file MUST be mirrored as a classic-script copy in
+// constants.js (no export keyword) or the browser will ReferenceError at script load.
 
 export const WAVE_DEFINITIONS = [
   ".p...p...p,..p.p.p.p.,.p.p...p.p,..p.p.p.p.,.p...p...p.|c|Wave 1 cleared!,Prepare for wave 2",
