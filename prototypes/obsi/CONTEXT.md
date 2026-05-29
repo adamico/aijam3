@@ -36,7 +36,7 @@ Manual decrement pattern (`if (n > 0) n--`). Used for `cooldown` (player) and en
 Flat `ENEMY_CONFIGS` object in `constants.js` holding per-type balance values. Frame-count fields (`shootRate`, `diveRate`, `spawnInterval`, `spitDelay`) are pending conversion to seconds when those counters migrate to Timer objects.
 
 **Module system**
-Sequential `<script>` tags, global scope. Matches LittleJS's own loading model. No ES module imports/exports.
+Sequential `<script>` tags, global scope. Matches LittleJS's own loading model. No ES module imports/exports. Pure functions live in both `pure.js` (ESM, tests-only) and `constants.js` (classic, browser); the two copies must stay in sync or browser loads will fail with ReferenceError.
 
 **HitEvent**
 The canonical result of a bullet striking a target. Shape: `{ kind, reflected, pos, scoreValue, spawned }`. `kind` is `'damaged'` (target survived), `'killed'` (target destroyed), or `'absorbed'` (damage negated). `scoreValue` is only non-zero for `kind: 'killed'` hits. `reflected` and `spawned` indicate post-hit behavior (reflection/splitting). Computed by pure function `computeHitEvent` from target health, damage amount, and hit metadata.
