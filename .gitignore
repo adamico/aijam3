@@ -15,3 +15,5 @@ local/
 .claude/skills/*/sessions/
 .ralph.conf
 .ralph-logs/
+
+.DS_Store
