@@ -64,11 +64,15 @@ export function gameUpdatePost() {
 // All 3D scene elements use this: goal (z=0), keeper (z=0), ball (z=variable).
 const FOCUS_DISTANCE = 5.0; // Higher value reduces perspective distortion
 const CAMERA_Y = 1.0;       // Eye-level camera height
+const HEIGHT_COMPRESSION = 0.7; // Simulates camera tilt (looking down), bringing ball and shadow closer
 
 function project(x3d, y3d, depthFromCamera) {
     const scale = FOCUS_DISTANCE / (FOCUS_DISTANCE + depthFromCamera);
+    const heightAboveGround = y3d - GROUND_Y;
+    const groundProjY = CAMERA_Y + (GROUND_Y - CAMERA_Y) * scale;
+    const yProj = groundProjY + heightAboveGround * scale * HEIGHT_COMPRESSION;
     return {
-        pos: vec2(x3d * scale, CAMERA_Y + (y3d - CAMERA_Y) * scale),
+        pos: vec2(x3d * scale, yProj),
         scale,
     };
 }
