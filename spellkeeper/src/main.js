@@ -8,6 +8,7 @@ import {
 import { solveIkChain } from './ikChain.js';
 import { solveTorsoDrag } from './bodyRig.js';
 import { advanceShot, createShot } from './shotTrajectory.js';
+import { getRampShotConfig } from './shotRamp.js';
 import { resolveCrossingSave } from './saveResolver.js';
 import { createMatchState, isMatchComplete, recordShotResult } from './matchState.js';
 
@@ -104,13 +105,6 @@ const BALL_SHADOW_OPACITY = 0.18;
 const BALL_DETAIL_SCALE = 0.8;
 const COLOR_BALL = c('#ffffff');
 const COLOR_BALL_DETAIL = c('#AABBBB');
-const SHOT_SEQUENCE = [
-  { hex: 'standard', start: { x: -2.5, y: GROUND_Y + BALL_RADIUS }, target: { x: -1.2, y: GROUND_Y + 1.3 } },
-  { hex: 'fireball', start: { x: 1.9, y: GROUND_Y + BALL_RADIUS }, target: { x: 1.7, y: GROUND_Y + 1.8 } },
-  // Same lane as standard, but with a strong lateral bow so the curve hex is learnable.
-  { hex: 'curve', start: { x: -2.5, y: GROUND_Y + BALL_RADIUS }, target: { x: -1.2, y: GROUND_Y + 1.3 }, curveDirection: 1 },
-  { hex: 'heavy', start: { x: 2.6, y: GROUND_Y + BALL_RADIUS }, target: { x: -1.8, y: GROUND_Y + 0.9 } },
-];
 const SHOT_RESPAWN_DELAY = 0.35;
 const SAVE_FEEDBACK_DURATION = 0.9;
 
@@ -176,8 +170,8 @@ export function goalPlaneFromProjectedMouse(projectedMousePos) {
 }
 
 export function spawnShot(index = Ball.shotIndex) {
-  const shotConfig = SHOT_SEQUENCE[index % SHOT_SEQUENCE.length];
-  Ball.shotIndex = index % SHOT_SEQUENCE.length;
+  const shotConfig = getRampShotConfig(index);
+  Ball.shotIndex = index;
   Ball.shot = createShot({
     ...shotConfig,
     maxZ: BALL_MAX_Z,
@@ -238,7 +232,7 @@ export function updateBallShot(dt = 1 / 60) {
 
     applyMatchShotOutcome(Ball.lastSaveResult.outcome);
 
-    Ball.shotIndex = Match.state.shotsTaken % SHOT_SEQUENCE.length;
+    Ball.shotIndex = Match.state.shotsTaken;
     Ball.respawnTimer = isMatchComplete(Match.state) ? 0 : SHOT_RESPAWN_DELAY;
   }
 
