@@ -73,8 +73,7 @@ function project(x3d, y3d, depthFromCamera) {
     };
 }
 
-export function gameRender() {
-    // Perspective scale for goal plane elements (z=0 → depthFromCamera=BALL_MAX_Z)
+function drawGoal() {
     const goalDepth = BALL_MAX_Z;
 
     // 1. Draw ground/pitch line at goal plane depth
@@ -91,8 +90,10 @@ export function gameRender() {
     drawLine(postBotL.pos, postTopL.pos, lineW, c('#ffffff')); // left post
     drawLine(postBotR.pos, postTopR.pos, lineW, c('#ffffff')); // right post
     drawLine(postTopL.pos, postTopR.pos, lineW, c('#ffffff')); // crossbar
+}
 
-    // 3. Draw Goalkeeper (Familiar) — all joints at z=0 (goal plane)
+function drawKeeper() {
+    const goalDepth = BALL_MAX_Z;
     const fam = (x, y) => project(x, y, goalDepth);
 
     const torso = fam(Familiar.torsoPos.x, Familiar.torsoPos.y);
@@ -117,13 +118,11 @@ export function gameRender() {
     drawCircle(rHand.pos, Familiar.handRadius * rHand.scale, c('#d95763'));
 }
 
-export function gameRenderPost() {
-    // 4. Draw Ball with perspective depth calculation relative to camera eye-level.
+function drawBall() {
     // Ball starts near camera (z=MAX_Z) and approaches goal (z=0).
     // depthFromCamera = how far the ball is from the camera lens.
     const depthFromCamera = BALL_MAX_Z - Ball.z; // 0 = near camera, MAX_Z = at goal
     const { pos: ballPos, scale } = project(Ball.x, Ball.y, depthFromCamera);
-    // scale=1.0 at spawn (near camera, large), scale≈0.1 at goal plane (far, small)
 
     // Draw Ground Shadow projected on the ground plane at GROUND_Y
     const { pos: shadowPos } = project(Ball.x, GROUND_Y, depthFromCamera);
@@ -135,6 +134,15 @@ export function gameRenderPost() {
     drawCircle(ballPos, Ball.radius * scale, c('#f1c40f'));
     // Ball outline/inner detail to distinguish it
     drawCircle(ballPos, Ball.radius * scale * 0.8, c('#f39c12'));
+}
+
+export function gameRender() {
+    drawGoal();
+    drawKeeper();
+}
+
+export function gameRenderPost() {
+    drawBall();
 }
 
 // Startup LittleJS Engine only if running in a browser environment
