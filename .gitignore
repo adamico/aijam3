@@ -17,3 +17,7 @@ local/
 .ralph-logs/
 
 .DS_Store
+
+# engine dirs mirrored from submodule by prototypes/setup-links.sh
+/dist
+/templates

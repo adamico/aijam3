@@ -47,4 +47,18 @@ for dir in "$PROTO"/*/; do
     linked=$((linked + 1))
 done
 
+# Mirror the engine dirs at the superproject root so a game's relative engine
+# paths (../../dist, ../../templates) also resolve when index.html is opened
+# from prototypes/<game>/ — not only from the games/ symlink path.
+for engine in dist templates; do
+    src="$ROOT/LittleJS-AI/$engine"
+    dst="$ROOT/$engine"
+    [[ -d "$src" ]] || continue
+    if [[ -L "$dst" || -e "$dst" ]]; then
+        rm -rf "$dst"
+    fi
+    ln -s "LittleJS-AI/$engine" "$dst"
+    echo "linked  $engine -> LittleJS-AI/$engine"
+done
+
 echo "done: $linked game(s) bridged."
