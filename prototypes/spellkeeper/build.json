@@ -1,6 +1,0 @@
-{
-    "title": "Little JS Game",
-    "name": "game",
-    "sources": ["game.js"],
-    "data": ["tiles.png"]
-}
