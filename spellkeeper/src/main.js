@@ -139,10 +139,11 @@ function drawBall() {
 export function gameRender() {
     drawGoal();
     drawKeeper();
+    drawBall();
 }
 
 export function gameRenderPost() {
-    drawBall();
+    // Reserved for screen-space UI / post-processing overlays
 }
 
 // Startup LittleJS Engine only if running in a browser environment
