@@ -1,10 +1,11 @@
 /*
-    Little JS Hello World Demo
-    - Just prints 'Hello World!'
-    - A good starting point for new projects
+    Spell Keeper
+    - A simple game where you control a wizard and cast spells
 */
 
 'use strict';
+
+const GAME_TITLE = 'Spell Keeper';
 
 ///////////////////////////////////////////////////////////////////////////////
 function gameInit()
@@ -39,7 +40,7 @@ function gameRenderPost()
 {
     // called after objects are rendered
     // draw effects or hud that appear above all objects
-    drawTextScreen('Hello World!', mainCanvasSize.scale(.5), 80);
+    drawTextScreen(GAME_TITLE, mainCanvasSize.scale(.5), 80);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

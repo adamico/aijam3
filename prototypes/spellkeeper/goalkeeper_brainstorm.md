@@ -1,4 +1,4 @@
-# Game Jam Project Brainstorm: Papercraft Goalkeeper
+# Game Jam Project Brainstorm: Spell Keeper
 
 This document captures the core concept, visual aesthetics, control mechanics, and references for a small sports-themed game jam project. Use this file to resume development in a subsequent session.
 
