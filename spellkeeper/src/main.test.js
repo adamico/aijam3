@@ -26,6 +26,7 @@ vi.mock('littlejsengine', () => {
     return {
         engineInit: vi.fn(),
         mousePos: new MockVector2(0, 0),
+        timeDelta: 1 / 60,
         vec2: (x, y) => new MockVector2(x, y),
         rgb: (r, g, b, a) => new MockColor(r, g, b, a),
         Color: MockColor,
@@ -65,5 +66,21 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(pose.leftHand.y).toBeCloseTo(target.y, 5);
         expect(pose.rightHand.x).toBeCloseTo(target.x, 5);
         expect(pose.rightHand.y).toBeCloseTo(target.y, 5);
+        expect(pose.torso.x).toBeCloseTo(0, 5);
+    });
+
+    it('drags the torso gradually when the pointer pushes beyond arm reach', async () => {
+        const { applyKeeperHandIk, getFamiliarPose } = await import('./main.js');
+        const target = { x: 5, y: -3.8 };
+
+        const result = applyKeeperHandIk(target, 0.1);
+        const pose = getFamiliarPose();
+
+        expect(result.body.isDragging).toBe(true);
+        expect(pose.torso.x).toBeGreaterThan(0);
+        expect(pose.torso.x).toBeLessThan(result.body.desiredTorso.x);
+        expect(result.body.velocity.x).toBeLessThanOrEqual(2.2);
+        expect(pose.head.x).toBeCloseTo(pose.torso.x, 5);
+        expect(pose.rightShoulder.x).toBeCloseTo(pose.torso.x + 0.3, 5);
     });
 });

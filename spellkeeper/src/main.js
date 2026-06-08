@@ -3,9 +3,10 @@ import {
   vec2, setCameraPos, setCameraScale,
   drawLine, drawCircle,
   rgb, Color, setCanvasClearColor,
-  mousePos
+  mousePos, timeDelta
 } from 'littlejsengine';
 import { solveIkChain } from './ikChain.js';
+import { solveTorsoDrag } from './bodyRig.js';
 
 // Helper to convert hex to LittleJS Color
 const c = (hex) => new Color().setHex(hex);
@@ -67,6 +68,12 @@ const FAMILIAR_HAND_IK = {
     fallbackDirection: { x: 1, y: 0 },
   },
 };
+const FAMILIAR_TORSO_DRAG_MAX_SPEED = 2.2; // meters/second; intentionally heavy
+const FAMILIAR_BODY_OFFSETS = {
+  head: { x: 0, y: FAMILIAR_INIT_HEAD_Y - FAMILIAR_INIT_TORSO_Y },
+  leftShoulder: { x: -FAMILIAR_INIT_SHOULDER_X, y: FAMILIAR_INIT_SHOULDER_Y - FAMILIAR_INIT_TORSO_Y },
+  rightShoulder: { x: FAMILIAR_INIT_SHOULDER_X, y: FAMILIAR_INIT_SHOULDER_Y - FAMILIAR_INIT_TORSO_Y },
+};
 
 // All dimensions and joints are defined in physical meters relative to the ground.
 const Familiar = {
@@ -114,7 +121,7 @@ export function gameInit() {
 }
 
 export function gameUpdate() {
-  updateKeeperIk(mousePos);
+  updateKeeperIk(mousePos, timeDelta);
 }
 
 export function gameUpdatePost() {
@@ -126,6 +133,33 @@ export function goalPlaneFromProjectedMouse(projectedMousePos) {
     x: projectedMousePos.x,
     y: projectedMousePos.y / COS_THETA,
   };
+}
+
+function setFamiliarTorsoX(x) {
+  Familiar.torsoPos = vec2(x, Familiar.torsoPos.y);
+  Familiar.headPos = vec2(x + FAMILIAR_BODY_OFFSETS.head.x, Familiar.torsoPos.y + FAMILIAR_BODY_OFFSETS.head.y);
+  Familiar.leftShoulder = vec2(
+    x + FAMILIAR_BODY_OFFSETS.leftShoulder.x,
+    Familiar.torsoPos.y + FAMILIAR_BODY_OFFSETS.leftShoulder.y,
+  );
+  Familiar.rightShoulder = vec2(
+    x + FAMILIAR_BODY_OFFSETS.rightShoulder.x,
+    Familiar.torsoPos.y + FAMILIAR_BODY_OFFSETS.rightShoulder.y,
+  );
+}
+
+function updateFamiliarBodyRig(target, dt = 1 / 60) {
+  const pose = solveTorsoDrag({
+    torso: Familiar.torsoPos,
+    target,
+    shoulders: [FAMILIAR_BODY_OFFSETS.leftShoulder, FAMILIAR_BODY_OFFSETS.rightShoulder],
+    maxReach: FAMILIAR_UPPER_ARM_LENGTH + FAMILIAR_FOREARM_LENGTH,
+    maxSpeed: FAMILIAR_TORSO_DRAG_MAX_SPEED,
+    dt,
+  });
+
+  setFamiliarTorsoX(pose.torso.x);
+  return pose;
 }
 
 function applyHandIk(side, target) {
@@ -152,19 +186,25 @@ export function applyRightHandIk(target) {
   return applyHandIk('right', target);
 }
 
-export function applyKeeperHandIk(target) {
+export function applyKeeperHandIk(target, dt = 1 / 60) {
+  const body = updateFamiliarBodyRig(target, dt);
   return {
+    body,
     left: applyLeftHandIk(target),
     right: applyRightHandIk(target),
   };
 }
 
-export function updateKeeperIk(projectedMousePos) {
-  return applyKeeperHandIk(goalPlaneFromProjectedMouse(projectedMousePos));
+export function updateKeeperIk(projectedMousePos, dt = 1 / 60) {
+  return applyKeeperHandIk(goalPlaneFromProjectedMouse(projectedMousePos), dt);
 }
 
 export function getFamiliarPose() {
   return {
+    torso: { x: Familiar.torsoPos.x, y: Familiar.torsoPos.y },
+    head: { x: Familiar.headPos.x, y: Familiar.headPos.y },
+    leftShoulder: { x: Familiar.leftShoulder.x, y: Familiar.leftShoulder.y },
+    rightShoulder: { x: Familiar.rightShoulder.x, y: Familiar.rightShoulder.y },
     leftHand: { x: Familiar.leftHand.x, y: Familiar.leftHand.y },
     rightHand: { x: Familiar.rightHand.x, y: Familiar.rightHand.y },
   };
