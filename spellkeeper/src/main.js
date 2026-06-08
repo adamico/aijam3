@@ -12,6 +12,7 @@ const c = (hex) => new Color().setHex(hex);
 const GROUND_Y = -5.0;
 const GROUND_HALF_WIDTH = 30.0;
 const GROUND_LINE_THICKNESS = 0.08;
+const PITCH_CENTER_X = 0.0;        // center of screen/pitch in world space
 const COLOR_STADIUM_NIGHT = rgb(0.05, 0.06, 0.12);
 const COLOR_GROUND_LINE = c('#3b5c3b');
 
@@ -21,10 +22,10 @@ const GOAL_HEIGHT = 2.44;  // standard height proportion
 const GOAL_POST_THICKNESS = 0.2;
 const COLOR_GOAL_FRAME = c('#ffffff');
 
-const GOAL_LEFT_POST = vec2(-GOAL_WIDTH / 2, GROUND_Y);
-const GOAL_RIGHT_POST = vec2(GOAL_WIDTH / 2, GROUND_Y);
-const GOAL_CROSSBAR_LEFT = vec2(-GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT);
-const GOAL_CROSSBAR_RIGHT = vec2(GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT);
+const GOAL_LEFT_POST = vec2(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y);
+const GOAL_RIGHT_POST = vec2(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y);
+const GOAL_CROSSBAR_LEFT = vec2(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT);
+const GOAL_CROSSBAR_RIGHT = vec2(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT);
 
 // --- Goalkeeper (Familiar) Initial Joints/Structure ---
 const FAMILIAR_TORSO_RADIUS = 0.35;
@@ -49,14 +50,14 @@ const FAMILIAR_INIT_HAND_Y = 1.2;
 
 // All dimensions and joints are defined in physical meters relative to the ground.
 const Familiar = {
-    torsoPos: vec2(0, GROUND_Y + FAMILIAR_INIT_TORSO_Y),
-    headPos: vec2(0, GROUND_Y + FAMILIAR_INIT_HEAD_Y),
-    leftShoulder: vec2(-FAMILIAR_INIT_SHOULDER_X, GROUND_Y + FAMILIAR_INIT_SHOULDER_Y),
-    rightShoulder: vec2(FAMILIAR_INIT_SHOULDER_X, GROUND_Y + FAMILIAR_INIT_SHOULDER_Y),
-    leftElbow: vec2(-FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y),
-    rightElbow: vec2(FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y),
-    leftHand: vec2(-FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y),
-    rightHand: vec2(FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y),
+    torsoPos: vec2(PITCH_CENTER_X, GROUND_Y + FAMILIAR_INIT_TORSO_Y),
+    headPos: vec2(PITCH_CENTER_X, GROUND_Y + FAMILIAR_INIT_HEAD_Y),
+    leftShoulder: vec2(PITCH_CENTER_X - FAMILIAR_INIT_SHOULDER_X, GROUND_Y + FAMILIAR_INIT_SHOULDER_Y),
+    rightShoulder: vec2(PITCH_CENTER_X + FAMILIAR_INIT_SHOULDER_X, GROUND_Y + FAMILIAR_INIT_SHOULDER_Y),
+    leftElbow: vec2(PITCH_CENTER_X - FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y),
+    rightElbow: vec2(PITCH_CENTER_X + FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y),
+    leftHand: vec2(PITCH_CENTER_X - FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y),
+    rightHand: vec2(PITCH_CENTER_X + FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y),
     torsoRadius: FAMILIAR_TORSO_RADIUS,
     headRadius: FAMILIAR_HEAD_RADIUS,
     handRadius: FAMILIAR_HAND_RADIUS,
@@ -73,7 +74,7 @@ const COLOR_BALL_DETAIL = c('#f39c12');
 const COLOR_BALL_SHADOW = rgb(1, 1, 1, BALL_SHADOW_OPACITY);
 
 const Ball = {
-    x: 0,                   // centered on pitch
+    x: PITCH_CENTER_X,             // centered on pitch
     y: GROUND_Y + BALL_RADIUS,     // rests on the ground
     z: BALL_MAX_Z,          // spawns at camera/penalty distance
     radius: BALL_RADIUS,
@@ -88,7 +89,7 @@ const CAMERA_SCALE = 85;
 
 export function gameInit() {
     setCanvasClearColor(COLOR_STADIUM_NIGHT);
-    setCameraPos(vec2(0, CAMERA_CENTER_Y));
+    setCameraPos(vec2(PITCH_CENTER_X, CAMERA_CENTER_Y));
     setCameraScale(CAMERA_SCALE);
 }
 
@@ -120,10 +121,10 @@ function drawGoal() {
     drawLine(gL.pos, gR.pos, GROUND_LINE_THICKNESS * gL.scale, COLOR_GROUND_LINE);
 
     // 2. Draw Goal Frame — posts and crossbar projected from 3D at z=0
-    const postBotL  = project(-GOAL_WIDTH / 2, GROUND_Y,             goalDepth);
-    const postTopL  = project(-GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT, goalDepth);
-    const postBotR  = project( GOAL_WIDTH / 2, GROUND_Y,             goalDepth);
-    const postTopR  = project( GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT, goalDepth);
+    const postBotL  = project(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y,             goalDepth);
+    const postTopL  = project(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT, goalDepth);
+    const postBotR  = project(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y,             goalDepth);
+    const postTopR  = project(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT, goalDepth);
     const lineW = GOAL_POST_THICKNESS * postBotL.scale;
     drawLine(postBotL.pos, postTopL.pos, lineW, COLOR_GOAL_FRAME); // left post
     drawLine(postBotR.pos, postTopR.pos, lineW, COLOR_GOAL_FRAME); // right post
