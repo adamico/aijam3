@@ -57,6 +57,8 @@ Direct-control project; exempt from the Lever/Auto-Execution model — see ADR-0
 - **Reach** — max IK arm extension. Design rule: Goal-mouth width > Reach, so some shots force torso-drag (shifting the torso horizontally when the cursor target exceeds the arm limits).
 - **Hex** — a magically modified shot type with fixed, learnable physics (e.g. fireball = fast, curve = swerving, heavy = slow/big). Player skill = reading the trajectory, not reacting to telegraphs.
 - **Read cues** — the trajectory is judged from three converging signals: on-screen arc (primary), ball scale (ball shrinks as it recedes toward goal; best look is early/front-loaded), and ground shadow (always present; landing + timing). No per-shot reticle telegraph except in the opening tutorial shots.
+- **Goalkeeper Move** — an expressive familiar body action that makes saves feel athletic and creature-like without changing the single-cursor control model.
+- **Automatic Expressive Dive** — a brief full-body Goalkeeper Move triggered by hard lateral reach near a threatening shot; primarily visual, with a small save advantage from extra reach and a light timing commitment.
 
 ### Avoid
 - "direct control" — use "lever" instead
