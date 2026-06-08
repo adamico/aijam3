@@ -83,4 +83,20 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(pose.head.x).toBeCloseTo(pose.torso.x, 5);
         expect(pose.rightShoulder.x).toBeCloseTo(pose.torso.x + 0.3, 5);
     });
+
+    it('updates the active shot with orthographic size and ground shadow cues', async () => {
+        const { spawnShot, updateBallShot, getBallPose } = await import('./main.js');
+
+        spawnShot(0);
+        const start = getBallPose();
+        updateBallShot(0.5);
+        const later = getBallPose();
+
+        expect(later.z).toBeLessThan(start.z);
+        expect(later.scale).toBe(start.scale);
+        expect(later.y).toBeGreaterThan(start.y);
+        expect(later.shadow.y).toBe(-5);
+        expect(later.shadow.opacity).toBeLessThan(start.shadow.opacity);
+        expect(later.hex).toBe('standard');
+    });
 });

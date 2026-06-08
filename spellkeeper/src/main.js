@@ -7,6 +7,7 @@ import {
 } from 'littlejsengine';
 import { solveIkChain } from './ikChain.js';
 import { solveTorsoDrag } from './bodyRig.js';
+import { advanceShot, createShot } from './shotTrajectory.js';
 
 // Helper to convert hex to LittleJS Color
 const c = (hex) => new Color().setHex(hex);
@@ -98,13 +99,30 @@ const BALL_SHADOW_OPACITY = 0.18;
 const BALL_DETAIL_SCALE = 0.8;
 const COLOR_BALL = c('#ffffff');
 const COLOR_BALL_DETAIL = c('#AABBBB');
-const COLOR_BALL_SHADOW = rgb(1, 1, 1, BALL_SHADOW_OPACITY);
+const SHOT_SEQUENCE = [
+  { hex: 'standard', start: { x: -2.5, y: GROUND_Y + BALL_RADIUS }, target: { x: -1.2, y: GROUND_Y + 1.3 } },
+  { hex: 'fireball', start: { x: 1.9, y: GROUND_Y + BALL_RADIUS }, target: { x: 1.7, y: GROUND_Y + 1.8 } },
+  { hex: 'curve', start: { x: -3.0, y: GROUND_Y + BALL_RADIUS }, target: { x: 1.2, y: GROUND_Y + 1.2 }, curveDirection: 1 },
+  { hex: 'heavy', start: { x: 2.6, y: GROUND_Y + BALL_RADIUS }, target: { x: -1.8, y: GROUND_Y + 0.9 } },
+];
+const SHOT_RESPAWN_DELAY = 0.35;
 
 const Ball = {
   x: PITCH_CENTER_X,             // centered on pitch
   y: GROUND_Y + BALL_RADIUS,     // rests on the ground
   z: BALL_MAX_Z,          // spawns at camera/penalty distance
   radius: BALL_RADIUS,
+  scale: 1,
+  color: '#ffffff',
+  shadow: {
+    x: PITCH_CENTER_X,
+    y: GROUND_Y,
+    scale: BALL_SHADOW_SCALE,
+    opacity: BALL_SHADOW_OPACITY,
+  },
+  shot: null,
+  shotIndex: 0,
+  respawnTimer: 0,
 };
 
 // --- Camera & Projection Constants ---
@@ -118,10 +136,12 @@ export function gameInit() {
   setCanvasClearColor(COLOR_STADIUM_NIGHT);
   setCameraPos(vec2(PITCH_CENTER_X, CAMERA_CENTER_Y));
   setCameraScale(CAMERA_SCALE);
+  spawnShot(0);
 }
 
 export function gameUpdate() {
   updateKeeperIk(mousePos, timeDelta);
+  updateBallShot(timeDelta);
 }
 
 export function gameUpdatePost() {
@@ -132,6 +152,63 @@ export function goalPlaneFromProjectedMouse(projectedMousePos) {
   return {
     x: projectedMousePos.x,
     y: projectedMousePos.y / COS_THETA,
+  };
+}
+
+export function spawnShot(index = Ball.shotIndex) {
+  const shotConfig = SHOT_SEQUENCE[index % SHOT_SEQUENCE.length];
+  Ball.shotIndex = index % SHOT_SEQUENCE.length;
+  Ball.shot = createShot({
+    ...shotConfig,
+    maxZ: BALL_MAX_Z,
+    groundY: GROUND_Y,
+    radius: BALL_RADIUS,
+  });
+  Ball.respawnTimer = 0;
+  applyShotSample(advanceShot(Ball.shot, 0).sample);
+  return Ball.shot;
+}
+
+function applyShotSample(sample) {
+  Ball.x = sample.x;
+  Ball.y = sample.y;
+  Ball.z = sample.z;
+  Ball.radius = sample.radius;
+  Ball.scale = sample.scale;
+  Ball.color = sample.color;
+  Ball.shadow = sample.shadow;
+}
+
+export function updateBallShot(dt = 1 / 60) {
+  if (!Ball.shot) spawnShot(0);
+
+  if (Ball.respawnTimer > 0) {
+    Ball.respawnTimer = Math.max(0, Ball.respawnTimer - dt);
+    if (Ball.respawnTimer === 0) spawnShot(Ball.shotIndex);
+    return getBallPose();
+  }
+
+  Ball.shot = advanceShot(Ball.shot, dt);
+  applyShotSample(Ball.shot.sample);
+
+  if (Ball.shot.sample.isComplete) {
+    Ball.shotIndex = (Ball.shotIndex + 1) % SHOT_SEQUENCE.length;
+    Ball.respawnTimer = SHOT_RESPAWN_DELAY;
+  }
+
+  return getBallPose();
+}
+
+export function getBallPose() {
+  return {
+    x: Ball.x,
+    y: Ball.y,
+    z: Ball.z,
+    radius: Ball.radius,
+    scale: Ball.scale,
+    color: Ball.color,
+    shadow: { ...Ball.shadow },
+    hex: Ball.shot?.hex,
   };
 }
 
@@ -271,18 +348,18 @@ function drawBall() {
   // Ball starts near camera (z=MAX_Z) and approaches goal (z=0).
   // depthFromCamera = how far the ball is from the camera lens.
   const depthFromCamera = BALL_MAX_Z - Ball.z; // 0 = near camera, MAX_Z = at goal
-  const { pos: ballPos, scale } = project(Ball.x, Ball.y, depthFromCamera);
+  const { pos: ballPos } = project(Ball.x, Ball.y, depthFromCamera);
 
-  // Draw Ground Shadow projected on the ground plane at GROUND_Y
-  const { pos: shadowPos } = project(Ball.x, GROUND_Y, depthFromCamera);
-  const shadowRadius = Ball.radius * scale * BALL_SHADOW_SCALE;
-  // Semi-transparent white shadow — visible on the dark background
-  drawCircle(shadowPos, shadowRadius, COLOR_BALL_SHADOW);
+  // Draw Ground Shadow projected on the ground plane at GROUND_Y.
+  // The trajectory sample shrinks/fades this shadow as height increases.
+  const { pos: shadowPos } = project(Ball.shadow.x, Ball.shadow.y, depthFromCamera);
+  const shadowRadius = Ball.radius * Ball.scale * BALL_SHADOW_SCALE * Ball.shadow.scale;
+  drawCircle(shadowPos, shadowRadius, rgb(1, 1, 1, Ball.shadow.opacity));
 
-  // Draw projected Ball
-  drawCircle(ballPos, Ball.radius * scale, COLOR_BALL);
-  // Ball outline/inner detail to distinguish it
-  drawCircle(ballPos, Ball.radius * scale * BALL_DETAIL_SCALE, COLOR_BALL_DETAIL);
+  // Draw projected Ball with per-hex tint. Orthographic projection keeps size constant.
+  drawCircle(ballPos, Ball.radius * Ball.scale, Ball.color ? c(Ball.color) : COLOR_BALL);
+  // Ball outline/inner detail to distinguish it.
+  drawCircle(ballPos, Ball.radius * Ball.scale * BALL_DETAIL_SCALE, COLOR_BALL_DETAIL);
 }
 
 export function gameRender() {
