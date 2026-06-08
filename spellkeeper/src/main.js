@@ -121,10 +121,10 @@ function drawGoal() {
     drawLine(gL.pos, gR.pos, GROUND_LINE_THICKNESS * gL.scale, COLOR_GROUND_LINE);
 
     // 2. Draw Goal Frame — posts and crossbar projected from 3D at z=0
-    const postBotL  = project(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y,             goalDepth);
-    const postTopL  = project(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT, goalDepth);
-    const postBotR  = project(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y,             goalDepth);
-    const postTopR  = project(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT, goalDepth);
+    const postBotL  = project(GOAL_LEFT_POST.x, GOAL_LEFT_POST.y, goalDepth);
+    const postTopL  = project(GOAL_CROSSBAR_LEFT.x, GOAL_CROSSBAR_LEFT.y, goalDepth);
+    const postBotR  = project(GOAL_RIGHT_POST.x, GOAL_RIGHT_POST.y, goalDepth);
+    const postTopR  = project(GOAL_CROSSBAR_RIGHT.x, GOAL_CROSSBAR_RIGHT.y, goalDepth);
     const lineW = GOAL_POST_THICKNESS * postBotL.scale;
     drawLine(postBotL.pos, postTopL.pos, lineW, COLOR_GOAL_FRAME); // left post
     drawLine(postBotR.pos, postTopR.pos, lineW, COLOR_GOAL_FRAME); // right post
