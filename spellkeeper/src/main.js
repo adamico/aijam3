@@ -9,6 +9,7 @@ import { solveIkChain } from './ikChain.js';
 import { solveTorsoDrag } from './bodyRig.js';
 import { advanceShot, createShot } from './shotTrajectory.js';
 import { resolveCrossingSave } from './saveResolver.js';
+import { createMatchState, isMatchComplete, recordShotResult } from './matchState.js';
 
 // Helper to convert hex to LittleJS Color
 const c = (hex) => new Color().setHex(hex);
@@ -113,6 +114,10 @@ const SHOT_SEQUENCE = [
 const SHOT_RESPAWN_DELAY = 0.35;
 const SAVE_FEEDBACK_DURATION = 0.9;
 
+const Match = {
+  state: createMatchState(),
+};
+
 const Ball = {
   x: PITCH_CENTER_X,             // centered on pitch
   y: GROUND_Y + BALL_RADIUS,     // rests on the ground
@@ -146,6 +151,7 @@ export function gameInit() {
   setCanvasClearColor(COLOR_STADIUM_NIGHT);
   setCameraPos(vec2(PITCH_CENTER_X, CAMERA_CENTER_Y));
   setCameraScale(CAMERA_SCALE);
+  Match.state = createMatchState();
   Ball.saves = 0;
   Ball.conceded = 0;
   Ball.lastSaveResult = null;
@@ -193,6 +199,16 @@ function applyShotSample(sample) {
   Ball.shadow = sample.shadow;
 }
 
+export function applyMatchShotOutcome(outcome) {
+  if (isMatchComplete(Match.state)) return getMatchState();
+
+  Match.state = recordShotResult(Match.state, outcome);
+  Ball.saves = Match.state.saves;
+  Ball.conceded = Match.state.conceded;
+  Ball.feedbackTimer = SAVE_FEEDBACK_DURATION;
+  return getMatchState();
+}
+
 export function updateBallShot(dt = 1 / 60) {
   if (!Ball.shot) spawnShot(0);
 
@@ -200,9 +216,11 @@ export function updateBallShot(dt = 1 / 60) {
     Ball.feedbackTimer = Math.max(0, Ball.feedbackTimer - dt);
   }
 
+  if (isMatchComplete(Match.state)) return getBallPose();
+
   if (Ball.respawnTimer > 0) {
     Ball.respawnTimer = Math.max(0, Ball.respawnTimer - dt);
-    if (Ball.respawnTimer === 0) spawnShot(Ball.shotIndex);
+    if (Ball.respawnTimer === 0 && !isMatchComplete(Match.state)) spawnShot(Ball.shotIndex);
     return getBallPose();
   }
 
@@ -218,12 +236,10 @@ export function updateBallShot(dt = 1 / 60) {
       segments: getFamiliarSaveSegments(),
     });
 
-    if (Ball.lastSaveResult.outcome === 'save') Ball.saves += 1;
-    if (Ball.lastSaveResult.outcome === 'conceded') Ball.conceded += 1;
-    Ball.feedbackTimer = SAVE_FEEDBACK_DURATION;
+    applyMatchShotOutcome(Ball.lastSaveResult.outcome);
 
-    Ball.shotIndex = (Ball.shotIndex + 1) % SHOT_SEQUENCE.length;
-    Ball.respawnTimer = SHOT_RESPAWN_DELAY;
+    Ball.shotIndex = Match.state.shotsTaken % SHOT_SEQUENCE.length;
+    Ball.respawnTimer = isMatchComplete(Match.state) ? 0 : SHOT_RESPAWN_DELAY;
   }
 
   return getBallPose();
@@ -249,6 +265,12 @@ export function getSaveState() {
     conceded: Ball.conceded,
     feedbackTimer: Ball.feedbackTimer,
     lastResult: Ball.lastSaveResult ? { ...Ball.lastSaveResult } : null,
+  };
+}
+
+export function getMatchState() {
+  return {
+    ...Match.state,
   };
 }
 
@@ -429,13 +451,33 @@ export function gameRenderPost() {
 function drawSaveFeedback() {
   const centerX = mainCanvasSize.x / 2;
   drawTextScreen(
-    `Saves ${Ball.saves}   Misses ${Ball.conceded}`,
+    `Shot ${Match.state.shotsTaken}/${Match.state.totalShots}   Saves ${Match.state.saves}   Misses ${Match.state.conceded}   Score ${Match.state.ongoingScore}`,
     vec2(centerX, 34),
     28,
     COLOR_SCORE_FEEDBACK,
     3,
     COLOR_STADIUM_NIGHT,
   );
+
+  if (isMatchComplete(Match.state)) {
+    drawTextScreen(
+      Match.state.status === 'won' ? 'MATCH WON!' : 'MATCH LOST',
+      vec2(centerX, 86),
+      48,
+      Match.state.status === 'won' ? COLOR_SAVE_FEEDBACK : COLOR_MISS_FEEDBACK,
+      5,
+      COLOR_STADIUM_NIGHT,
+    );
+    drawTextScreen(
+      `Final Score ${Match.state.score}`,
+      vec2(centerX, 136),
+      32,
+      COLOR_SCORE_FEEDBACK,
+      4,
+      COLOR_STADIUM_NIGHT,
+    );
+    return;
+  }
 
   if (!Ball.lastSaveResult || Ball.feedbackTimer <= 0) return;
 
