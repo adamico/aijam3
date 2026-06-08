@@ -15,6 +15,9 @@ local/
 .claude/skills/*/sessions/
 .ralph.conf
 .ralph-logs/
+.agents/skills/*
+.claude/skills/*
+skills-lock.json
 
 .DS_Store
 
