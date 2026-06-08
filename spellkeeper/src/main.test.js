@@ -1,5 +1,4 @@
 import { vi, describe, it, expect } from 'vitest';
-import * as LJS from 'littlejsengine';
 
 // Mock littlejsengine BEFORE importing main.js
 vi.mock('littlejsengine', () => {
@@ -26,6 +25,7 @@ vi.mock('littlejsengine', () => {
     }
     return {
         engineInit: vi.fn(),
+        mousePos: new MockVector2(0, 0),
         vec2: (x, y) => new MockVector2(x, y),
         rgb: (r, g, b, a) => new MockColor(r, g, b, a),
         Color: MockColor,
@@ -52,5 +52,18 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(() => gameInit()).not.toThrow();
         expect(() => gameRender()).not.toThrow();
         expect(() => gameRenderPost()).not.toThrow();
+    });
+
+    it('moves both hands toward the pointer target, not just the keeper-left glove', async () => {
+        const { applyKeeperHandIk, getFamiliarPose } = await import('./main.js');
+        const target = { x: 0, y: -3.3 };
+
+        applyKeeperHandIk(target);
+        const pose = getFamiliarPose();
+
+        expect(pose.leftHand.x).toBeCloseTo(target.x, 5);
+        expect(pose.leftHand.y).toBeCloseTo(target.y, 5);
+        expect(pose.rightHand.x).toBeCloseTo(target.x, 5);
+        expect(pose.rightHand.y).toBeCloseTo(target.y, 5);
     });
 });
