@@ -14,7 +14,7 @@ const GROUND_HALF_WIDTH = 30.0;
 const GROUND_LINE_THICKNESS = 0.08;
 const PITCH_CENTER_X = 0.0;        // center of screen/pitch in world space
 const COLOR_STADIUM_NIGHT = rgb(0.05, 0.06, 0.12);
-const COLOR_GROUND_LINE = c('#3b5c3b');
+const COLOR_GROUND_LINE = c('#ffffff');
 
 // --- Goal Plane Bounding Dimensions ---
 const GOAL_WIDTH = 7.32;   // ~7 meters between posts
@@ -28,9 +28,9 @@ const GOAL_CROSSBAR_LEFT = vec2(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y + GOAL
 const GOAL_CROSSBAR_RIGHT = vec2(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT);
 
 // --- Goalkeeper (Familiar) Initial Joints/Structure ---
-const FAMILIAR_TORSO_RADIUS = 0.35;
-const FAMILIAR_HEAD_RADIUS = 0.2;
-const FAMILIAR_HAND_RADIUS = 0.2;
+const FAMILIAR_TORSO_RADIUS = 0.65;
+const FAMILIAR_HEAD_RADIUS = 0.45;
+const FAMILIAR_HAND_RADIUS = 0.3;
 const FAMILIAR_UPPER_ARM_THICKNESS = 0.18;
 const FAMILIAR_FOREARM_THICKNESS = 0.15;
 const COLOR_FAMILIAR_TORSO = c('#4d82cb');
@@ -39,10 +39,10 @@ const COLOR_FAMILIAR_ARM = c('#3d6db0');
 const COLOR_FAMILIAR_HAND = c('#d95763');
 
 // Initial joint layout offsets (in meters relative to ground/center)
-const FAMILIAR_INIT_TORSO_Y = 0.8;
-const FAMILIAR_INIT_HEAD_Y = 1.5;
-const FAMILIAR_INIT_SHOULDER_X = 0.4;
-const FAMILIAR_INIT_SHOULDER_Y = 1.1;
+const FAMILIAR_INIT_HEAD_Y = 1.7;
+const FAMILIAR_INIT_TORSO_Y = 1;
+const FAMILIAR_INIT_SHOULDER_X = 0.3;
+const FAMILIAR_INIT_SHOULDER_Y = 1.2;
 const FAMILIAR_INIT_ELBOW_X = 0.8;
 const FAMILIAR_INIT_ELBOW_Y = 0.9;
 const FAMILIAR_INIT_HAND_X = 1.2;
@@ -64,13 +64,13 @@ const Familiar = {
 };
 
 // --- Ball Structure at Spawn ---
-const BALL_RADIUS = 0.35;           // larger than real ball (0.11m) for visual clarity
+const BALL_RADIUS = 0.45;           // larger than real ball (0.11m) for visual clarity
 const BALL_MAX_Z = 11.0;            // distance between starting position and goal line in Z axis
 const BALL_SHADOW_SCALE = 0.9;
 const BALL_SHADOW_OPACITY = 0.18;
 const BALL_DETAIL_SCALE = 0.8;
-const COLOR_BALL = c('#f1c40f');
-const COLOR_BALL_DETAIL = c('#f39c12');
+const COLOR_BALL = c('#ffffff');
+const COLOR_BALL_DETAIL = c('#AABBBB');
 const COLOR_BALL_SHADOW = rgb(1, 1, 1, BALL_SHADOW_OPACITY);
 
 const Ball = {
@@ -81,11 +81,11 @@ const Ball = {
 };
 
 // --- Camera & Projection Constants ---
-const CAMERA_TILT_ANGLE = 30.0; // degrees, camera tilt down from horizon
+const CAMERA_TILT_ANGLE = 40.0; // degrees, camera tilt down from horizon
 const COS_THETA = Math.cos((CAMERA_TILT_ANGLE * Math.PI) / 180);
 const SIN_THETA = Math.sin((CAMERA_TILT_ANGLE * Math.PI) / 180);
 const CAMERA_CENTER_Y = -6.0;  // centers the scene vertically on screen
-const CAMERA_SCALE = 67;       // fits the goal and ball on screen
+const CAMERA_SCALE = 96;       // fits the goal and ball on screen
 
 export function gameInit() {
     setCanvasClearColor(COLOR_STADIUM_NIGHT);
