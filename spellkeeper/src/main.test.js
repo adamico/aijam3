@@ -43,6 +43,12 @@ vi.mock('littlejsengine', () => {
                 throw new Error('Assertion failed: color is invalid');
             }
         }),
+        drawTextScreen: vi.fn((text, pos, size, color) => {
+            if (!(color instanceof MockColor)) {
+                throw new Error('Assertion failed: text color is invalid');
+            }
+        }),
+        mainCanvasSize: new MockVector2(1280, 720),
     };
 });
 
@@ -98,5 +104,30 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(later.shadow.y).toBe(-5);
         expect(later.shadow.opacity).toBeLessThan(start.shadow.opacity);
         expect(later.hex).toBe('standard');
+    });
+
+    it('resolves a goal-plane overlap as a save when the shot crosses', async () => {
+        const engine = await import('littlejsengine');
+        const { gameInit, gameRenderPost, applyKeeperHandIk, getSaveState, updateBallShot } = await import('./main.js');
+
+        gameInit();
+        applyKeeperHandIk({ x: -1.2, y: -3.7 });
+        updateBallShot(999);
+        const saves = getSaveState();
+
+        expect(saves.saves).toBe(1);
+        expect(saves.conceded).toBe(0);
+        expect(saves.lastResult.outcome).toBe('save');
+        expect(saves.lastResult.crossedGoalPlane).toBe(true);
+
+        gameRenderPost();
+        expect(engine.drawTextScreen).toHaveBeenCalledWith(
+            'SAVE!',
+            expect.anything(),
+            56,
+            expect.anything(),
+            5,
+            expect.anything(),
+        );
     });
 });

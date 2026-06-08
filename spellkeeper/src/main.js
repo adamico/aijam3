@@ -1,13 +1,14 @@
 import {
   engineInit,
   vec2, setCameraPos, setCameraScale,
-  drawLine, drawCircle,
+  drawLine, drawCircle, drawTextScreen,
   rgb, Color, setCanvasClearColor,
-  mousePos, timeDelta
+  mousePos, timeDelta, mainCanvasSize
 } from 'littlejsengine';
 import { solveIkChain } from './ikChain.js';
 import { solveTorsoDrag } from './bodyRig.js';
 import { advanceShot, createShot } from './shotTrajectory.js';
+import { resolveCrossingSave } from './saveResolver.js';
 
 // Helper to convert hex to LittleJS Color
 const c = (hex) => new Color().setHex(hex);
@@ -25,6 +26,9 @@ const GOAL_WIDTH = 7.32;   // ~7 meters between posts
 const GOAL_HEIGHT = 2.44;  // standard height proportion
 const GOAL_POST_THICKNESS = 0.2;
 const COLOR_GOAL_FRAME = c('#ffffff');
+const COLOR_SAVE_FEEDBACK = c('#66ff99');
+const COLOR_MISS_FEEDBACK = c('#ff6677');
+const COLOR_SCORE_FEEDBACK = c('#d7e8ff');
 
 const GOAL_LEFT_POST = vec2(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y);
 const GOAL_RIGHT_POST = vec2(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y);
@@ -107,6 +111,7 @@ const SHOT_SEQUENCE = [
   { hex: 'heavy', start: { x: 2.6, y: GROUND_Y + BALL_RADIUS }, target: { x: -1.8, y: GROUND_Y + 0.9 } },
 ];
 const SHOT_RESPAWN_DELAY = 0.35;
+const SAVE_FEEDBACK_DURATION = 0.9;
 
 const Ball = {
   x: PITCH_CENTER_X,             // centered on pitch
@@ -124,6 +129,10 @@ const Ball = {
   shot: null,
   shotIndex: 0,
   respawnTimer: 0,
+  lastSaveResult: null,
+  feedbackTimer: 0,
+  saves: 0,
+  conceded: 0,
 };
 
 // --- Camera & Projection Constants ---
@@ -137,6 +146,10 @@ export function gameInit() {
   setCanvasClearColor(COLOR_STADIUM_NIGHT);
   setCameraPos(vec2(PITCH_CENTER_X, CAMERA_CENTER_Y));
   setCameraScale(CAMERA_SCALE);
+  Ball.saves = 0;
+  Ball.conceded = 0;
+  Ball.lastSaveResult = null;
+  Ball.feedbackTimer = 0;
   spawnShot(0);
 }
 
@@ -183,16 +196,32 @@ function applyShotSample(sample) {
 export function updateBallShot(dt = 1 / 60) {
   if (!Ball.shot) spawnShot(0);
 
+  if (Ball.feedbackTimer > 0) {
+    Ball.feedbackTimer = Math.max(0, Ball.feedbackTimer - dt);
+  }
+
   if (Ball.respawnTimer > 0) {
     Ball.respawnTimer = Math.max(0, Ball.respawnTimer - dt);
     if (Ball.respawnTimer === 0) spawnShot(Ball.shotIndex);
     return getBallPose();
   }
 
+  const previousZ = Ball.z;
   Ball.shot = advanceShot(Ball.shot, dt);
   applyShotSample(Ball.shot.sample);
 
   if (Ball.shot.sample.isComplete) {
+    Ball.lastSaveResult = resolveCrossingSave({
+      previousZ,
+      currentZ: Ball.z,
+      ball: { x: Ball.x, y: Ball.y, radius: Ball.radius },
+      segments: getFamiliarSaveSegments(),
+    });
+
+    if (Ball.lastSaveResult.outcome === 'save') Ball.saves += 1;
+    if (Ball.lastSaveResult.outcome === 'conceded') Ball.conceded += 1;
+    Ball.feedbackTimer = SAVE_FEEDBACK_DURATION;
+
     Ball.shotIndex = (Ball.shotIndex + 1) % SHOT_SEQUENCE.length;
     Ball.respawnTimer = SHOT_RESPAWN_DELAY;
   }
@@ -210,6 +239,16 @@ export function getBallPose() {
     color: Ball.color,
     shadow: { ...Ball.shadow },
     hex: Ball.shot?.hex,
+    saveResult: Ball.lastSaveResult ? { ...Ball.lastSaveResult } : null,
+  };
+}
+
+export function getSaveState() {
+  return {
+    saves: Ball.saves,
+    conceded: Ball.conceded,
+    feedbackTimer: Ball.feedbackTimer,
+    lastResult: Ball.lastSaveResult ? { ...Ball.lastSaveResult } : null,
   };
 }
 
@@ -283,9 +322,23 @@ export function getFamiliarPose() {
     head: { x: Familiar.headPos.x, y: Familiar.headPos.y },
     leftShoulder: { x: Familiar.leftShoulder.x, y: Familiar.leftShoulder.y },
     rightShoulder: { x: Familiar.rightShoulder.x, y: Familiar.rightShoulder.y },
+    leftElbow: { x: Familiar.leftElbow.x, y: Familiar.leftElbow.y },
+    rightElbow: { x: Familiar.rightElbow.x, y: Familiar.rightElbow.y },
     leftHand: { x: Familiar.leftHand.x, y: Familiar.leftHand.y },
     rightHand: { x: Familiar.rightHand.x, y: Familiar.rightHand.y },
   };
+}
+
+export function getFamiliarSaveSegments() {
+  return [
+    { id: 'torso', center: Familiar.torsoPos, radius: Familiar.torsoRadius },
+    { id: 'leftUpperArm', start: Familiar.leftShoulder, end: Familiar.leftElbow, radius: FAMILIAR_UPPER_ARM_THICKNESS / 2 },
+    { id: 'leftForearm', start: Familiar.leftElbow, end: Familiar.leftHand, radius: FAMILIAR_FOREARM_THICKNESS / 2 },
+    { id: 'leftHand', center: Familiar.leftHand, radius: Familiar.handRadius },
+    { id: 'rightUpperArm', start: Familiar.rightShoulder, end: Familiar.rightElbow, radius: FAMILIAR_UPPER_ARM_THICKNESS / 2 },
+    { id: 'rightForearm', start: Familiar.rightElbow, end: Familiar.rightHand, radius: FAMILIAR_FOREARM_THICKNESS / 2 },
+    { id: 'rightHand', center: Familiar.rightHand, radius: Familiar.handRadius },
+  ];
 }
 
 function project(x3d, y3d, depthFromCamera) {
@@ -370,7 +423,31 @@ export function gameRender() {
 }
 
 export function gameRenderPost() {
-  // Reserved for screen-space UI / post-processing overlays
+  drawSaveFeedback();
+}
+
+function drawSaveFeedback() {
+  const centerX = mainCanvasSize.x / 2;
+  drawTextScreen(
+    `Saves ${Ball.saves}   Misses ${Ball.conceded}`,
+    vec2(centerX, 34),
+    28,
+    COLOR_SCORE_FEEDBACK,
+    3,
+    COLOR_STADIUM_NIGHT,
+  );
+
+  if (!Ball.lastSaveResult || Ball.feedbackTimer <= 0) return;
+
+  const isSave = Ball.lastSaveResult.outcome === 'save';
+  drawTextScreen(
+    isSave ? 'SAVE!' : 'MISS!',
+    vec2(centerX, 86),
+    56,
+    isSave ? COLOR_SAVE_FEEDBACK : COLOR_MISS_FEEDBACK,
+    5,
+    COLOR_STADIUM_NIGHT,
+  );
 }
 
 // Startup LittleJS Engine only if running in a browser environment
