@@ -81,11 +81,11 @@ const Ball = {
 };
 
 // --- Camera & Projection Constants ---
-const FOCUS_DISTANCE = 5.0; // Higher value reduces perspective distortion
-const CAMERA_Y = 1.0;       // Eye-level camera height
-const HEIGHT_COMPRESSION = 0.7; // Simulates camera tilt (looking down), bringing ball and shadow closer
-const CAMERA_CENTER_Y = -2.0;
-const CAMERA_SCALE = 85;
+const CAMERA_TILT_ANGLE = 30.0; // degrees, camera tilt down from horizon
+const COS_THETA = Math.cos((CAMERA_TILT_ANGLE * Math.PI) / 180);
+const SIN_THETA = Math.sin((CAMERA_TILT_ANGLE * Math.PI) / 180);
+const CAMERA_CENTER_Y = -6.0;  // centers the scene vertically on screen
+const CAMERA_SCALE = 67;       // fits the goal and ball on screen
 
 export function gameInit() {
     setCanvasClearColor(COLOR_STADIUM_NIGHT);
@@ -102,13 +102,14 @@ export function gameUpdatePost() {
 }
 
 function project(x3d, y3d, depthFromCamera) {
-    const scale = FOCUS_DISTANCE / (FOCUS_DISTANCE + depthFromCamera);
-    const heightAboveGround = y3d - GROUND_Y;
-    const groundProjY = CAMERA_Y + (GROUND_Y - CAMERA_Y) * scale;
-    const yProj = groundProjY + heightAboveGround * scale * HEIGHT_COMPRESSION;
+    // depthFromCamera = BALL_MAX_Z - z3d -> z3d = BALL_MAX_Z - depthFromCamera
+    const z3d = BALL_MAX_Z - depthFromCamera;
+    
+    const xProj = x3d;
+    const yProj = y3d * COS_THETA - z3d * SIN_THETA;
     return {
-        pos: vec2(x3d * scale, yProj),
-        scale,
+        pos: vec2(xProj, yProj),
+        scale: 1.0, // uniform scale in orthographic projection
     };
 }
 
