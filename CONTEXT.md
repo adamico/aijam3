@@ -48,8 +48,8 @@ An ordered list of pending enemy spawns (`{eType, row, col, style, spawnTimer}`)
 | `B` | Boss | |
 | `g` | Treasure | |
 
-### Paperkeeper (context-local terms)
-Direct-control prototype; exempt from the Lever/Auto-Execution model — see ADR-0008.
+### Spell Keeper (context-local terms)
+Direct-control project; exempt from the Lever/Auto-Execution model — see ADR-0008.
 
 - **Familiar** — the shapeshifting magical creature disguised as the goalkeeper; the player-controlled body (IK kinematic chain).
 - **Goal Plane** — the 2D XY plane at the goal mouth. All save logic is 2D on this plane; the ball's Z-travel is only a flight telegraph/timer.
