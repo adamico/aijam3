@@ -3,7 +3,10 @@ import {
   DEFAULT_DIVE_CONFIG,
   advanceDiveState,
   createDiveState,
+  deriveEffectiveReach,
+  getShotTimeToGoal,
   isDiveActive,
+  shouldTriggerDive,
   startDive,
 } from './diveState.js';
 
@@ -25,6 +28,99 @@ describe('DiveState', () => {
     expect(state.elapsed).toBe(0);
     expect(state.direction).toBeNull();
     expect(isDiveActive(state)).toBe(false);
+  });
+
+  it('derives effective reach from body dimensions', () => {
+    const compactReach = deriveEffectiveReach({
+      torso: { x: 0, y: -4 },
+      shoulders: [{ x: -0.2, y: -3.8 }, { x: 0.2, y: -3.8 }],
+      upperArmLength: 0.5,
+      forearmLength: 0.5,
+      handRadius: 0.2,
+    });
+    const broadReach = deriveEffectiveReach({
+      torso: { x: 0, y: -4 },
+      shoulders: [{ x: -0.6, y: -3.8 }, { x: 0.6, y: -3.8 }],
+      upperArmLength: 0.7,
+      forearmLength: 0.7,
+      handRadius: 0.3,
+    });
+
+    expect(compactReach).toBeCloseTo(Math.hypot(0.2, 0.2) + 1.2);
+    expect(broadReach).toBeGreaterThan(compactReach);
+  });
+
+  it('bases shot threat on remaining time to goal rather than raw progress', () => {
+    const fastHalfwayShot = {
+      elapsed: 0.45,
+      spec: { duration: 0.7 },
+      sample: { progress: 0.5 },
+    };
+    const slowHalfwayShot = {
+      elapsed: 1.075,
+      spec: { duration: 2.15 },
+      sample: { progress: 0.5 },
+    };
+
+    expect(getShotTimeToGoal(fastHalfwayShot)).toBeCloseTo(0.25);
+    expect(getShotTimeToGoal(slowHalfwayShot)).toBeCloseTo(1.075);
+    expect(shouldTriggerDive({
+      cursorTarget: { x: 2.4, y: 0 },
+      origin: { x: 0, y: 0 },
+      body: {
+        torso: { x: 0, y: 0 },
+        shoulders: [{ x: 0, y: 0 }],
+        upperArmLength: 0.7,
+        forearmLength: 0.7,
+        handRadius: 0.2,
+      },
+      shot: fastHalfwayShot,
+      config: { threatWindow: 0.34 },
+    }).shouldTrigger).toBe(true);
+    expect(shouldTriggerDive({
+      cursorTarget: { x: 2.4, y: 0 },
+      origin: { x: 0, y: 0 },
+      body: {
+        torso: { x: 0, y: 0 },
+        shoulders: [{ x: 0, y: 0 }],
+        upperArmLength: 0.7,
+        forearmLength: 0.7,
+        handRadius: 0.2,
+      },
+      shot: slowHalfwayShot,
+      config: { threatWindow: 0.34 },
+    }).shouldTrigger).toBe(false);
+  });
+
+  it('requires cursor strain and shot threat together before triggering', () => {
+    const body = {
+      torso: { x: 0, y: 0 },
+      shoulders: [{ x: 0, y: 0 }],
+      upperArmLength: 0.7,
+      forearmLength: 0.7,
+      handRadius: 0.2,
+    };
+    const threatShot = { elapsed: 0.98, spec: { duration: 1.3 } };
+    const safeShot = { elapsed: 0.4, spec: { duration: 1.3 } };
+
+    expect(shouldTriggerDive({
+      cursorTarget: { x: 2.4, y: 0 },
+      origin: body.torso,
+      body,
+      shot: safeShot,
+    }).shouldTrigger).toBe(false);
+    expect(shouldTriggerDive({
+      cursorTarget: { x: 1.2, y: 0 },
+      origin: body.torso,
+      body,
+      shot: threatShot,
+    }).shouldTrigger).toBe(false);
+    expect(shouldTriggerDive({
+      cursorTarget: { x: 2.4, y: 0 },
+      origin: body.torso,
+      body,
+      shot: threatShot,
+    }).shouldTrigger).toBe(true);
   });
 
   it('locks direction from the cursor target at trigger time', () => {

@@ -51,6 +51,64 @@ function normalizeConfig(config = {}) {
   };
 }
 
+export function deriveEffectiveReach({
+  torso,
+  shoulders,
+  upperArmLength,
+  forearmLength,
+  handRadius = 0,
+} = {}) {
+  if (!torso) throw new Error('Dive reach requires a torso');
+  if (!shoulders?.length) throw new Error('Dive reach requires at least one shoulder');
+  if (upperArmLength < 0 || forearmLength < 0 || handRadius < 0) {
+    throw new Error('Dive reach body dimensions must be non-negative');
+  }
+
+  const armReach = upperArmLength + forearmLength + handRadius;
+  return Math.max(...shoulders.map((shoulder) => (
+    Math.hypot(shoulder.x - torso.x, shoulder.y - torso.y) + armReach
+  )));
+}
+
+export function getShotTimeToGoal(shot) {
+  if (!shot) return Infinity;
+  if (Number.isFinite(shot.remainingTimeToGoal)) return Math.max(0, shot.remainingTimeToGoal);
+
+  const duration = shot.spec?.duration;
+  if (!Number.isFinite(duration)) return Infinity;
+
+  return Math.max(0, duration - Math.max(0, shot.elapsed || 0));
+}
+
+export function shouldTriggerDive({
+  cursorTarget,
+  origin,
+  body,
+  shot,
+  config = DEFAULT_DIVE_CONFIG,
+} = {}) {
+  if (!cursorTarget) throw new Error('Dive trigger cursorTarget is required');
+  if (!origin) throw new Error('Dive trigger origin is required');
+
+  const activeConfig = normalizeConfig(config);
+  const effectiveReach = deriveEffectiveReach(body);
+  const cursorDistance = Math.hypot(cursorTarget.x - origin.x, cursorTarget.y - origin.y);
+  const triggerReach = effectiveReach * activeConfig.triggerMarginScale;
+  const timeToGoal = getShotTimeToGoal(shot);
+  const hasCursorStrain = cursorDistance > triggerReach;
+  const hasShotThreat = timeToGoal <= activeConfig.threatWindow;
+
+  return {
+    shouldTrigger: hasCursorStrain && hasShotThreat,
+    effectiveReach,
+    triggerReach,
+    cursorDistance,
+    timeToGoal,
+    hasCursorStrain,
+    hasShotThreat,
+  };
+}
+
 export function createDiveState(config = DEFAULT_DIVE_CONFIG) {
   const activeConfig = normalizeConfig(config);
 
