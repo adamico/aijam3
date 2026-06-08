@@ -51,10 +51,10 @@ An ordered list of pending enemy spawns (`{eType, row, col, style, spawnTimer}`)
 ### Spell Keeper (context-local terms)
 Direct-control project; exempt from the Lever/Auto-Execution model — see ADR-0008.
 
-- **Familiar** — the shapeshifting magical creature disguised as the goalkeeper; the player-controlled body (IK kinematic chain).
-- **Goal Plane** — the 2D XY plane at the goal mouth. All save logic is 2D on this plane; the ball's Z-travel is only a flight telegraph/timer.
-- **Save** — a familiar body segment (hand/arm/torso capsule) overlapping the ball's XY at the frame it crosses the Goal Plane. No 3D physics.
-- **Reach** — max IK arm extension. Design rule: Goal-mouth width > Reach, so some shots force torso-drag.
+- **Familiar** — the shapeshifting magical creature disguised as the goalkeeper; the player-controlled body (IK kinematic chain). The player controls both hands/gloves coordinated together using a single cursor target.
+- **Goal Plane** — the 2D XY plane at the goal mouth at z = 0. The ball travels in explicit 3D space (x, y, z) towards the Goal Plane, projecting to the 2D viewport. Save logic is evaluated on the Goal Plane.
+- **Save** — a familiar body segment (hand/arm/torso capsule) overlapping the ball's XY at the frame it crosses the Goal Plane (z <= 0). No 3D physics.
+- **Reach** — max IK arm extension. Design rule: Goal-mouth width > Reach, so some shots force torso-drag (shifting the torso horizontally when the cursor target exceeds the arm limits).
 - **Hex** — a magically modified shot type with fixed, learnable physics (e.g. fireball = fast, curve = swerving, heavy = slow/big). Player skill = reading the trajectory, not reacting to telegraphs.
 - **Read cues** — the trajectory is judged from three converging signals: on-screen arc (primary), ball scale (ball shrinks as it recedes toward goal; best look is early/front-loaded), and ground shadow (always present; landing + timing). No per-shot reticle telegraph except in the opening tutorial shots.
 
