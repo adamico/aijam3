@@ -102,7 +102,8 @@ const COLOR_BALL_DETAIL = c('#AABBBB');
 const SHOT_SEQUENCE = [
   { hex: 'standard', start: { x: -2.5, y: GROUND_Y + BALL_RADIUS }, target: { x: -1.2, y: GROUND_Y + 1.3 } },
   { hex: 'fireball', start: { x: 1.9, y: GROUND_Y + BALL_RADIUS }, target: { x: 1.7, y: GROUND_Y + 1.8 } },
-  { hex: 'curve', start: { x: -3.0, y: GROUND_Y + BALL_RADIUS }, target: { x: 1.2, y: GROUND_Y + 1.2 }, curveDirection: 1 },
+  // Same lane as standard, but with a strong lateral bow so the curve hex is learnable.
+  { hex: 'curve', start: { x: -2.5, y: GROUND_Y + BALL_RADIUS }, target: { x: -1.2, y: GROUND_Y + 1.3 }, curveDirection: 1 },
   { hex: 'heavy', start: { x: 2.6, y: GROUND_Y + BALL_RADIUS }, target: { x: -1.8, y: GROUND_Y + 0.9 } },
 ];
 const SHOT_RESPAWN_DELAY = 0.35;

@@ -16,7 +16,7 @@ const BASE_SHOT_RADIUS_SCALE = 1;
 const SHOT_DURATION_MODIFIERS = {
   standard: 1,
   fireball: 0.7,
-  curve: 1.58,
+  curve: 1,
   heavy: 2.15,
 };
 
@@ -30,7 +30,7 @@ const SHOT_ARC_HEIGHT_MODIFIERS = {
 const SHOT_CURVE_AMPLITUDE_MODIFIERS = {
   standard: 0,
   fireball: 0,
-  curve: 1,
+  curve: 2,
   heavy: 0,
 };
 
@@ -67,7 +67,7 @@ export const SHOT_HEXES = {
     arcHeight: BASE_SHOT_ARC_HEIGHT * SHOT_ARC_HEIGHT_MODIFIERS.curve,
     curveAmplitude: BASE_SHOT_CURVE_AMPLITUDE * SHOT_CURVE_AMPLITUDE_MODIFIERS.curve,
     radiusScale: BASE_SHOT_RADIUS_SCALE * SHOT_RADIUS_SCALE_MODIFIERS.curve,
-    color: '#8be9fd',
+    color: '#00d8ff',
   },
   heavy: {
     key: 'heavy',
