@@ -90,6 +90,67 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(pose.rightShoulder.x).toBeCloseTo(pose.torso.x + 0.3, 5);
     });
 
+    it('enters a committed lateral dive on a hard threatening reach while hands keep aiming live', async () => {
+        const { gameInit, updateBallShot, applyKeeperHandIk, getDiveState, getFamiliarPose } = await import('./main.js');
+
+        gameInit();
+        updateBallShot(1.0);
+        const firstTarget = { x: 4.4, y: -3.4 };
+        const firstResult = applyKeeperHandIk(firstTarget, 0.1);
+        const firstPose = getFamiliarPose();
+        const activeDive = getDiveState();
+
+        expect(activeDive.status).toBe('diving');
+        expect(activeDive.direction.x).toBeGreaterThan(0);
+        expect(firstResult.dive.isActive).toBe(true);
+        expect(firstPose.torso.x).toBeGreaterThan(firstResult.body.torso.x);
+        expect(firstPose.torso.y).toBeGreaterThan(firstResult.body.torso.y);
+        expect(firstPose.head.x).toBeGreaterThan(firstPose.torso.x);
+        expect(firstResult.left.requestedTarget).toEqual(firstTarget);
+        expect(firstResult.right.requestedTarget).toEqual(firstTarget);
+        expect(firstPose.leftHand.x).toBeGreaterThan(firstPose.leftShoulder.x);
+        expect(firstPose.rightHand.x).toBeGreaterThan(firstPose.rightShoulder.x);
+
+        const liveTarget = { x: -0.2, y: -3.2 };
+        const correctedResult = applyKeeperHandIk(liveTarget, 0.05);
+        const correctedPose = getFamiliarPose();
+        const committedDive = getDiveState();
+
+        expect(committedDive.direction.x).toBeCloseTo(activeDive.direction.x);
+        expect(correctedPose.torso.x).toBeGreaterThan(firstResult.body.torso.x);
+        expect(correctedResult.left.requestedTarget).toEqual(liveTarget);
+        expect(correctedResult.right.requestedTarget).toEqual(liveTarget);
+    });
+
+    it('does not loop/retrigger while the same hard threatening reach is held', async () => {
+        const { gameInit, updateBallShot, applyKeeperHandIk, getDiveState } = await import('./main.js');
+
+        gameInit();
+        updateBallShot(1.0);
+        const heldTarget = { x: 4.4, y: -3.4 };
+
+        applyKeeperHandIk(heldTarget, 0.1);
+        const firstDive = getDiveState();
+        applyKeeperHandIk(heldTarget, 0.3);
+        const expiredDive = getDiveState();
+        applyKeeperHandIk(heldTarget, 0.05);
+        const heldAfterExpiry = getDiveState();
+
+        expect(firstDive.status).toBe('diving');
+        expect(expiredDive.status).toBe('expired');
+        expect(heldAfterExpiry.status).toBe('expired');
+        expect(heldAfterExpiry.triggerTarget).toEqual(firstDive.triggerTarget);
+    });
+
+    it('does not enter a dive from cursor strain without shot threat', async () => {
+        const { gameInit, applyKeeperHandIk, getDiveState } = await import('./main.js');
+
+        gameInit();
+        applyKeeperHandIk({ x: -4.4, y: -3.4 }, 0.1);
+
+        expect(getDiveState().status).toBe('idle');
+    });
+
     it('updates the active shot with orthographic size and ground shadow cues', async () => {
         const { spawnShot, updateBallShot, getBallPose } = await import('./main.js');
 

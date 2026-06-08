@@ -16,8 +16,8 @@ describe('DiveState', () => {
 
     expect(DEFAULT_DIVE_CONFIG.threatWindow).toBe(0.34);
     expect(DEFAULT_DIVE_CONFIG.triggerMarginScale).toBe(1.15);
-    expect(DEFAULT_DIVE_CONFIG.reachBonusScale).toBe(0.22);
-    expect(DEFAULT_DIVE_CONFIG.duration).toBe(0.28);
+    expect(DEFAULT_DIVE_CONFIG.reachBonusScale).toBe(0.62);
+    expect(DEFAULT_DIVE_CONFIG.duration).toBe(0.4);
     expect(DEFAULT_DIVE_CONFIG.poseEasing).toEqual({
       windup: 0.16,
       commit: 0.52,

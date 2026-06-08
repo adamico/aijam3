@@ -31,8 +31,8 @@ function normalizeDirection(target, fallbackDirection = { x: 1, y: 0 }) {
 export const DEFAULT_DIVE_CONFIG = {
   threatWindow: 0.34,
   triggerMarginScale: 1.15,
-  reachBonusScale: 0.22,
-  duration: 0.28,
+  reachBonusScale: 0.62,
+  duration: 0.4,
   poseEasing: {
     windup: 0.16,
     commit: 0.52,

@@ -7,6 +7,15 @@ import {
 } from 'littlejsengine';
 import { solveIkChain } from './ikChain.js';
 import { solveTorsoDrag } from './bodyRig.js';
+import {
+  DEFAULT_DIVE_CONFIG,
+  advanceDiveState,
+  createDiveState,
+  deriveEffectiveReach,
+  isDiveActive,
+  shouldTriggerDive,
+  startDive,
+} from './diveState.js';
 import { advanceShot, createShot } from './shotTrajectory.js';
 import { getRampShotConfig } from './shotRamp.js';
 import { resolveCrossingSave } from './saveResolver.js';
@@ -76,6 +85,9 @@ const FAMILIAR_HAND_IK = {
   },
 };
 const FAMILIAR_TORSO_DRAG_MAX_SPEED = 2.2; // meters/second; intentionally heavy
+const FAMILIAR_DIVE_VERTICAL_LIFT_SCALE = 0.32;
+const FAMILIAR_DIVE_HEAD_LEAD_SCALE = 0.45;
+const FAMILIAR_DIVE_SHOULDER_LEAD_SCALE = 0.28;
 const FAMILIAR_BODY_OFFSETS = {
   head: { x: 0, y: FAMILIAR_INIT_HEAD_Y - FAMILIAR_INIT_TORSO_Y },
   leftShoulder: { x: -FAMILIAR_INIT_SHOULDER_X, y: FAMILIAR_INIT_SHOULDER_Y - FAMILIAR_INIT_TORSO_Y },
@@ -112,6 +124,26 @@ const Match = {
   state: createMatchState(),
 };
 
+const EMPTY_DIVE_VISUAL_POSE = {
+  torso: { x: 0, y: 0 },
+  head: { x: 0, y: 0 },
+  shoulders: { x: 0, y: 0 },
+};
+
+function cloneDiveVisualPose(pose = EMPTY_DIVE_VISUAL_POSE) {
+  return {
+    torso: { ...pose.torso },
+    head: { ...pose.head },
+    shoulders: { ...pose.shoulders },
+  };
+}
+
+const Dive = {
+  state: createDiveState(),
+  visualPose: cloneDiveVisualPose(),
+  canTrigger: true,
+};
+
 const Ball = {
   x: PITCH_CENTER_X,             // centered on pitch
   y: GROUND_Y + BALL_RADIUS,     // rests on the ground
@@ -141,10 +173,23 @@ const SIN_THETA = Math.sin((CAMERA_TILT_ANGLE * Math.PI) / 180);
 const CAMERA_CENTER_Y = -6.0;  // centers the scene vertically on screen
 const CAMERA_SCALE = 96;       // fits the goal and ball on screen
 
+function resetFamiliarPose() {
+  Familiar.torsoPos = vec2(PITCH_CENTER_X, GROUND_Y + FAMILIAR_INIT_TORSO_Y);
+  setFamiliarTorsoX(Familiar.torsoPos.x);
+  Familiar.leftElbow = vec2(PITCH_CENTER_X - FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y);
+  Familiar.rightElbow = vec2(PITCH_CENTER_X + FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y);
+  Familiar.leftHand = vec2(PITCH_CENTER_X - FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y);
+  Familiar.rightHand = vec2(PITCH_CENTER_X + FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y);
+}
+
 export function gameInit() {
   setCanvasClearColor(COLOR_STADIUM_NIGHT);
   setCameraPos(vec2(PITCH_CENTER_X, CAMERA_CENTER_Y));
   setCameraScale(CAMERA_SCALE);
+  resetFamiliarPose();
+  Dive.state = createDiveState();
+  Dive.visualPose = cloneDiveVisualPose();
+  Dive.canTrigger = true;
   Match.state = createMatchState();
   Ball.saves = 0;
   Ball.conceded = 0;
@@ -319,10 +364,84 @@ export function applyRightHandIk(target) {
   return applyHandIk('right', target);
 }
 
+function getDiveBodyModel() {
+  return {
+    torso: { x: Familiar.torsoPos.x, y: Familiar.torsoPos.y },
+    shoulders: [
+      { x: Familiar.leftShoulder.x, y: Familiar.leftShoulder.y },
+      { x: Familiar.rightShoulder.x, y: Familiar.rightShoulder.y },
+    ],
+    upperArmLength: FAMILIAR_UPPER_ARM_LENGTH,
+    forearmLength: FAMILIAR_FOREARM_LENGTH,
+    handRadius: Familiar.handRadius,
+  };
+}
+
+function clearDivePoseFromFamiliar() {
+  const pose = Dive.visualPose;
+  Familiar.torsoPos = vec2(Familiar.torsoPos.x - pose.torso.x, Familiar.torsoPos.y - pose.torso.y);
+  Familiar.headPos = vec2(Familiar.headPos.x - pose.head.x, Familiar.headPos.y - pose.head.y);
+  Familiar.leftShoulder = vec2(Familiar.leftShoulder.x - pose.shoulders.x, Familiar.leftShoulder.y - pose.shoulders.y);
+  Familiar.rightShoulder = vec2(Familiar.rightShoulder.x - pose.shoulders.x, Familiar.rightShoulder.y - pose.shoulders.y);
+  Dive.visualPose = cloneDiveVisualPose();
+}
+
+function applyDivePoseToFamiliar(diveState, bodyModel) {
+  if (!isDiveActive(diveState)) return { isActive: false, offset: { x: 0, y: 0 }, reachBonus: 0 };
+
+  const effectiveReach = deriveEffectiveReach(bodyModel);
+  const reachBonus = effectiveReach * DEFAULT_DIVE_CONFIG.reachBonusScale;
+  const extension = diveState.pose.extension;
+  const verticalLift = Math.max(0, diveState.direction.y) * reachBonus * FAMILIAR_DIVE_VERTICAL_LIFT_SCALE;
+  const torsoOffset = {
+    x: diveState.direction.x * reachBonus * extension,
+    y: verticalLift * extension,
+  };
+  const headOffset = {
+    x: torsoOffset.x + diveState.direction.x * reachBonus * extension * FAMILIAR_DIVE_HEAD_LEAD_SCALE,
+    y: torsoOffset.y + verticalLift * FAMILIAR_DIVE_HEAD_LEAD_SCALE,
+  };
+  const shoulderOffset = {
+    x: torsoOffset.x + diveState.direction.x * reachBonus * extension * FAMILIAR_DIVE_SHOULDER_LEAD_SCALE,
+    y: torsoOffset.y,
+  };
+
+  Familiar.torsoPos = vec2(Familiar.torsoPos.x + torsoOffset.x, Familiar.torsoPos.y + torsoOffset.y);
+  Familiar.headPos = vec2(Familiar.headPos.x + headOffset.x, Familiar.headPos.y + headOffset.y);
+  Familiar.leftShoulder = vec2(Familiar.leftShoulder.x + shoulderOffset.x, Familiar.leftShoulder.y + shoulderOffset.y);
+  Familiar.rightShoulder = vec2(Familiar.rightShoulder.x + shoulderOffset.x, Familiar.rightShoulder.y + shoulderOffset.y);
+  Dive.visualPose = { torso: torsoOffset, head: headOffset, shoulders: shoulderOffset };
+
+  return { isActive: true, offset: torsoOffset, reachBonus, extension };
+}
+
 export function applyKeeperHandIk(target, dt = 1 / 60) {
+  clearDivePoseFromFamiliar();
+  const triggerBody = getDiveBodyModel();
+  const origin = triggerBody.torso;
+
+  Dive.state = advanceDiveState(Dive.state, dt);
+  if (!isDiveActive(Dive.state)) {
+    const trigger = shouldTriggerDive({
+      cursorTarget: target,
+      origin,
+      body: triggerBody,
+      shot: Ball.shot,
+    });
+    if (!trigger.shouldTrigger) {
+      Dive.canTrigger = true;
+    } else if (Dive.canTrigger) {
+      Dive.state = advanceDiveState(startDive(Dive.state, { cursorTarget: target, origin }), dt);
+      Dive.canTrigger = false;
+    }
+  }
+
   const body = updateFamiliarBodyRig(target, dt);
+  const dive = applyDivePoseToFamiliar(Dive.state, getDiveBodyModel());
+
   return {
     body,
+    dive,
     left: applyLeftHandIk(target),
     right: applyRightHandIk(target),
   };
@@ -330,6 +449,16 @@ export function applyKeeperHandIk(target, dt = 1 / 60) {
 
 export function updateKeeperIk(projectedMousePos, dt = 1 / 60) {
   return applyKeeperHandIk(goalPlaneFromProjectedMouse(projectedMousePos), dt);
+}
+
+export function getDiveState() {
+  return {
+    ...Dive.state,
+    direction: Dive.state.direction ? { ...Dive.state.direction } : null,
+    triggerTarget: Dive.state.triggerTarget ? { ...Dive.state.triggerTarget } : null,
+    triggerOrigin: Dive.state.triggerOrigin ? { ...Dive.state.triggerOrigin } : null,
+    pose: { ...Dive.state.pose },
+  };
 }
 
 export function getFamiliarPose() {
