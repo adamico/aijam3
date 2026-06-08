@@ -70,6 +70,7 @@ const BALL_SHADOW_OPACITY = 0.18;
 const BALL_DETAIL_SCALE = 0.8;
 const COLOR_BALL = c('#f1c40f');
 const COLOR_BALL_DETAIL = c('#f39c12');
+const COLOR_BALL_SHADOW = rgb(1, 1, 1, BALL_SHADOW_OPACITY);
 
 const Ball = {
     x: 0,                   // centered on pitch
@@ -165,7 +166,7 @@ function drawBall() {
     const { pos: shadowPos } = project(Ball.x, GROUND_Y, depthFromCamera);
     const shadowRadius = Ball.radius * scale * BALL_SHADOW_SCALE;
     // Semi-transparent white shadow — visible on the dark background
-    drawCircle(shadowPos, shadowRadius, rgb(1, 1, 1, BALL_SHADOW_OPACITY));
+    drawCircle(shadowPos, shadowRadius, COLOR_BALL_SHADOW);
 
     // Draw projected Ball
     drawCircle(ballPos, Ball.radius * scale, COLOR_BALL);
