@@ -37,16 +37,26 @@ const COLOR_FAMILIAR_HEAD = c('#2c4d7e');
 const COLOR_FAMILIAR_ARM = c('#3d6db0');
 const COLOR_FAMILIAR_HAND = c('#d95763');
 
+// Initial joint layout offsets (in meters relative to ground/center)
+const FAMILIAR_INIT_TORSO_Y = 0.8;
+const FAMILIAR_INIT_HEAD_Y = 1.5;
+const FAMILIAR_INIT_SHOULDER_X = 0.4;
+const FAMILIAR_INIT_SHOULDER_Y = 1.1;
+const FAMILIAR_INIT_ELBOW_X = 0.8;
+const FAMILIAR_INIT_ELBOW_Y = 0.9;
+const FAMILIAR_INIT_HAND_X = 1.2;
+const FAMILIAR_INIT_HAND_Y = 1.2;
+
 // All dimensions and joints are defined in physical meters relative to the ground.
 const Familiar = {
-    torsoPos: vec2(0, GROUND_Y + 0.8),
-    headPos: vec2(0, GROUND_Y + 1.5),
-    leftShoulder: vec2(-0.4, GROUND_Y + 1.1),
-    rightShoulder: vec2(0.4, GROUND_Y + 1.1),
-    leftElbow: vec2(-0.8, GROUND_Y + 0.9),
-    rightElbow: vec2(0.8, GROUND_Y + 0.9),
-    leftHand: vec2(-1.2, GROUND_Y + 1.2),
-    rightHand: vec2(1.2, GROUND_Y + 1.2),
+    torsoPos: vec2(0, GROUND_Y + FAMILIAR_INIT_TORSO_Y),
+    headPos: vec2(0, GROUND_Y + FAMILIAR_INIT_HEAD_Y),
+    leftShoulder: vec2(-FAMILIAR_INIT_SHOULDER_X, GROUND_Y + FAMILIAR_INIT_SHOULDER_Y),
+    rightShoulder: vec2(FAMILIAR_INIT_SHOULDER_X, GROUND_Y + FAMILIAR_INIT_SHOULDER_Y),
+    leftElbow: vec2(-FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y),
+    rightElbow: vec2(FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y),
+    leftHand: vec2(-FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y),
+    rightHand: vec2(FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y),
     torsoRadius: FAMILIAR_TORSO_RADIUS,
     headRadius: FAMILIAR_HEAD_RADIUS,
     handRadius: FAMILIAR_HAND_RADIUS,
