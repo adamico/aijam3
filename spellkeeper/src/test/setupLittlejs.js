@@ -10,8 +10,28 @@ class MockVector2 {
     return Math.hypot(this.x, this.y);
   }
 
+  add(v) {
+    return new MockVector2(this.x + v.x, this.y + v.y);
+  }
+
+  subtract(v) {
+    return new MockVector2(this.x - v.x, this.y - v.y);
+  }
+
   scale(s) {
     return new MockVector2(this.x * s, this.y * s);
+  }
+
+  lengthSquared() {
+    return this.x ** 2 + this.y ** 2;
+  }
+
+  distanceSquared(v) {
+    return (this.x - v.x) ** 2 + (this.y - v.y) ** 2;
+  }
+
+  dot(v) {
+    return this.x * v.x + this.y * v.y;
   }
 
   normalize(length = 1) {

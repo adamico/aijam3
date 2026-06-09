@@ -1,26 +1,20 @@
+import { clamp, vec2 } from 'littlejsengine';
+
 const DEFAULT_EPSILON = 1e-6;
 
 function segmentDistanceSquared(point, start, end) {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const lengthSquared = dx * dx + dy * dy;
+  const pointVector = vec2(point.x, point.y);
+  const startVector = vec2(start.x, start.y);
+  const segmentVector = vec2(end.x - start.x, end.y - start.y);
+  const lengthSquared = segmentVector.lengthSquared();
 
   if (lengthSquared <= DEFAULT_EPSILON) {
-    const px = point.x - start.x;
-    const py = point.y - start.y;
-    return px * px + py * py;
+    return pointVector.distanceSquared(startVector);
   }
 
-  const t = Math.min(1, Math.max(0, (
-    ((point.x - start.x) * dx) + ((point.y - start.y) * dy)
-  ) / lengthSquared));
-  const closest = {
-    x: start.x + dx * t,
-    y: start.y + dy * t,
-  };
-  const px = point.x - closest.x;
-  const py = point.y - closest.y;
-  return px * px + py * py;
+  const t = clamp(pointVector.subtract(startVector).dot(segmentVector) / lengthSquared);
+  const closest = startVector.add(segmentVector.scale(t));
+  return pointVector.distanceSquared(closest);
 }
 
 function normalizeSegment(segment) {
