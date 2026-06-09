@@ -17,7 +17,7 @@ import {
   startDive,
 } from './diveState.js';
 import { advanceShot, createShot } from './shotTrajectory.js';
-import { getRampShotConfig } from './shotRamp.js';
+import { DEFAULT_SHOT_PLAN_SEED, createShotPlan, describeShotPlan } from './shotPlan.js';
 import { resolveCrossingSave } from './saveResolver.js';
 import { createMatchState, isMatchComplete, recordShotResult } from './matchState.js';
 
@@ -120,9 +120,16 @@ const COLOR_BALL_DETAIL = c('#AABBBB');
 const SHOT_RESPAWN_DELAY = 0.35;
 const SAVE_FEEDBACK_DURATION = 0.9;
 
+const initialMatchState = createMatchState();
 const Match = {
-  state: createMatchState(),
+  state: initialMatchState,
+  shotPlanSeed: DEFAULT_SHOT_PLAN_SEED,
+  plan: createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: initialMatchState.totalShots }),
 };
+
+export function createRuntimeShotPlanSeed() {
+  return `spellkeeper-match-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 const EMPTY_DIVE_VISUAL_POSE = {
   torso: { x: 0, y: 0 },
@@ -182,7 +189,7 @@ function resetFamiliarPose() {
   Familiar.rightHand = vec2(PITCH_CENTER_X + FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y);
 }
 
-export function gameInit() {
+export function gameInit(options = {}) {
   setCanvasClearColor(COLOR_STADIUM_NIGHT);
   setCameraPos(vec2(PITCH_CENTER_X, CAMERA_CENTER_Y));
   setCameraScale(CAMERA_SCALE);
@@ -191,6 +198,8 @@ export function gameInit() {
   Dive.visualPose = cloneDiveVisualPose();
   Dive.canTrigger = true;
   Match.state = createMatchState();
+  Match.shotPlanSeed = options.shotPlanSeed ?? createRuntimeShotPlanSeed();
+  Match.plan = createShotPlan(Match.shotPlanSeed, { totalShots: Match.state.totalShots });
   Ball.saves = 0;
   Ball.conceded = 0;
   Ball.lastSaveResult = null;
@@ -215,10 +224,14 @@ export function goalPlaneFromProjectedMouse(projectedMousePos) {
 }
 
 export function spawnShot(index = Ball.shotIndex) {
-  const shotConfig = getRampShotConfig(index);
+  const shotEntry = Match.plan[index];
+  if (!shotEntry) {
+    throw new Error(`Shot plan entry missing for shot index: ${index}`);
+  }
+
   Ball.shotIndex = index;
   Ball.shot = createShot({
-    ...shotConfig,
+    ...shotEntry.shot,
     maxZ: BALL_MAX_Z,
     groundY: GROUND_Y,
     radius: BALL_RADIUS,
@@ -311,6 +324,10 @@ export function getMatchState() {
   return {
     ...Match.state,
   };
+}
+
+export function getShotPlanDebugInfo() {
+  return describeShotPlan(Match.plan);
 }
 
 function setFamiliarTorsoX(x) {

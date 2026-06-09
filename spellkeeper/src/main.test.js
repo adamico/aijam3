@@ -1,4 +1,5 @@
 import { vi, describe, it, expect } from 'vitest';
+import { DEFAULT_SHOT_PLAN_SEED, createShotPlan } from './shotPlan.js';
 
 // Mock littlejsengine BEFORE importing main.js
 vi.mock('littlejsengine', () => {
@@ -185,20 +186,65 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(getDiveState().status).toBe('idle');
     });
 
-    it('updates the active shot with orthographic size and ground shadow cues', async () => {
-        const { spawnShot, updateBallShot, getBallPose } = await import('./main.js');
+    it('spawns shots from the current match plan and advances to the next index after each resolution', async () => {
+        const { gameInit, updateBallShot, getBallPose, getMatchState } = await import('./main.js');
+        const plan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
 
-        spawnShot(0);
-        const start = getBallPose();
-        updateBallShot(0.5);
-        const later = getBallPose();
+        gameInit({ shotPlanSeed: DEFAULT_SHOT_PLAN_SEED });
 
-        expect(later.z).toBeLessThan(start.z);
-        expect(later.scale).toBe(start.scale);
-        expect(later.y).toBeGreaterThan(start.y);
-        expect(later.shadow.y).toBe(-5);
-        expect(later.shadow.opacity).toBeLessThan(start.shadow.opacity);
-        expect(later.hex).toBe('standard');
+        const first = getBallPose();
+        expect(first.hex).toBe(plan[0].shot.hex);
+        expect(first.x).toBeCloseTo(plan[0].shot.start.x, 5);
+        expect(first.y).toBeCloseTo(plan[0].shot.start.y, 5);
+        expect(getMatchState().shotsTaken).toBe(0);
+
+        updateBallShot(999);
+        expect(getMatchState().shotsTaken).toBe(1);
+
+        updateBallShot(0.35);
+        const second = getBallPose();
+        expect(second.hex).toBe(plan[1].shot.hex);
+        expect(second.x).toBeCloseTo(plan[1].shot.start.x, 5);
+        expect(second.y).toBeCloseTo(plan[1].shot.start.y, 5);
+    });
+
+    it('exposes the active shot plan through a debug snapshot without rendering', async () => {
+        const { gameInit, getMatchState, getShotPlanDebugInfo } = await import('./main.js');
+        const expected = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
+
+        gameInit({ shotPlanSeed: DEFAULT_SHOT_PLAN_SEED });
+
+        const debugPlan = getShotPlanDebugInfo();
+
+        expect(debugPlan).toEqual(expected);
+        expect(debugPlan[0].designer.label).toBe('straight warmup');
+        expect(debugPlan[0].designer.pressureTags).toEqual(expect.arrayContaining(['readable', 'warmup']));
+
+        debugPlan[0].designer.pressureTags.push('mutated');
+        expect(getShotPlanDebugInfo()[0].designer.pressureTags).not.toContain('mutated');
+        expect(getMatchState().shotsTaken).toBe(0);
+    });
+
+    it('uses runtime randomness only to choose the default match seed', async () => {
+        const { gameInit, getShotPlanDebugInfo } = await import('./main.js');
+
+        vi.spyOn(Date, 'now')
+            .mockReturnValueOnce(1000)
+            .mockReturnValueOnce(2000);
+        vi.spyOn(Math, 'random')
+            .mockReturnValueOnce(0.123456789)
+            .mockReturnValueOnce(0.987654321);
+
+        gameInit();
+        const firstPlan = getShotPlanDebugInfo();
+        gameInit();
+        const secondPlan = getShotPlanDebugInfo();
+
+        expect(firstPlan[0].designer.planId).toBeTypeOf('string');
+        expect(firstPlan[0].designer.planId).not.toBe(secondPlan[0].designer.planId);
+        expect(firstPlan).not.toEqual(secondPlan);
+
+        vi.restoreAllMocks();
     });
 
     it('resolves a goal-plane overlap as a save when the shot crosses', async () => {
@@ -226,7 +272,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         );
     });
 
-    it('ends the match and renders a final score after 3 concessions', async () => {
+    it('ends the match and renders a final score after 5 concessions', async () => {
         const engine = await import('littlejsengine');
         const { gameInit, gameRenderPost, applyMatchShotOutcome, getMatchState } = await import('./main.js');
 
@@ -234,11 +280,13 @@ describe('Spell Keeper basic gameplay scene', () => {
         applyMatchShotOutcome('conceded');
         applyMatchShotOutcome('conceded');
         applyMatchShotOutcome('conceded');
+        applyMatchShotOutcome('conceded');
+        applyMatchShotOutcome('conceded');
         const match = getMatchState();
 
         expect(match.status).toBe('lost');
-        expect(match.conceded).toBe(3);
-        expect(match.shotsTaken).toBe(3);
+        expect(match.conceded).toBe(5);
+        expect(match.shotsTaken).toBe(5);
         expect(match.score).toBe(0);
 
         gameRenderPost();

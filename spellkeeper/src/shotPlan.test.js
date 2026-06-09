@@ -1,0 +1,187 @@
+import { describe, expect, it } from 'vitest';
+import { DEFAULT_SHOT_PLAN_SEED, createShotPlan, getCandidateSelectionWeight } from './shotPlan.js';
+
+describe('shot plan generator', () => {
+  it('creates the same 30-shot plan for the same seed', () => {
+    const first = createShotPlan(DEFAULT_SHOT_PLAN_SEED);
+    const second = createShotPlan(DEFAULT_SHOT_PLAN_SEED);
+
+    expect(first).toHaveLength(30);
+    expect(second).toHaveLength(30);
+    expect(first).toEqual(second);
+    expect(first.map((entry) => entry.index)).toEqual(Array.from({ length: 30 }, (_, index) => index));
+  });
+
+  it('keeps the first three opener shots fixed while different seeds diverge later', () => {
+    const alpha = createShotPlan('alpha-seed');
+    const beta = createShotPlan('beta-seed');
+
+    expect(alpha.slice(0, 3).map((entry) => entry.shot)).toEqual(beta.slice(0, 3).map((entry) => entry.shot));
+    expect(alpha.slice(0, 3).map((entry) => entry.designer.label)).toEqual(beta.slice(0, 3).map((entry) => entry.designer.label));
+    expect(alpha).not.toEqual(beta);
+    expect(alpha[0].designer.opener).toBe(true);
+    expect(alpha[1].designer.opener).toBe(true);
+    expect(alpha[2].designer.opener).toBe(true);
+    expect(alpha[3].designer.opener).toBe(false);
+  });
+
+  it('attaches readable designer metadata and gameplay config to every shot', () => {
+    const plan = createShotPlan('metadata-seed');
+    const difficultyBands = new Set(plan.map((entry) => entry.designer.difficultyBand));
+
+    for (const entry of plan) {
+      expect(entry.shot.hex).toBeTypeOf('string');
+      expect(entry.shot.originLane).toBeTypeOf('string');
+      expect(entry.shot.targetLane).toBeTypeOf('string');
+      expect(entry.shot.placementHeight).toBeTypeOf('string');
+      expect(entry.shot.start).toEqual(expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }));
+      expect(entry.shot.target).toEqual(expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }));
+      expect(entry.shot.target.x).toBeGreaterThanOrEqual(-3.05);
+      expect(entry.shot.target.x).toBeLessThanOrEqual(3.05);
+      expect(entry.shot.target.y).toBeGreaterThanOrEqual(-4.85);
+      expect(entry.shot.target.y).toBeLessThanOrEqual(-2.7);
+      expect(entry.designer).toEqual(
+        expect.objectContaining({
+          label: expect.any(String),
+          difficultyBand: expect.any(String),
+          pressureTags: expect.any(Array),
+          planId: expect.any(String),
+          opener: expect.any(Boolean),
+          originLane: expect.any(String),
+          targetLane: expect.any(String),
+          placementHeight: expect.any(String),
+        }),
+      );
+    }
+
+    expect(new Set(plan.map((entry) => entry.designer.planId)).size).toBe(1);
+    expect(plan[0].designer.difficultyBand).toBe('opener');
+    expect(plan[0].designer.label).toBe('straight warmup');
+    expect(plan[5].designer.pressureTags.length).toBeGreaterThan(0);
+    expect(difficultyBands).toEqual(new Set(['opener', 'readable variety', 'mixed pressure', 'chaos-but-fair']));
+    expect(plan.slice(3, 12).every((entry) => entry.designer.difficultyBand === 'readable variety')).toBe(true);
+    expect(plan.slice(12, 21).every((entry) => entry.designer.difficultyBand === 'mixed pressure')).toBe(true);
+    expect(plan.slice(21).every((entry) => entry.designer.difficultyBand === 'chaos-but-fair')).toBe(true);
+  });
+
+  it('keeps fireballs fair in readable and mixed acts while allowing a high-corner finale', () => {
+    const plan = createShotPlan('fireball-fairness-seed');
+    const readableFireballs = plan.filter((entry) => entry.designer.difficultyBand === 'readable variety' && entry.shot.hex === 'fireball');
+    const mixedFireballs = plan.filter((entry) => entry.designer.difficultyBand === 'mixed pressure' && entry.shot.hex === 'fireball');
+    const chaosFireballs = plan.filter((entry) => entry.designer.difficultyBand === 'chaos-but-fair' && entry.shot.hex === 'fireball');
+
+    for (const entry of readableFireballs) {
+      expect(entry.shot.placementHeight).not.toBe('high');
+      expect(['outer-left', 'outer-right']).not.toContain(entry.shot.originLane);
+      expect(['outer-left', 'outer-right']).not.toContain(entry.shot.targetLane);
+    }
+
+    for (const entry of mixedFireballs) {
+      expect(entry.shot.placementHeight).toBe('high');
+      expect(entry.shot.originLane).toBe('center');
+      expect(entry.shot.targetLane).toBe('center');
+    }
+
+    for (const entry of chaosFireballs) {
+      expect(entry.shot.placementHeight).toBe('high');
+      expect(['outer-left', 'outer-right']).toContain(entry.shot.originLane);
+      expect(['outer-left', 'outer-right']).toContain(entry.shot.targetLane);
+    }
+  });
+
+  it('avoids back-to-back repeated hexes, lanes, and shot signatures', () => {
+    const plan = createShotPlan('anti-repeat-seed');
+
+    for (let index = 2; index < plan.length; index += 1) {
+      const current = plan[index];
+      const previous = plan[index - 1];
+      const beforePrevious = plan[index - 2];
+
+      expect(current.shot.hex === previous.shot.hex && previous.shot.hex === beforePrevious.shot.hex).toBe(false);
+      expect(current.shot.targetLane === previous.shot.targetLane && previous.shot.targetLane === beforePrevious.shot.targetLane).toBe(false);
+    }
+
+    for (let index = 1; index < plan.length; index += 1) {
+      const current = plan[index];
+      const previous = plan[index - 1];
+      expect([
+        current.shot.hex,
+        current.shot.originLane,
+        current.shot.targetLane,
+        current.shot.placementHeight,
+      ]).not.toEqual([
+        previous.shot.hex,
+        previous.shot.originLane,
+        previous.shot.targetLane,
+        previous.shot.placementHeight,
+      ]);
+    }
+  });
+
+  it('includes every current hex and keeps heavy shots low and extreme-side', () => {
+    const plan = createShotPlan('hex-coverage-seed');
+    const hexes = new Set(plan.map((entry) => entry.shot.hex));
+
+    expect(hexes).toEqual(new Set(['standard', 'curve', 'fireball', 'heavy']));
+
+    const hexCounts = plan.reduce((counts, entry) => ({
+      ...counts,
+      [entry.shot.hex]: (counts[entry.shot.hex] ?? 0) + 1,
+    }), {});
+
+    expect(hexCounts.standard).toBeGreaterThanOrEqual(8);
+    expect(hexCounts.standard).toBeLessThanOrEqual(10);
+    expect(hexCounts.curve).toBeGreaterThanOrEqual(7);
+    expect(hexCounts.curve).toBeLessThanOrEqual(9);
+    expect(hexCounts.fireball).toBeGreaterThanOrEqual(6);
+    expect(hexCounts.fireball).toBeLessThanOrEqual(8);
+    expect(hexCounts.heavy).toBeGreaterThanOrEqual(4);
+    expect(hexCounts.heavy).toBeLessThanOrEqual(6);
+    expect(hexCounts.heavy).toBeLessThan(hexCounts.standard);
+    expect(hexCounts.heavy).toBeLessThan(hexCounts.curve);
+    expect(hexCounts.heavy).toBeLessThan(hexCounts.fireball);
+
+    for (const entry of plan.filter((shot) => shot.shot.hex === 'heavy')) {
+      expect(entry.shot.originLane).toBe(entry.shot.targetLane);
+      expect(entry.shot.placementHeight).toBe('low');
+      expect(entry.shot.start.x).toBe(entry.shot.target.x);
+      expect(['outer-left', 'outer-right']).toContain(entry.shot.targetLane);
+      expect(entry.designer.pressureTags).toEqual(expect.arrayContaining(['low', 'extreme-side', 'commitment']));
+    }
+  });
+
+  it('keeps the seeded plan within the PRD scope', () => {
+    const plan = createShotPlan('scope-check-seed');
+
+    expect(plan).toHaveLength(30);
+
+    for (const entry of plan) {
+      expect(entry).not.toHaveProperty('seed');
+      expect(entry).not.toHaveProperty('preview');
+      expect(entry).not.toHaveProperty('adaptiveDifficulty');
+      expect(entry.shot).not.toHaveProperty('trajectoryHeight');
+      expect(entry.designer).not.toHaveProperty('seed');
+      expect(entry.designer).not.toHaveProperty('preview');
+      expect(entry.designer).not.toHaveProperty('familiarTrick');
+    }
+  });
+
+  it('biases post-heavy follow-ups toward the opposite side without forcing them', () => {
+    const lastHeavyLeft = [{ shot: { hex: 'heavy', targetLane: 'outer-left' } }];
+    const opposite = { shot: { hex: 'standard', targetLane: 'outer-right' } };
+    const sameSide = { shot: { hex: 'standard', targetLane: 'outer-left' } };
+    const center = { shot: { hex: 'standard', targetLane: 'center' } };
+
+    expect(getCandidateSelectionWeight(opposite, lastHeavyLeft, 'mixed pressure')).toBeGreaterThan(getCandidateSelectionWeight(sameSide, lastHeavyLeft, 'mixed pressure'));
+    expect(getCandidateSelectionWeight(opposite, lastHeavyLeft, 'chaos-but-fair')).toBeGreaterThan(getCandidateSelectionWeight(sameSide, lastHeavyLeft, 'chaos-but-fair'));
+    expect(getCandidateSelectionWeight(opposite, lastHeavyLeft, 'readable variety')).toBe(1);
+    expect(getCandidateSelectionWeight(center, lastHeavyLeft, 'mixed pressure')).toBeGreaterThan(1);
+    expect(getCandidateSelectionWeight(sameSide, lastHeavyLeft, 'mixed pressure')).toBeLessThan(1);
+  });
+
+  it('rejects invalid generation inputs predictably', () => {
+    expect(() => createShotPlan(null)).toThrow(/seed/);
+    expect(() => createShotPlan('seed', { totalShots: 2 })).toThrow(/at least 3/);
+    expect(() => createShotPlan('seed', { totalShots: 30.5 })).toThrow(/integer/);
+  });
+});

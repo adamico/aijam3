@@ -1,6 +1,6 @@
 export const DEFAULT_MATCH_RULES = {
-  totalShots: 10,
-  maxConcessions: 3,
+  totalShots: 30,
+  maxConcessions: 5,
   savePoints: 100,
   cleanSheetBonus: 500,
 };
