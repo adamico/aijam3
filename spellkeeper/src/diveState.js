@@ -1,21 +1,14 @@
-import { clamp, Ease, lerp } from 'littlejsengine';
+import { clamp, Ease, lerp, vec2 } from 'littlejsengine';
 
 const DEFAULT_EPSILON = 1e-6;
 const easeOutCubic = Ease.OUT(Ease.POWER(3));
 
 function normalizeDirection(target, fallbackDirection = { x: 1, y: 0 }) {
-  const length = Math.hypot(target.x, target.y);
-  if (length <= DEFAULT_EPSILON) {
-    return {
-      x: Math.sign(fallbackDirection.x || 1) || 1,
-      y: 0,
-    };
+  if (Math.hypot(target.x, target.y) <= DEFAULT_EPSILON) {
+    return vec2(Math.sign(fallbackDirection.x || 1) || 1, 0);
   }
 
-  return {
-    x: target.x / length,
-    y: target.y / length,
-  };
+  return vec2(target.x, target.y).normalize();
 }
 
 export const DEFAULT_DIVE_CONFIG = {

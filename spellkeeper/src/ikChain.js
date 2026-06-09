@@ -1,16 +1,6 @@
-import { clamp } from 'littlejsengine';
+import { clamp, vec2 } from 'littlejsengine';
 
 const DEFAULT_EPSILON = 1e-6;
-
-function normalize(vector, fallback = { x: 1, y: 0 }, epsilon = DEFAULT_EPSILON) {
-  const length = Math.hypot(vector.x, vector.y);
-  if (length <= epsilon) return { x: fallback.x, y: fallback.y };
-  return { x: vector.x / length, y: vector.y / length };
-}
-
-function signedAngle(vector) {
-  return Math.atan2(vector.y, vector.x);
-}
 
 /**
  * Solve a stable two-bone 2D IK chain using the law of cosines.
@@ -36,7 +26,9 @@ export function solveIkChain({
   const maxReach = upperLength + lowerLength;
   const requested = { x: target.x - shoulder.x, y: target.y - shoulder.y };
   const requestedDistance = Math.hypot(requested.x, requested.y);
-  const direction = normalize(requested, fallbackDirection, epsilon);
+  const direction = requestedDistance <= epsilon
+    ? vec2(fallbackDirection.x, fallbackDirection.y)
+    : vec2(requested.x, requested.y).normalize();
   const solveDistance = Math.min(requestedDistance, maxReach);
   const handDistance = maxReach <= epsilon ? 0 : solveDistance;
   const hand = {
@@ -55,8 +47,8 @@ export function solveIkChain({
       maxReach,
       isClamped: requestedDistance > maxReach + epsilon,
       angles: {
-        upper: signedAngle({ x: hand.x - shoulder.x, y: hand.y - shoulder.y }),
-        lower: signedAngle({ x: hand.x - shoulder.x, y: hand.y - shoulder.y }),
+        upper: vec2(hand.x - shoulder.x, hand.y - shoulder.y).angle(),
+        lower: vec2(hand.x - shoulder.x, hand.y - shoulder.y).angle(),
       },
     };
   }
@@ -85,8 +77,8 @@ export function solveIkChain({
     maxReach,
     isClamped: requestedDistance > maxReach + epsilon,
     angles: {
-      upper: signedAngle({ x: elbow.x - shoulder.x, y: elbow.y - shoulder.y }),
-      lower: signedAngle({ x: hand.x - elbow.x, y: hand.y - elbow.y }),
+      upper: vec2(elbow.x - shoulder.x, elbow.y - shoulder.y).angle(),
+      lower: vec2(hand.x - elbow.x, hand.y - elbow.y).angle(),
     },
   };
 }

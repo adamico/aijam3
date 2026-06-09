@@ -7,6 +7,19 @@ vi.mock('littlejsengine', () => {
             this.x = x;
             this.y = y;
         }
+        length() {
+            return Math.hypot(this.x, this.y);
+        }
+        scale(s) {
+            return new MockVector2(this.x * s, this.y * s);
+        }
+        normalize(length = 1) {
+            const currentLength = this.length();
+            return currentLength ? this.scale(length / currentLength) : new MockVector2(0, length);
+        }
+        angle() {
+            return Math.atan2(this.x, this.y);
+        }
     }
     class MockColor {
         constructor(r = 1, g = 1, b = 1, a = 1) {
