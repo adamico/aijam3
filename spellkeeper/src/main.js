@@ -21,6 +21,7 @@ import { createMatchState, isMatchComplete, recordShotResult } from './matchStat
 import {
   advanceShotRuntime,
   createShotRuntime,
+  recordShotRuntimeOutcome,
   queueNextShot,
 } from './shotRuntime.js';
 
@@ -305,7 +306,15 @@ export function applyMatchShotOutcome(outcome) {
   Match.state = recordShotResult(Match.state, outcome);
   Ball.saves = Match.state.saves;
   Ball.conceded = Match.state.conceded;
-  Ball.feedbackTimer = SAVE_FEEDBACK_DURATION;
+
+  if (Ball.runtime) {
+    Ball.runtime = recordShotRuntimeOutcome(Ball.runtime, {
+      nextShotIndex: Match.state.shotsTaken,
+      matchComplete: isMatchComplete(Match.state),
+    });
+    syncBallFromRuntime(Ball.runtime);
+  }
+
   return getMatchState();
 }
 
@@ -324,7 +333,6 @@ export function updateBallShot(dt = 1 / 60) {
     if (event.type !== 'shot-resolved') continue;
 
     applyMatchShotOutcome(event.result.outcome);
-    Ball.lastSaveResult = { ...event.result };
   }
 
   return getBallPose();

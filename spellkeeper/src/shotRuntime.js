@@ -135,6 +135,9 @@ function spawnShotEntry(state, index) {
     activeShotEntry: clonePlanEntry(entry),
     activeShot: cloneShot(activeShot),
     respawnTimer: 0,
+    nextShotIndex: null,
+    matchComplete: false,
+    shotResolved: false,
   };
 }
 
@@ -152,6 +155,9 @@ export function createShotRuntime({
     activeShotEntry: null,
     activeShot: null,
     respawnTimer: 0,
+    nextShotIndex: null,
+    matchComplete: false,
+    shotResolved: false,
     feedback: {
       lastResult: null,
       timer: 0,
@@ -162,12 +168,41 @@ export function createShotRuntime({
 }
 
 function spawnNextShot(runtime) {
-  const nextIndex = runtime.activeShotIndex + 1;
+  const nextIndex = runtime.nextShotIndex ?? runtime.activeShotIndex + 1;
   if (nextIndex >= runtime.plan.length) {
     return runtime;
   }
 
   return spawnShotEntry(runtime, nextIndex);
+}
+
+export function recordShotRuntimeOutcome(runtime, {
+  result = null,
+  nextShotIndex = null,
+  matchComplete = false,
+} = {}) {
+  if (!runtime) return runtime;
+
+  const nextRuntime = cloneRuntime(runtime);
+
+  if (result) {
+    nextRuntime.feedback = {
+      lastResult: { ...result },
+      timer: nextRuntime.shotTiming.feedbackDuration,
+    };
+  }
+
+  nextRuntime.matchComplete = Boolean(matchComplete);
+  nextRuntime.nextShotIndex = Number.isInteger(nextShotIndex) && nextShotIndex >= 0
+    ? nextShotIndex
+    : null;
+
+  if (nextRuntime.matchComplete) {
+    nextRuntime.respawnTimer = 0;
+    nextRuntime.nextShotIndex = null;
+  }
+
+  return nextRuntime;
 }
 
 export function advanceShotRuntime(runtime, {
@@ -190,6 +225,10 @@ export function advanceShotRuntime(runtime, {
   if (nextRuntime.respawnTimer > 0) {
     nextRuntime.respawnTimer = Math.max(0, nextRuntime.respawnTimer - step);
     if (nextRuntime.respawnTimer === 0) {
+      if (nextRuntime.matchComplete || nextRuntime.nextShotIndex == null) {
+        return { runtime: nextRuntime, events };
+      }
+
       return {
         runtime: spawnNextShot(nextRuntime),
         events,
@@ -199,7 +238,7 @@ export function advanceShotRuntime(runtime, {
     return { runtime: nextRuntime, events };
   }
 
-  if (!nextRuntime.activeShot) {
+  if (nextRuntime.shotResolved || !nextRuntime.activeShot) {
     return { runtime: nextRuntime, events };
   }
 
@@ -234,6 +273,8 @@ export function advanceShotRuntime(runtime, {
       timer: nextRuntime.shotTiming.feedbackDuration,
     };
     nextRuntime.respawnTimer = nextRuntime.shotTiming.respawnDelay;
+    nextRuntime.nextShotIndex = nextRuntime.activeShotIndex + 1;
+    nextRuntime.shotResolved = true;
 
     events.push({
       type: 'shot-resolved',

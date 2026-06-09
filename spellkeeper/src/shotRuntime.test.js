@@ -6,6 +6,7 @@ import {
   getActiveShot,
   getFeedbackState,
   getShotPose,
+  recordShotRuntimeOutcome,
 } from './shotRuntime.js';
 
 const shotDimensions = {
@@ -129,6 +130,70 @@ describe('shot runtime', () => {
     });
     expect(advanced.feedback.lastResult).toMatchObject({ outcome: 'conceded' });
     expect(advanced.activeShot.sample.saveResult).toMatchObject({ outcome: 'conceded' });
+  });
+
+  it('keeps feedback alive for the configured duration and respawns after the delay', () => {
+    const shotPlan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
+    const runtime = createShotRuntime({ shotPlan, shotDimensions, shotTiming });
+    const resolveSave = vi.fn(() => ({
+      outcome: 'save',
+      isSave: true,
+      segmentId: 'rightHand',
+      distance: 0.5,
+      overlapDepth: 0.2,
+      crossedGoalPlane: true,
+    }));
+
+    const resolved = advanceShotRuntime(runtime, {
+      dt: 999,
+      saveSegments: [{ id: 'rightHand', center: { x: 0, y: 0 }, radius: 0.3 }],
+      resolveSave,
+    }).runtime;
+    const queued = recordShotRuntimeOutcome(resolved, {
+      nextShotIndex: 1,
+      matchComplete: false,
+    });
+
+    const beforeRespawn = advanceShotRuntime(queued, { dt: 0.34 }).runtime;
+    const respawned = advanceShotRuntime(beforeRespawn, { dt: 0.01 }).runtime;
+    const feedbackExpired = advanceShotRuntime(respawned, { dt: 0.55 }).runtime;
+
+    expect(beforeRespawn.respawnTimer).toBeCloseTo(0.01, 2);
+    expect(beforeRespawn.feedback.timer).toBeCloseTo(0.56, 2);
+    expect(respawned.activeShotIndex).toBe(1);
+    expect(respawned.feedback.timer).toBeGreaterThan(0);
+    expect(feedbackExpired.feedback.timer).toBe(0);
+    expect(feedbackExpired.activeShotIndex).toBe(1);
+  });
+
+  it('does not respawn after orchestration marks the match complete', () => {
+    const shotPlan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
+    const runtime = createShotRuntime({ shotPlan, shotDimensions, shotTiming });
+    const resolveSave = vi.fn(() => ({
+      outcome: 'conceded',
+      isSave: false,
+      segmentId: null,
+      distance: null,
+      overlapDepth: null,
+      crossedGoalPlane: true,
+    }));
+
+    const resolved = advanceShotRuntime(runtime, {
+      dt: 999,
+      saveSegments: [],
+      resolveSave,
+    }).runtime;
+    const completed = recordShotRuntimeOutcome(resolved, {
+      nextShotIndex: 1,
+      matchComplete: true,
+    });
+    const advanced = advanceShotRuntime(completed, { dt: 10 }).runtime;
+
+    expect(advanced.matchComplete).toBe(true);
+    expect(advanced.shotResolved).toBe(true);
+    expect(advanced.respawnTimer).toBe(0);
+    expect(advanced.activeShotIndex).toBe(0);
+    expect(advanced.feedback.timer).toBe(0);
   });
 
   it('rejects missing or empty Shot Plans at creation time', () => {
