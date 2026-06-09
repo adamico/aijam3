@@ -234,7 +234,7 @@ function cloneShot(shot) {
   };
 }
 
-function cloneDesigner(designer) {
+function cloneShotDesigner(designer) {
   return {
     ...designer,
     pressureTags: [...designer.pressureTags],
@@ -519,6 +519,6 @@ export function describeShotPlan(plan) {
   return plan.map((entry) => ({
     index: entry.index,
     shot: cloneShot(entry.shot),
-    designer: cloneDesigner(entry.designer),
+    designer: cloneShotDesigner(entry.designer),
   }));
 }
