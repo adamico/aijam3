@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SHOT_PLAN_SEED, createShotPlan } from './shotPlan.js';
+import { DEFAULT_SHOT_PLAN_SEED, createShotPlan, getCandidateSelectionWeight } from './shotPlan.js';
 
 describe('shot plan generator', () => {
   it('creates the same 30-shot plan for the same seed', () => {
@@ -86,6 +86,35 @@ describe('shot plan generator', () => {
     }
   });
 
+  it('avoids back-to-back repeated hexes, lanes, and shot signatures', () => {
+    const plan = createShotPlan('anti-repeat-seed');
+
+    for (let index = 2; index < plan.length; index += 1) {
+      const current = plan[index];
+      const previous = plan[index - 1];
+      const beforePrevious = plan[index - 2];
+
+      expect(current.shot.hex === previous.shot.hex && previous.shot.hex === beforePrevious.shot.hex).toBe(false);
+      expect(current.shot.targetLane === previous.shot.targetLane && previous.shot.targetLane === beforePrevious.shot.targetLane).toBe(false);
+    }
+
+    for (let index = 1; index < plan.length; index += 1) {
+      const current = plan[index];
+      const previous = plan[index - 1];
+      expect([
+        current.shot.hex,
+        current.shot.originLane,
+        current.shot.targetLane,
+        current.shot.placementHeight,
+      ]).not.toEqual([
+        previous.shot.hex,
+        previous.shot.originLane,
+        previous.shot.targetLane,
+        previous.shot.placementHeight,
+      ]);
+    }
+  });
+
   it('includes every current hex and keeps heavy shots low and extreme-side', () => {
     const plan = createShotPlan('hex-coverage-seed');
     const hexes = new Set(plan.map((entry) => entry.shot.hex));
@@ -95,9 +124,23 @@ describe('shot plan generator', () => {
     for (const entry of plan.filter((shot) => shot.shot.hex === 'heavy')) {
       expect(entry.shot.originLane).toBe(entry.shot.targetLane);
       expect(entry.shot.placementHeight).toBe('low');
-      expect(entry.shot.start.x).toBeCloseTo(entry.shot.target.x, 10);
+      expect(entry.shot.start.x).toBe(entry.shot.target.x);
       expect(['outer-left', 'outer-right']).toContain(entry.shot.targetLane);
+      expect(entry.designer.pressureTags).toEqual(expect.arrayContaining(['low', 'extreme-side', 'commitment']));
     }
+  });
+
+  it('biases post-heavy follow-ups toward the opposite side without forcing them', () => {
+    const lastHeavyLeft = [{ shot: { hex: 'heavy', targetLane: 'outer-left' } }];
+    const opposite = { shot: { hex: 'standard', targetLane: 'outer-right' } };
+    const sameSide = { shot: { hex: 'standard', targetLane: 'outer-left' } };
+    const center = { shot: { hex: 'standard', targetLane: 'center' } };
+
+    expect(getCandidateSelectionWeight(opposite, lastHeavyLeft, 'mixed pressure')).toBeGreaterThan(getCandidateSelectionWeight(sameSide, lastHeavyLeft, 'mixed pressure'));
+    expect(getCandidateSelectionWeight(opposite, lastHeavyLeft, 'chaos-but-fair')).toBeGreaterThan(getCandidateSelectionWeight(sameSide, lastHeavyLeft, 'chaos-but-fair'));
+    expect(getCandidateSelectionWeight(opposite, lastHeavyLeft, 'readable variety')).toBe(1);
+    expect(getCandidateSelectionWeight(center, lastHeavyLeft, 'mixed pressure')).toBeGreaterThan(1);
+    expect(getCandidateSelectionWeight(sameSide, lastHeavyLeft, 'mixed pressure')).toBeLessThan(1);
   });
 
   it('rejects invalid generation inputs predictably', () => {

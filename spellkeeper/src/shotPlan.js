@@ -35,6 +35,7 @@ const PLACEMENT_HEIGHT_ZONES = {
   high: { key: 'high', y: -2.9 },
 };
 const OUTER_LANES = new Set(['outer-left', 'outer-right']);
+const HEAVY_PRESSURE_TAGS = ['low', 'extreme-side', 'commitment'];
 
 const FIXED_OPENER_SHOTS = [
   {
@@ -73,7 +74,7 @@ const FIXED_OPENER_SHOTS = [
     designer: {
       label: 'heavy slow drag',
       difficultyBand: 'opener',
-      pressureTags: ['commitment', 'drag'],
+      pressureTags: [...HEAVY_PRESSURE_TAGS, 'drag'],
     },
   },
 ];
@@ -102,7 +103,7 @@ const SHOT_PHASE_POOLS = [
     },
     {
       shot: { hex: 'heavy', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'low' },
-      designer: { label: 'cross-body weight', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['weight', 'cross-body'] },
+      designer: { label: 'cross-body weight', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: [...HEAVY_PRESSURE_TAGS, 'weight', 'cross-body'] },
     },
   ],
   [
@@ -128,7 +129,7 @@ const SHOT_PHASE_POOLS = [
     },
     {
       shot: { hex: 'heavy', originLane: 'outerRight', targetLane: 'outerRight', placementHeight: 'low' },
-      designer: { label: 'heavy cross drag', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['weight', 'cross-body'] },
+      designer: { label: 'heavy cross drag', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: [...HEAVY_PRESSURE_TAGS, 'weight', 'cross-body'] },
     },
   ],
   [
@@ -154,7 +155,7 @@ const SHOT_PHASE_POOLS = [
     },
     {
       shot: { hex: 'heavy', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'low' },
-      designer: { label: 'late heavy cross', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['weight', 'finish'] },
+      designer: { label: 'late heavy cross', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: [...HEAVY_PRESSURE_TAGS, 'weight', 'finish'] },
     },
   ],
 ];
@@ -326,12 +327,21 @@ function candidateSignature(candidate) {
     candidate.shot.originLane,
     candidate.shot.targetLane,
     candidate.shot.placementHeight,
-    candidate.shot.curveDirection ?? 0,
   ].join('|');
 }
 
 function isOuterLane(laneKey) {
   return OUTER_LANES.has(laneKey);
+}
+
+function laneSide(laneKey) {
+  if (laneKey.includes('left')) return 'left';
+  if (laneKey.includes('right')) return 'right';
+  return 'center';
+}
+
+function isOppositeSideLane(candidateLane, referenceLane) {
+  return laneSide(candidateLane) === (laneSide(referenceLane) === 'left' ? 'right' : 'left');
 }
 
 function isHighCornerFireball(candidate) {
@@ -352,6 +362,44 @@ function isCandidateFairForBand(candidate, band) {
   }
 
   return true;
+}
+
+export function getCandidateSelectionWeight(candidate, plan, band) {
+  const last = plan[plan.length - 1];
+  if (
+    !last
+    || last.shot.hex !== 'heavy'
+    || (band !== SHOT_PLAN_DIFFICULTY_BANDS.mixed && band !== SHOT_PLAN_DIFFICULTY_BANDS.chaos)
+  ) {
+    return 1;
+  }
+
+  if (candidate.shot.hex === 'heavy') {
+    return 1;
+  }
+
+  if (isOppositeSideLane(candidate.shot.targetLane, last.shot.targetLane)) {
+    return 2;
+  }
+
+  if (laneSide(candidate.shot.targetLane) === 'center') {
+    return 1.15;
+  }
+
+  return 0.9;
+}
+
+function pickWeightedCandidate(candidates, plan, band, rng) {
+  const weights = candidates.map((candidate) => getCandidateSelectionWeight(candidate, plan, band));
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  let roll = rng() * totalWeight;
+
+  for (let index = 0; index < candidates.length; index += 1) {
+    roll -= weights[index];
+    if (roll <= 0) return candidates[index];
+  }
+
+  return candidates[candidates.length - 1];
 }
 
 function isCandidateValid(candidate, plan, band) {
@@ -423,7 +471,7 @@ export function createShotPlan(seed, rules = {}) {
     let template = null;
     const retries = Math.max(6, candidates.length);
     for (let attempt = 0; attempt < retries && !template; attempt += 1) {
-      const candidate = candidates[Math.floor(rng() * candidates.length)];
+      const candidate = pickWeightedCandidate(candidates, plan, band, rng);
       const generated = createShotTemplateEntry(candidate, index, band, rng);
       if (isCandidateValid(generated, plan, band)) {
         template = candidate;
