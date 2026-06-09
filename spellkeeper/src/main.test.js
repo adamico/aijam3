@@ -226,7 +226,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         );
     });
 
-    it('ends the match and renders a final score after 3 concessions', async () => {
+    it('ends the match and renders a final score after 5 concessions', async () => {
         const engine = await import('littlejsengine');
         const { gameInit, gameRenderPost, applyMatchShotOutcome, getMatchState } = await import('./main.js');
 
@@ -234,11 +234,13 @@ describe('Spell Keeper basic gameplay scene', () => {
         applyMatchShotOutcome('conceded');
         applyMatchShotOutcome('conceded');
         applyMatchShotOutcome('conceded');
+        applyMatchShotOutcome('conceded');
+        applyMatchShotOutcome('conceded');
         const match = getMatchState();
 
         expect(match.status).toBe('lost');
-        expect(match.conceded).toBe(3);
-        expect(match.shotsTaken).toBe(3);
+        expect(match.conceded).toBe(5);
+        expect(match.shotsTaken).toBe(5);
         expect(match.score).toBe(0);
 
         gameRenderPost();
