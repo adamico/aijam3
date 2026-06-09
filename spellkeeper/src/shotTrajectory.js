@@ -1,10 +1,6 @@
-import { clamp } from 'littlejsengine';
+import { clamp, lerp } from 'littlejsengine';
 
 const DEFAULT_EPSILON = 1e-6;
-
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
 
 const BASE_SHOT_DURATION = 1.3;
 const BASE_SHOT_ARC_HEIGHT = 2.6;

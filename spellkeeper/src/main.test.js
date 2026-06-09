@@ -25,6 +25,11 @@ vi.mock('littlejsengine', () => {
     }
     return {
         clamp: (value, min = 0, max = 1) => (value < min ? min : value > max ? max : value),
+        lerp: (valueA, valueB, percent) => valueA + Math.max(0, Math.min(1, percent)) * (valueB - valueA),
+        Ease: {
+            POWER: (n) => (x) => x ** n,
+            OUT: (f) => (x) => 1 - f(1 - x),
+        },
         engineInit: vi.fn(),
         mousePos: new MockVector2(0, 0),
         timeDelta: 1 / 60,

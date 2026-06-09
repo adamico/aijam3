@@ -1,15 +1,7 @@
-import { clamp } from 'littlejsengine';
+import { clamp, Ease, lerp } from 'littlejsengine';
 
 const DEFAULT_EPSILON = 1e-6;
-
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
-
-function easeOutCubic(t) {
-  const clamped = clamp(t, 0, 1);
-  return 1 - Math.pow(1 - clamped, 3);
-}
+const easeOutCubic = Ease.OUT(Ease.POWER(3));
 
 function normalizeDirection(target, fallbackDirection = { x: 1, y: 0 }) {
   const length = Math.hypot(target.x, target.y);
