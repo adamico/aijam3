@@ -56,9 +56,14 @@ Direct-control project; exempt from the Lever/Auto-Execution model — see ADR-0
 - **Save** — a familiar body segment (hand/arm/torso capsule) overlapping the ball's XY at the frame it crosses the Goal Plane (z <= 0). No 3D physics.
 - **Reach** — max IK arm extension. Design rule: Goal-mouth width > Reach, so some shots force torso-drag (shifting the torso horizontally when the cursor target exceeds the arm limits).
 - **Hex** — a magically modified shot type with fixed, learnable physics (e.g. fireball = fast, curve = swerving, heavy = slow/big). Player skill = reading the trajectory, not reacting to telegraphs.
+- **Heavy Hex** — a slow, heavy shot that earns its place by forcing committed low extreme-side coverage. It travels straight toward the Goal Plane, targets either the far-left or far-right goal edge, and stays low; its pressure comes from occupying the keeper before the next shot may punish overcommitment elsewhere.
+- **Shot Plan** — the seeded 30-shot match sequence that defines each shot's Hex, origin, Goal Plane placement, difficulty band, and pressure tags before the match begins. It is generated for debugging and design readability, not shown to the player as a preview.
+- **Shot Placement Height** — where the ball is aimed vertically on the Goal Plane: low, middle, or high in the mouth of the goal. _Avoid_: altitude when referring to goal placement; altitude is reserved for trajectory/arc height.
+- **Trajectory Height** — the ball's vertical arc through space before reaching the Goal Plane. This may vary for curved shots as part of making the trajectory more expressive, separate from Shot Placement Height.
 - **Read cues** — the trajectory is judged from three converging signals: on-screen arc (primary), ball scale (ball shrinks as it recedes toward goal; best look is early/front-loaded), and ground shadow (always present; landing + timing). No per-shot reticle telegraph except in the opening tutorial shots.
 - **Goalkeeper Move** — an expressive familiar body action that makes saves feel athletic and creature-like without changing the single-cursor control model.
 - **Automatic Expressive Dive** — a brief full-body Goalkeeper Move triggered by hard lateral reach near a threatening shot; primarily visual, with a small save advantage from extra reach and a light timing commitment.
+- **Familiar Trick** — a magical or creature-like ability that answers specific shot-sequence pressures without replacing the core save read. Tricks should be responses to Hex and sequence pressure, not generic power-ups.
 
 ### Avoid
 - "direct control" — use "lever" instead
