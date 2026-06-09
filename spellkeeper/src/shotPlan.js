@@ -1,12 +1,42 @@
 const DEFAULT_SHOT_PLAN_TOTAL_SHOTS = 30;
 export const DEFAULT_SHOT_PLAN_SEED = 'spellkeeper-default-shot-plan';
 
+const SHOT_PLAN_REQUIRED_HEXES = ['standard', 'curve', 'fireball', 'heavy'];
+const SHOT_PLAN_START_Y = -4.55;
+const SHOT_PLAN_SAFE_TARGET_X_MIN = -3.05;
+const SHOT_PLAN_SAFE_TARGET_X_MAX = 3.05;
+const SHOT_PLAN_SAFE_TARGET_Y_MIN = -4.85;
+const SHOT_PLAN_SAFE_TARGET_Y_MAX = -2.7;
+
+const ORIGIN_LANES = {
+  outerLeft: { key: 'outer-left', x: -2.75 },
+  innerLeft: { key: 'inner-left', x: -1.45 },
+  center: { key: 'center', x: 0 },
+  innerRight: { key: 'inner-right', x: 1.45 },
+  outerRight: { key: 'outer-right', x: 2.75 },
+};
+
+const TARGET_LANES = {
+  outerLeft: { key: 'outer-left', x: -2.55 },
+  innerLeft: { key: 'inner-left', x: -1.3 },
+  center: { key: 'center', x: 0 },
+  innerRight: { key: 'inner-right', x: 1.3 },
+  outerRight: { key: 'outer-right', x: 2.55 },
+};
+
+const PLACEMENT_HEIGHT_ZONES = {
+  low: { key: 'low', y: -3.95 },
+  mid: { key: 'mid', y: -3.35 },
+  high: { key: 'high', y: -2.9 },
+};
+
 const FIXED_OPENER_SHOTS = [
   {
     shot: {
       hex: 'standard',
-      start: { x: -1.2, y: -4.55 },
-      target: { x: -0.8, y: -3.85 },
+      originLane: 'innerLeft',
+      targetLane: 'innerLeft',
+      placementHeight: 'low',
     },
     designer: {
       label: 'straight warmup',
@@ -17,8 +47,9 @@ const FIXED_OPENER_SHOTS = [
   {
     shot: {
       hex: 'standard',
-      start: { x: 1.2, y: -4.55 },
-      target: { x: 0.9, y: -3.55 },
+      originLane: 'innerRight',
+      targetLane: 'innerRight',
+      placementHeight: 'mid',
     },
     designer: {
       label: 'low corner read',
@@ -29,8 +60,9 @@ const FIXED_OPENER_SHOTS = [
   {
     shot: {
       hex: 'heavy',
-      start: { x: -1.8, y: -4.55 },
-      target: { x: 1.0, y: -3.85 },
+      originLane: 'outerRight',
+      targetLane: 'outerRight',
+      placementHeight: 'low',
     },
     designer: {
       label: 'heavy slow drag',
@@ -43,101 +75,83 @@ const FIXED_OPENER_SHOTS = [
 const SHOT_PHASE_POOLS = [
   [
     {
-      shot: { hex: 'standard', start: { x: -2.1, y: -4.55 }, target: { x: -1.2, y: -3.7 } },
+      shot: { hex: 'standard', originLane: 'innerLeft', targetLane: 'innerLeft', placementHeight: 'low' },
       designer: { label: 'build left lane', difficultyBand: 'build', pressureTags: ['lane', 'read'] },
     },
     {
-      shot: { hex: 'standard', start: { x: 2.1, y: -4.55 }, target: { x: 1.3, y: -3.55 } },
+      shot: { hex: 'standard', originLane: 'innerRight', targetLane: 'innerRight', placementHeight: 'mid' },
       designer: { label: 'build right lane', difficultyBand: 'build', pressureTags: ['lane', 'read'] },
     },
     {
-      shot: { hex: 'curve', start: { x: -2.4, y: -4.55 }, target: { x: -1.3, y: -3.6 }, curveDirection: 1 },
+      shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'innerLeft', placementHeight: 'mid', curveDirection: 1 },
       designer: { label: 'gentle left curve', difficultyBand: 'build', pressureTags: ['curve', 'shape'] },
     },
     {
-      shot: { hex: 'curve', start: { x: 2.4, y: -4.55 }, target: { x: 1.4, y: -3.5 }, curveDirection: -1 },
+      shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'innerRight', placementHeight: 'mid', curveDirection: -1 },
       designer: { label: 'gentle right curve', difficultyBand: 'build', pressureTags: ['curve', 'shape'] },
     },
     {
-      shot: { hex: 'fireball', start: { x: -0.3, y: -4.55 }, target: { x: 0.2, y: -3.25 } },
+      shot: { hex: 'fireball', originLane: 'center', targetLane: 'center', placementHeight: 'low' },
       designer: { label: 'central speed test', difficultyBand: 'build', pressureTags: ['speed', 'center'] },
     },
     {
-      shot: { hex: 'heavy', start: { x: 1.9, y: -4.55 }, target: { x: -1.8, y: -3.9 } },
+      shot: { hex: 'heavy', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'low' },
       designer: { label: 'cross-body weight', difficultyBand: 'build', pressureTags: ['weight', 'cross-body'] },
     },
   ],
   [
     {
-      shot: { hex: 'standard', start: { x: -2.7, y: -4.55 }, target: { x: -2.0, y: -3.35 } },
+      shot: { hex: 'standard', originLane: 'outerLeft', targetLane: 'innerLeft', placementHeight: 'high' },
       designer: { label: 'pressure left high', difficultyBand: 'pressure', pressureTags: ['wide', 'high'] },
     },
     {
-      shot: { hex: 'standard', start: { x: 2.7, y: -4.55 }, target: { x: 2.0, y: -3.15 } },
+      shot: { hex: 'standard', originLane: 'outerRight', targetLane: 'innerRight', placementHeight: 'high' },
       designer: { label: 'pressure right high', difficultyBand: 'pressure', pressureTags: ['wide', 'high'] },
     },
     {
-      shot: { hex: 'curve', start: { x: -2.9, y: -4.55 }, target: { x: 1.6, y: -3.4 }, curveDirection: 1 },
+      shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'innerRight', placementHeight: 'mid', curveDirection: 1 },
       designer: { label: 'sweeping left curve', difficultyBand: 'pressure', pressureTags: ['curve', 'switch'] },
     },
     {
-      shot: { hex: 'curve', start: { x: 2.9, y: -4.55 }, target: { x: -1.6, y: -3.45 }, curveDirection: -1 },
+      shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'innerLeft', placementHeight: 'mid', curveDirection: -1 },
       designer: { label: 'sweeping right curve', difficultyBand: 'pressure', pressureTags: ['curve', 'switch'] },
     },
     {
-      shot: { hex: 'fireball', start: { x: 0.0, y: -4.55 }, target: { x: 0.0, y: -3.08 } },
+      shot: { hex: 'fireball', originLane: 'center', targetLane: 'center', placementHeight: 'high' },
       designer: { label: 'fast central test', difficultyBand: 'pressure', pressureTags: ['speed', 'center'] },
     },
     {
-      shot: { hex: 'heavy', start: { x: -2.5, y: -4.55 }, target: { x: 2.4, y: -3.92 } },
+      shot: { hex: 'heavy', originLane: 'outerRight', targetLane: 'outerRight', placementHeight: 'low' },
       designer: { label: 'heavy cross drag', difficultyBand: 'pressure', pressureTags: ['weight', 'cross-body'] },
     },
   ],
   [
     {
-      shot: { hex: 'standard', start: { x: -2.85, y: -4.55 }, target: { x: -2.55, y: -3.0 } },
+      shot: { hex: 'standard', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'high' },
       designer: { label: 'clutch left squeeze', difficultyBand: 'clutch', pressureTags: ['corner', 'late'] },
     },
     {
-      shot: { hex: 'standard', start: { x: 2.85, y: -4.55 }, target: { x: 2.55, y: -3.0 } },
+      shot: { hex: 'standard', originLane: 'outerRight', targetLane: 'outerRight', placementHeight: 'high' },
       designer: { label: 'clutch right squeeze', difficultyBand: 'clutch', pressureTags: ['corner', 'late'] },
     },
     {
-      shot: { hex: 'curve', start: { x: -2.6, y: -4.55 }, target: { x: 2.2, y: -3.18 }, curveDirection: 1 },
+      shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'outerRight', placementHeight: 'mid', curveDirection: 1 },
       designer: { label: 'late curve switch', difficultyBand: 'clutch', pressureTags: ['curve', 'switch'] },
     },
     {
-      shot: { hex: 'curve', start: { x: 2.6, y: -4.55 }, target: { x: -2.2, y: -3.18 }, curveDirection: -1 },
+      shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'outerLeft', placementHeight: 'mid', curveDirection: -1 },
       designer: { label: 'late curve reverse', difficultyBand: 'clutch', pressureTags: ['curve', 'switch'] },
     },
     {
-      shot: { hex: 'fireball', start: { x: -0.7, y: -4.55 }, target: { x: 0.7, y: -3.0 } },
+      shot: { hex: 'fireball', originLane: 'center', targetLane: 'center', placementHeight: 'high' },
       designer: { label: 'late fireball center', difficultyBand: 'clutch', pressureTags: ['speed', 'center'] },
     },
     {
-      shot: { hex: 'heavy', start: { x: 2.9, y: -4.55 }, target: { x: -2.85, y: -3.95 } },
+      shot: { hex: 'heavy', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'low' },
       designer: { label: 'late heavy cross', difficultyBand: 'clutch', pressureTags: ['weight', 'finish'] },
     },
   ],
 ];
-
-function clonePoint(point) {
-  return { x: point.x, y: point.y };
-}
-
-function cloneShot(shot) {
-  const cloned = {
-    hex: shot.hex,
-    start: clonePoint(shot.start),
-    target: clonePoint(shot.target),
-  };
-
-  if (shot.curveDirection !== undefined) {
-    cloned.curveDirection = shot.curveDirection;
-  }
-
-  return cloned;
-}
 
 function cloneDesigner(designer) {
   return {
@@ -186,16 +200,15 @@ function createRng(seedText) {
   };
 }
 
-function mirrorPoint(point) {
-  return { x: -point.x, y: point.y };
-}
-
 function jitter(value, spread, rng) {
   return value + (rng() * 2 - 1) * spread;
 }
 
-function clampTargetX(x) {
-  return Math.max(-3.05, Math.min(3.05, x));
+function clampTargetPoint(point) {
+  return {
+    x: Math.max(SHOT_PLAN_SAFE_TARGET_X_MIN, Math.min(SHOT_PLAN_SAFE_TARGET_X_MAX, point.x)),
+    y: Math.max(SHOT_PLAN_SAFE_TARGET_Y_MIN, Math.min(SHOT_PLAN_SAFE_TARGET_Y_MAX, point.y)),
+  };
 }
 
 function buildShotEntry({ index, shot, designer }) {
@@ -206,24 +219,57 @@ function buildShotEntry({ index, shot, designer }) {
   };
 }
 
-function createSeededShot(template, index, band, rng) {
-  const mirrored = rng() < 0.5;
-  const start = mirrored ? mirrorPoint(template.shot.start) : clonePoint(template.shot.start);
-  const target = mirrored ? mirrorPoint(template.shot.target) : clonePoint(template.shot.target);
+function resolveLane(laneMap, laneKey, kind) {
+  const lane = laneMap[laneKey];
+  if (!lane) {
+    throw new Error(`Shot plan ${kind} lane is unknown: ${laneKey}`);
+  }
+
+  return lane;
+}
+
+function createShotCoordinates(template, rng, jitterAmount = 1) {
+  const originLane = resolveLane(ORIGIN_LANES, template.originLane, 'origin');
+  const targetLane = resolveLane(TARGET_LANES, template.targetLane, 'target');
+  const placementHeight = PLACEMENT_HEIGHT_ZONES[template.placementHeight];
+  if (!placementHeight) {
+    throw new Error(`Shot plan placement height is unknown: ${template.placementHeight}`);
+  }
+
+  const sharedHeavyX = template.hex === 'heavy'
+    ? jitter(originLane.x, 0.12 * jitterAmount, rng)
+    : null;
+  const start = {
+    x: sharedHeavyX ?? jitter(originLane.x, 0.12 * jitterAmount, rng),
+    y: jitter(SHOT_PLAN_START_Y, 0.04 * jitterAmount, rng),
+  };
+  const target = clampTargetPoint({
+    x: sharedHeavyX ?? jitter(targetLane.x, 0.14 * jitterAmount, rng),
+    y: jitter(placementHeight.y, 0.06 * jitterAmount, rng),
+  });
+
+  return {
+    start,
+    target,
+    originLane: originLane.key,
+    targetLane: targetLane.key,
+    placementHeight: placementHeight.key,
+  };
+}
+
+function createShotTemplateEntry(template, index, band, rng, jitterAmount = 1) {
+  const coordinates = createShotCoordinates(template.shot, rng, jitterAmount);
   const shot = {
     hex: template.shot.hex,
-    start: {
-      x: jitter(start.x, 0.14, rng),
-      y: jitter(start.y, 0.06, rng),
-    },
-    target: {
-      x: clampTargetX(jitter(target.x, 0.16, rng)),
-      y: jitter(target.y, 0.08, rng),
-    },
+    start: coordinates.start,
+    target: coordinates.target,
+    originLane: coordinates.originLane,
+    targetLane: coordinates.targetLane,
+    placementHeight: coordinates.placementHeight,
   };
 
   if (template.shot.curveDirection !== undefined) {
-    shot.curveDirection = mirrored ? -template.shot.curveDirection : template.shot.curveDirection;
+    shot.curveDirection = template.shot.curveDirection;
   }
 
   return buildShotEntry({
@@ -232,14 +278,69 @@ function createSeededShot(template, index, band, rng) {
     designer: {
       label: template.designer.label,
       difficultyBand: band,
-      pressureTags: [...template.designer.pressureTags],
+      pressureTags: [...template.designer.pressureTags, coordinates.originLane, coordinates.targetLane, coordinates.placementHeight],
+      originLane: coordinates.originLane,
+      targetLane: coordinates.targetLane,
+      placementHeight: coordinates.placementHeight,
       opener: false,
     },
   });
 }
 
-function pickTemplate(pool, rng) {
-  return pool[Math.floor(rng() * pool.length)];
+function createFixedOpenerEntry(template, index) {
+  const coordinates = createShotCoordinates(template.shot, createRng(`${template.designer.label}-${index}`), 0);
+  const shot = {
+    hex: template.shot.hex,
+    start: coordinates.start,
+    target: coordinates.target,
+    originLane: coordinates.originLane,
+    targetLane: coordinates.targetLane,
+    placementHeight: coordinates.placementHeight,
+  };
+
+  if (template.shot.curveDirection !== undefined) {
+    shot.curveDirection = template.shot.curveDirection;
+  }
+
+  return buildShotEntry({
+    index,
+    shot,
+    designer: {
+      ...cloneDesigner(template.designer),
+      originLane: coordinates.originLane,
+      targetLane: coordinates.targetLane,
+      placementHeight: coordinates.placementHeight,
+    },
+  });
+}
+
+function candidateSignature(candidate) {
+  return [
+    candidate.shot.hex,
+    candidate.shot.originLane,
+    candidate.shot.targetLane,
+    candidate.shot.placementHeight,
+    candidate.shot.curveDirection ?? 0,
+  ].join('|');
+}
+
+function isCandidateValid(candidate, plan) {
+  const last = plan[plan.length - 1];
+  const previous = plan[plan.length - 2];
+
+  if (last && last.shot.hex === candidate.shot.hex && previous?.shot.hex === candidate.shot.hex) {
+    return false;
+  }
+
+  if (last && last.shot.targetLane === candidate.shot.targetLane && previous?.shot.targetLane === candidate.shot.targetLane) {
+    return false;
+  }
+
+  if (last && candidateSignature(last) === candidateSignature(candidate)) {
+    return false;
+  }
+
+  return true;
 }
 
 function bandForIndex(index, totalShots) {
@@ -264,26 +365,55 @@ export function createShotPlan(seed, rules = {}) {
   const { totalShots } = normalizeRules(rules);
   const rng = createRng(normalizedSeed);
   const plan = [];
+  const hexCounts = new Map(SHOT_PLAN_REQUIRED_HEXES.map((hex) => [hex, 0]));
 
   for (let index = 0; index < totalShots; index += 1) {
     if (index < FIXED_OPENER_SHOTS.length) {
       const opener = FIXED_OPENER_SHOTS[index];
-      plan.push(buildShotEntry({
-        index,
-        shot: cloneShot(opener.shot),
-        designer: {
-          ...cloneDesigner(opener.designer),
-          opener: true,
-        },
-      }));
+      const openerEntry = createFixedOpenerEntry(opener, index);
+      openerEntry.designer.opener = true;
+      plan.push(openerEntry);
+      hexCounts.set(openerEntry.shot.hex, (hexCounts.get(openerEntry.shot.hex) ?? 0) + 1);
       continue;
     }
 
     const band = bandForIndex(index, totalShots);
     const pool = SHOT_PHASE_POOLS[phaseIndexForBand(band)];
-    plan.push(createSeededShot(pickTemplate(pool, rng), index, band, rng));
+    const remainingSlots = totalShots - index;
+    const missingHexes = SHOT_PLAN_REQUIRED_HEXES.filter((hex) => (hexCounts.get(hex) ?? 0) === 0);
+    const forcedHex = missingHexes.length > 0 && remainingSlots <= missingHexes.length
+      ? missingHexes[0]
+      : null;
+    const candidates = forcedHex ? pool.filter((template) => template.shot.hex === forcedHex) : pool;
+
+    let template = null;
+    const retries = Math.max(6, candidates.length);
+    for (let attempt = 0; attempt < retries && !template; attempt += 1) {
+      const candidate = candidates[Math.floor(rng() * candidates.length)];
+      const generated = createShotTemplateEntry(candidate, index, band, rng);
+      if (isCandidateValid(generated, plan)) {
+        template = candidate;
+        plan.push(generated);
+        hexCounts.set(generated.shot.hex, (hexCounts.get(generated.shot.hex) ?? 0) + 1);
+      }
+    }
+
+    if (!template) {
+      for (const fallbackCandidate of candidates) {
+        const generated = createShotTemplateEntry(fallbackCandidate, index, band, rng);
+        if (isCandidateValid(generated, plan)) {
+          plan.push(generated);
+          hexCounts.set(generated.shot.hex, (hexCounts.get(generated.shot.hex) ?? 0) + 1);
+          template = fallbackCandidate;
+          break;
+        }
+      }
+    }
+
+    if (!template) {
+      throw new Error(`Shot plan generation failed at index ${index} for band ${band}`);
+    }
   }
 
   return plan;
 }
-
