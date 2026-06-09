@@ -20,7 +20,9 @@ import { DEFAULT_SHOT_PLAN_SEED, createShotPlan, describeShotPlan } from './shot
 import { createMatchState, isMatchComplete, recordShotResult } from './matchState.js';
 import {
   advanceShotRuntime,
+  getFeedbackState,
   createShotRuntime,
+  getShotPose,
   recordShotRuntimeOutcome,
   queueNextShot,
 } from './shotRuntime.js';
@@ -156,25 +158,9 @@ const Dive = {
 };
 
 const Ball = {
-  x: PITCH_CENTER_X,             // centered on pitch
-  y: GROUND_Y + BALL_RADIUS,     // rests on the ground
-  z: BALL_MAX_Z,          // spawns at camera/penalty distance
-  radius: BALL_RADIUS,
-  scale: 1,
-  color: '#ffffff',
-  shadow: {
-    x: PITCH_CENTER_X,
-    y: GROUND_Y,
-    scale: BALL_SHADOW_SCALE,
-    opacity: BALL_SHADOW_OPACITY,
-  },
   shot: null,
   shotIndex: 0,
   respawnTimer: 0,
-  lastSaveResult: null,
-  feedbackTimer: 0,
-  saves: 0,
-  conceded: 0,
   runtime: null,
 };
 
@@ -215,15 +201,13 @@ function syncBallFromRuntime(runtime) {
     sample: cloneRuntimeShotSample(runtime.activeShot.sample),
   } : null;
 
-  const sample = runtime.activeShot?.sample;
+  const sample = getShotPose(runtime);
   if (sample) {
     applyShotSample(sample);
   }
 
   Ball.shotIndex = runtime.activeShotIndex;
   Ball.respawnTimer = runtime.respawnTimer ?? 0;
-  Ball.feedbackTimer = runtime.feedback?.timer ?? 0;
-  Ball.lastSaveResult = runtime.feedback?.lastResult ? { ...runtime.feedback.lastResult } : null;
 }
 
 function createBallRuntime() {
@@ -253,10 +237,6 @@ export function gameInit(options = {}) {
   Match.shotPlanSeed = options.shotPlanSeed ?? createRuntimeShotPlanSeed();
   Match.plan = createShotPlan(Match.shotPlanSeed, { totalShots: Match.state.totalShots });
   Ball.runtime = createBallRuntime();
-  Ball.saves = 0;
-  Ball.conceded = 0;
-  Ball.lastSaveResult = null;
-  Ball.feedbackTimer = 0;
   syncBallFromRuntime(Ball.runtime);
 }
 
@@ -304,8 +284,6 @@ export function applyMatchShotOutcome(outcome) {
   if (isMatchComplete(Match.state)) return getMatchState();
 
   Match.state = recordShotResult(Match.state, outcome);
-  Ball.saves = Match.state.saves;
-  Ball.conceded = Match.state.conceded;
 
   if (Ball.runtime) {
     Ball.runtime = recordShotRuntimeOutcome(Ball.runtime, {
@@ -339,25 +317,48 @@ export function updateBallShot(dt = 1 / 60) {
 }
 
 export function getBallPose() {
+  const sample = getShotPose(Ball.runtime);
+
+  if (!sample) {
+    return {
+      x: PITCH_CENTER_X,
+      y: GROUND_Y + BALL_RADIUS,
+      z: BALL_MAX_Z,
+      radius: BALL_RADIUS,
+      scale: 1,
+      color: '#ffffff',
+      shadow: {
+        x: PITCH_CENTER_X,
+        y: GROUND_Y,
+        scale: BALL_SHADOW_SCALE,
+        opacity: BALL_SHADOW_OPACITY,
+      },
+      hex: Ball.shot?.hex,
+      saveResult: null,
+    };
+  }
+
   return {
-    x: Ball.x,
-    y: Ball.y,
-    z: Ball.z,
-    radius: Ball.radius,
-    scale: Ball.scale,
-    color: Ball.color,
-    shadow: { ...Ball.shadow },
+    x: sample.x,
+    y: sample.y,
+    z: sample.z,
+    radius: sample.radius,
+    scale: sample.scale,
+    color: sample.color,
+    shadow: { ...sample.shadow },
     hex: Ball.shot?.hex,
-    saveResult: Ball.lastSaveResult ? { ...Ball.lastSaveResult } : null,
+    saveResult: sample.saveResult ? { ...sample.saveResult } : null,
   };
 }
 
 export function getSaveState() {
+  const feedback = getFeedbackState(Ball.runtime);
+
   return {
-    saves: Ball.saves,
-    conceded: Ball.conceded,
-    feedbackTimer: Ball.feedbackTimer,
-    lastResult: Ball.lastSaveResult ? { ...Ball.lastSaveResult } : null,
+    saves: Match.state.saves,
+    conceded: Match.state.conceded,
+    feedbackTimer: feedback?.timer ?? 0,
+    lastResult: feedback?.lastResult ? { ...feedback.lastResult } : null,
   };
 }
 
@@ -604,19 +605,20 @@ function drawKeeper() {
 function drawBall() {
   // Ball starts near camera (z=MAX_Z) and approaches goal (z=0).
   // depthFromCamera = how far the ball is from the camera lens.
-  const depthFromCamera = BALL_MAX_Z - Ball.z; // 0 = near camera, MAX_Z = at goal
-  const { pos: ballPos } = project(Ball.x, Ball.y, depthFromCamera);
+  const ball = getBallPose();
+  const depthFromCamera = BALL_MAX_Z - ball.z; // 0 = near camera, MAX_Z = at goal
+  const { pos: ballPos } = project(ball.x, ball.y, depthFromCamera);
 
   // Draw Ground Shadow projected on the ground plane at GROUND_Y.
   // The trajectory sample shrinks/fades this shadow as height increases.
-  const { pos: shadowPos } = project(Ball.shadow.x, Ball.shadow.y, depthFromCamera);
-  const shadowRadius = Ball.radius * Ball.scale * BALL_SHADOW_SCALE * Ball.shadow.scale;
-  drawCircle(shadowPos, shadowRadius, rgb(1, 1, 1, Ball.shadow.opacity));
+  const { pos: shadowPos } = project(ball.shadow.x, ball.shadow.y, depthFromCamera);
+  const shadowRadius = ball.radius * ball.scale * BALL_SHADOW_SCALE * ball.shadow.scale;
+  drawCircle(shadowPos, shadowRadius, rgb(1, 1, 1, ball.shadow.opacity));
 
   // Draw projected Ball with per-hex tint. Orthographic projection keeps size constant.
-  drawCircle(ballPos, Ball.radius * Ball.scale, Ball.color ? c(Ball.color) : COLOR_BALL);
+  drawCircle(ballPos, ball.radius * ball.scale, ball.color ? c(ball.color) : COLOR_BALL);
   // Ball outline/inner detail to distinguish it.
-  drawCircle(ballPos, Ball.radius * Ball.scale * BALL_DETAIL_SCALE, COLOR_BALL_DETAIL);
+  drawCircle(ballPos, ball.radius * ball.scale * BALL_DETAIL_SCALE, COLOR_BALL_DETAIL);
 }
 
 export function gameRender() {
@@ -660,9 +662,10 @@ function drawSaveFeedback() {
     return;
   }
 
-  if (!Ball.lastSaveResult || Ball.feedbackTimer <= 0) return;
+  const feedback = getFeedbackState(Ball.runtime);
+  if (!feedback?.lastResult || feedback.timer <= 0) return;
 
-  const isSave = Ball.lastSaveResult.outcome === 'save';
+  const isSave = feedback.lastResult.outcome === 'save';
   drawTextScreen(
     isSave ? 'SAVE!' : 'MISS!',
     vec2(centerX, 86),
