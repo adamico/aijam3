@@ -226,6 +226,21 @@ function buildShotEntry({ index, shot, designer }) {
   };
 }
 
+function cloneShot(shot) {
+  return {
+    ...shot,
+    start: { ...shot.start },
+    target: { ...shot.target },
+  };
+}
+
+function cloneDesigner(designer) {
+  return {
+    ...designer,
+    pressureTags: [...designer.pressureTags],
+  };
+}
+
 function resolveLane(laneMap, laneKey, kind) {
   const lane = laneMap[laneKey];
   if (!lane) {
@@ -498,4 +513,12 @@ export function createShotPlan(seed, rules = {}) {
   }
 
   return plan;
+}
+
+export function describeShotPlan(plan) {
+  return plan.map((entry) => ({
+    index: entry.index,
+    shot: cloneShot(entry.shot),
+    designer: cloneDesigner(entry.designer),
+  }));
 }

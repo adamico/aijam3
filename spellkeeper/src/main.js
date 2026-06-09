@@ -17,7 +17,7 @@ import {
   startDive,
 } from './diveState.js';
 import { advanceShot, createShot } from './shotTrajectory.js';
-import { DEFAULT_SHOT_PLAN_SEED, createShotPlan } from './shotPlan.js';
+import { DEFAULT_SHOT_PLAN_SEED, createShotPlan, describeShotPlan } from './shotPlan.js';
 import { resolveCrossingSave } from './saveResolver.js';
 import { createMatchState, isMatchComplete, recordShotResult } from './matchState.js';
 
@@ -318,6 +318,10 @@ export function getMatchState() {
   return {
     ...Match.state,
   };
+}
+
+export function getShotPlanDebugInfo() {
+  return describeShotPlan(Match.plan);
 }
 
 function setFamiliarTorsoX(x) {

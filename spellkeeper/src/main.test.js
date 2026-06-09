@@ -208,6 +208,23 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(second.y).toBeCloseTo(plan[1].shot.start.y, 5);
     });
 
+    it('exposes the active shot plan through a debug snapshot without rendering', async () => {
+        const { gameInit, getMatchState, getShotPlanDebugInfo } = await import('./main.js');
+        const expected = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
+
+        gameInit();
+
+        const debugPlan = getShotPlanDebugInfo();
+
+        expect(debugPlan).toEqual(expected);
+        expect(debugPlan[0].designer.label).toBe('straight warmup');
+        expect(debugPlan[0].designer.pressureTags).toEqual(expect.arrayContaining(['readable', 'warmup']));
+
+        debugPlan[0].designer.pressureTags.push('mutated');
+        expect(getShotPlanDebugInfo()[0].designer.pressureTags).not.toContain('mutated');
+        expect(getMatchState().shotsTaken).toBe(0);
+    });
+
     it('resolves a goal-plane overlap as a save when the shot crosses', async () => {
         const engine = await import('littlejsengine');
         const { gameInit, gameRenderPost, applyKeeperHandIk, getSaveState, updateBallShot } = await import('./main.js');
