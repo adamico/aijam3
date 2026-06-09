@@ -2,6 +2,11 @@ const DEFAULT_SHOT_PLAN_TOTAL_SHOTS = 30;
 export const DEFAULT_SHOT_PLAN_SEED = 'spellkeeper-default-shot-plan';
 
 const SHOT_PLAN_REQUIRED_HEXES = ['standard', 'curve', 'fireball', 'heavy'];
+const SHOT_PLAN_DIFFICULTY_BANDS = {
+  readable: 'readable variety',
+  mixed: 'mixed pressure',
+  chaos: 'chaos-but-fair',
+};
 const SHOT_PLAN_START_Y = -4.55;
 const SHOT_PLAN_SAFE_TARGET_X_MIN = -3.05;
 const SHOT_PLAN_SAFE_TARGET_X_MAX = 3.05;
@@ -29,6 +34,7 @@ const PLACEMENT_HEIGHT_ZONES = {
   mid: { key: 'mid', y: -3.35 },
   high: { key: 'high', y: -2.9 },
 };
+const OUTER_LANES = new Set(['outer-left', 'outer-right']);
 
 const FIXED_OPENER_SHOTS = [
   {
@@ -76,79 +82,79 @@ const SHOT_PHASE_POOLS = [
   [
     {
       shot: { hex: 'standard', originLane: 'innerLeft', targetLane: 'innerLeft', placementHeight: 'low' },
-      designer: { label: 'build left lane', difficultyBand: 'build', pressureTags: ['lane', 'read'] },
+      designer: { label: 'build left lane', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['lane', 'read'] },
     },
     {
       shot: { hex: 'standard', originLane: 'innerRight', targetLane: 'innerRight', placementHeight: 'mid' },
-      designer: { label: 'build right lane', difficultyBand: 'build', pressureTags: ['lane', 'read'] },
+      designer: { label: 'build right lane', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['lane', 'read'] },
     },
     {
       shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'innerLeft', placementHeight: 'mid', curveDirection: 1 },
-      designer: { label: 'gentle left curve', difficultyBand: 'build', pressureTags: ['curve', 'shape'] },
+      designer: { label: 'gentle left curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['curve', 'shape'] },
     },
     {
       shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'innerRight', placementHeight: 'mid', curveDirection: -1 },
-      designer: { label: 'gentle right curve', difficultyBand: 'build', pressureTags: ['curve', 'shape'] },
+      designer: { label: 'gentle right curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['curve', 'shape'] },
     },
     {
       shot: { hex: 'fireball', originLane: 'center', targetLane: 'center', placementHeight: 'low' },
-      designer: { label: 'central speed test', difficultyBand: 'build', pressureTags: ['speed', 'center'] },
+      designer: { label: 'central speed test', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['speed', 'center'] },
     },
     {
       shot: { hex: 'heavy', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'low' },
-      designer: { label: 'cross-body weight', difficultyBand: 'build', pressureTags: ['weight', 'cross-body'] },
+      designer: { label: 'cross-body weight', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['weight', 'cross-body'] },
     },
   ],
   [
     {
       shot: { hex: 'standard', originLane: 'outerLeft', targetLane: 'innerLeft', placementHeight: 'high' },
-      designer: { label: 'pressure left high', difficultyBand: 'pressure', pressureTags: ['wide', 'high'] },
+      designer: { label: 'pressure left high', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['wide', 'high'] },
     },
     {
       shot: { hex: 'standard', originLane: 'outerRight', targetLane: 'innerRight', placementHeight: 'high' },
-      designer: { label: 'pressure right high', difficultyBand: 'pressure', pressureTags: ['wide', 'high'] },
+      designer: { label: 'pressure right high', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['wide', 'high'] },
     },
     {
       shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'innerRight', placementHeight: 'mid', curveDirection: 1 },
-      designer: { label: 'sweeping left curve', difficultyBand: 'pressure', pressureTags: ['curve', 'switch'] },
+      designer: { label: 'sweeping left curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['curve', 'switch'] },
     },
     {
       shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'innerLeft', placementHeight: 'mid', curveDirection: -1 },
-      designer: { label: 'sweeping right curve', difficultyBand: 'pressure', pressureTags: ['curve', 'switch'] },
+      designer: { label: 'sweeping right curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['curve', 'switch'] },
     },
     {
       shot: { hex: 'fireball', originLane: 'center', targetLane: 'center', placementHeight: 'high' },
-      designer: { label: 'fast central test', difficultyBand: 'pressure', pressureTags: ['speed', 'center'] },
+      designer: { label: 'fast central test', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['speed', 'center', 'high'] },
     },
     {
       shot: { hex: 'heavy', originLane: 'outerRight', targetLane: 'outerRight', placementHeight: 'low' },
-      designer: { label: 'heavy cross drag', difficultyBand: 'pressure', pressureTags: ['weight', 'cross-body'] },
+      designer: { label: 'heavy cross drag', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['weight', 'cross-body'] },
     },
   ],
   [
     {
       shot: { hex: 'standard', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'high' },
-      designer: { label: 'clutch left squeeze', difficultyBand: 'clutch', pressureTags: ['corner', 'late'] },
+      designer: { label: 'clutch left squeeze', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['corner', 'late'] },
     },
     {
       shot: { hex: 'standard', originLane: 'outerRight', targetLane: 'outerRight', placementHeight: 'high' },
-      designer: { label: 'clutch right squeeze', difficultyBand: 'clutch', pressureTags: ['corner', 'late'] },
+      designer: { label: 'clutch right squeeze', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['corner', 'late'] },
     },
     {
       shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'outerRight', placementHeight: 'mid', curveDirection: 1 },
-      designer: { label: 'late curve switch', difficultyBand: 'clutch', pressureTags: ['curve', 'switch'] },
+      designer: { label: 'late curve switch', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['curve', 'switch'] },
     },
     {
       shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'outerLeft', placementHeight: 'mid', curveDirection: -1 },
-      designer: { label: 'late curve reverse', difficultyBand: 'clutch', pressureTags: ['curve', 'switch'] },
+      designer: { label: 'late curve reverse', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['curve', 'switch'] },
     },
     {
-      shot: { hex: 'fireball', originLane: 'center', targetLane: 'center', placementHeight: 'high' },
-      designer: { label: 'late fireball center', difficultyBand: 'clutch', pressureTags: ['speed', 'center'] },
+      shot: { hex: 'fireball', originLane: 'outerRight', targetLane: 'outerRight', placementHeight: 'high' },
+      designer: { label: 'late fireball corner', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['speed', 'corner', 'high'] },
     },
     {
       shot: { hex: 'heavy', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'low' },
-      designer: { label: 'late heavy cross', difficultyBand: 'clutch', pressureTags: ['weight', 'finish'] },
+      designer: { label: 'late heavy cross', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['weight', 'finish'] },
     },
   ],
 ];
@@ -324,9 +330,37 @@ function candidateSignature(candidate) {
   ].join('|');
 }
 
-function isCandidateValid(candidate, plan) {
+function isOuterLane(laneKey) {
+  return OUTER_LANES.has(laneKey);
+}
+
+function isHighCornerFireball(candidate) {
+  return candidate.shot.hex === 'fireball'
+    && candidate.shot.placementHeight === 'high'
+    && (isOuterLane(candidate.shot.originLane) || isOuterLane(candidate.shot.targetLane));
+}
+
+function isCandidateFairForBand(candidate, band) {
+  if (candidate.shot.hex !== 'fireball') return true;
+
+  if (band === SHOT_PLAN_DIFFICULTY_BANDS.readable) {
+    return !isHighCornerFireball(candidate);
+  }
+
+  if (band === SHOT_PLAN_DIFFICULTY_BANDS.mixed) {
+    return !(candidate.shot.placementHeight === 'high' && (isOuterLane(candidate.shot.originLane) || isOuterLane(candidate.shot.targetLane)));
+  }
+
+  return true;
+}
+
+function isCandidateValid(candidate, plan, band) {
   const last = plan[plan.length - 1];
   const previous = plan[plan.length - 2];
+
+  if (!isCandidateFairForBand(candidate, band)) {
+    return false;
+  }
 
   if (last && last.shot.hex === candidate.shot.hex && previous?.shot.hex === candidate.shot.hex) {
     return false;
@@ -349,14 +383,14 @@ function bandForIndex(index, totalShots) {
 
   const remainingShots = totalShots - openerCount;
   const phaseProgress = (index - openerCount) / remainingShots;
-  if (phaseProgress < 1 / 3) return 'build';
-  if (phaseProgress < 2 / 3) return 'pressure';
-  return 'clutch';
+  if (phaseProgress < 1 / 3) return SHOT_PLAN_DIFFICULTY_BANDS.readable;
+  if (phaseProgress < 2 / 3) return SHOT_PLAN_DIFFICULTY_BANDS.mixed;
+  return SHOT_PLAN_DIFFICULTY_BANDS.chaos;
 }
 
 function phaseIndexForBand(band) {
-  if (band === 'build') return 0;
-  if (band === 'pressure') return 1;
+  if (band === SHOT_PLAN_DIFFICULTY_BANDS.readable) return 0;
+  if (band === SHOT_PLAN_DIFFICULTY_BANDS.mixed) return 1;
   return 2;
 }
 
@@ -391,7 +425,7 @@ export function createShotPlan(seed, rules = {}) {
     for (let attempt = 0; attempt < retries && !template; attempt += 1) {
       const candidate = candidates[Math.floor(rng() * candidates.length)];
       const generated = createShotTemplateEntry(candidate, index, band, rng);
-      if (isCandidateValid(generated, plan)) {
+      if (isCandidateValid(generated, plan, band)) {
         template = candidate;
         plan.push(generated);
         hexCounts.set(generated.shot.hex, (hexCounts.get(generated.shot.hex) ?? 0) + 1);
@@ -401,7 +435,7 @@ export function createShotPlan(seed, rules = {}) {
     if (!template) {
       for (const fallbackCandidate of candidates) {
         const generated = createShotTemplateEntry(fallbackCandidate, index, band, rng);
-        if (isCandidateValid(generated, plan)) {
+        if (isCandidateValid(generated, plan, band)) {
           plan.push(generated);
           hexCounts.set(generated.shot.hex, (hexCounts.get(generated.shot.hex) ?? 0) + 1);
           template = fallbackCandidate;

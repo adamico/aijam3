@@ -26,6 +26,7 @@ describe('shot plan generator', () => {
 
   it('attaches readable designer metadata and gameplay config to every shot', () => {
     const plan = createShotPlan('metadata-seed');
+    const difficultyBands = new Set(plan.map((entry) => entry.designer.difficultyBand));
 
     for (const entry of plan) {
       expect(entry.shot.hex).toBeTypeOf('string');
@@ -54,7 +55,35 @@ describe('shot plan generator', () => {
     expect(plan[0].designer.difficultyBand).toBe('opener');
     expect(plan[0].designer.label).toBe('straight warmup');
     expect(plan[5].designer.pressureTags.length).toBeGreaterThan(0);
-    expect(new Set(plan.map((entry) => entry.designer.difficultyBand)).size).toBeGreaterThan(1);
+    expect(difficultyBands).toEqual(new Set(['opener', 'readable variety', 'mixed pressure', 'chaos-but-fair']));
+    expect(plan.slice(3, 12).every((entry) => entry.designer.difficultyBand === 'readable variety')).toBe(true);
+    expect(plan.slice(12, 21).every((entry) => entry.designer.difficultyBand === 'mixed pressure')).toBe(true);
+    expect(plan.slice(21).every((entry) => entry.designer.difficultyBand === 'chaos-but-fair')).toBe(true);
+  });
+
+  it('keeps fireballs fair in readable and mixed acts while allowing a high-corner finale', () => {
+    const plan = createShotPlan('fireball-fairness-seed');
+    const readableFireballs = plan.filter((entry) => entry.designer.difficultyBand === 'readable variety' && entry.shot.hex === 'fireball');
+    const mixedFireballs = plan.filter((entry) => entry.designer.difficultyBand === 'mixed pressure' && entry.shot.hex === 'fireball');
+    const chaosFireballs = plan.filter((entry) => entry.designer.difficultyBand === 'chaos-but-fair' && entry.shot.hex === 'fireball');
+
+    for (const entry of readableFireballs) {
+      expect(entry.shot.placementHeight).not.toBe('high');
+      expect(['outer-left', 'outer-right']).not.toContain(entry.shot.originLane);
+      expect(['outer-left', 'outer-right']).not.toContain(entry.shot.targetLane);
+    }
+
+    for (const entry of mixedFireballs) {
+      expect(entry.shot.placementHeight).toBe('high');
+      expect(entry.shot.originLane).toBe('center');
+      expect(entry.shot.targetLane).toBe('center');
+    }
+
+    for (const entry of chaosFireballs) {
+      expect(entry.shot.placementHeight).toBe('high');
+      expect(['outer-left', 'outer-right']).toContain(entry.shot.originLane);
+      expect(['outer-left', 'outer-right']).toContain(entry.shot.targetLane);
+    }
   });
 
   it('includes every current hex and keeps heavy shots low and extreme-side', () => {
