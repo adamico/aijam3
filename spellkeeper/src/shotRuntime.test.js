@@ -23,8 +23,8 @@ describe('shot runtime', () => {
     const shotPlan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
     const runtime = createShotRuntime({ shotPlan, shotDimensions, shotTiming });
 
-    expect(getActiveShot(runtime)?.hex).toBe(shotPlan[0].shot.hex);
-    expect(getActiveShot(runtime)?.start).toEqual(shotPlan[0].shot.start);
+    expect(getActiveShot(runtime)?.shot.hex).toBe(shotPlan[0].shot.hex);
+    expect(getActiveShot(runtime)?.shot.start).toEqual(shotPlan[0].shot.start);
     expect(getShotPose(runtime)?.hex).toBe(shotPlan[0].shot.hex);
     expect(getShotPose(runtime)?.x).toBeCloseTo(shotPlan[0].shot.start.x, 5);
     expect(getShotPose(runtime)?.y).toBeCloseTo(shotPlan[0].shot.start.y, 5);
@@ -38,11 +38,11 @@ describe('shot runtime', () => {
     const shotPose = getShotPose(runtime);
     const feedback = getFeedbackState(runtime);
 
-    activeShot.start.x = 999;
+    activeShot.shot.start.x = 999;
     shotPose.shadow.scale = 999;
     feedback.timer = 999;
 
-    expect(getActiveShot(runtime)?.start.x).not.toBe(999);
+    expect(getActiveShot(runtime)?.shot.start.x).not.toBe(999);
     expect(getShotPose(runtime)?.shadow.scale).not.toBe(999);
     expect(getFeedbackState(runtime)?.timer).toBe(0);
   });
