@@ -130,6 +130,22 @@ describe('shot plan generator', () => {
     }
   });
 
+  it('keeps the seeded plan within the PRD scope', () => {
+    const plan = createShotPlan('scope-check-seed');
+
+    expect(plan).toHaveLength(30);
+
+    for (const entry of plan) {
+      expect(entry).not.toHaveProperty('seed');
+      expect(entry).not.toHaveProperty('preview');
+      expect(entry).not.toHaveProperty('adaptiveDifficulty');
+      expect(entry.shot).not.toHaveProperty('trajectoryHeight');
+      expect(entry.designer).not.toHaveProperty('seed');
+      expect(entry.designer).not.toHaveProperty('preview');
+      expect(entry.designer).not.toHaveProperty('familiarTrick');
+    }
+  });
+
   it('biases post-heavy follow-ups toward the opposite side without forcing them', () => {
     const lastHeavyLeft = [{ shot: { hex: 'heavy', targetLane: 'outer-left' } }];
     const opposite = { shot: { hex: 'standard', targetLane: 'outer-right' } };
