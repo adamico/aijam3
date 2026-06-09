@@ -16,7 +16,8 @@ describe('shot plan generator', () => {
     const alpha = createShotPlan('alpha-seed');
     const beta = createShotPlan('beta-seed');
 
-    expect(alpha.slice(0, 3)).toEqual(beta.slice(0, 3));
+    expect(alpha.slice(0, 3).map((entry) => entry.shot)).toEqual(beta.slice(0, 3).map((entry) => entry.shot));
+    expect(alpha.slice(0, 3).map((entry) => entry.designer.label)).toEqual(beta.slice(0, 3).map((entry) => entry.designer.label));
     expect(alpha).not.toEqual(beta);
     expect(alpha[0].designer.opener).toBe(true);
     expect(alpha[1].designer.opener).toBe(true);
@@ -44,6 +45,7 @@ describe('shot plan generator', () => {
           label: expect.any(String),
           difficultyBand: expect.any(String),
           pressureTags: expect.any(Array),
+          planId: expect.any(String),
           opener: expect.any(Boolean),
           originLane: expect.any(String),
           targetLane: expect.any(String),
@@ -52,6 +54,7 @@ describe('shot plan generator', () => {
       );
     }
 
+    expect(new Set(plan.map((entry) => entry.designer.planId)).size).toBe(1);
     expect(plan[0].designer.difficultyBand).toBe('opener');
     expect(plan[0].designer.label).toBe('straight warmup');
     expect(plan[5].designer.pressureTags.length).toBeGreaterThan(0);
@@ -120,6 +123,23 @@ describe('shot plan generator', () => {
     const hexes = new Set(plan.map((entry) => entry.shot.hex));
 
     expect(hexes).toEqual(new Set(['standard', 'curve', 'fireball', 'heavy']));
+
+    const hexCounts = plan.reduce((counts, entry) => ({
+      ...counts,
+      [entry.shot.hex]: (counts[entry.shot.hex] ?? 0) + 1,
+    }), {});
+
+    expect(hexCounts.standard).toBeGreaterThanOrEqual(8);
+    expect(hexCounts.standard).toBeLessThanOrEqual(10);
+    expect(hexCounts.curve).toBeGreaterThanOrEqual(7);
+    expect(hexCounts.curve).toBeLessThanOrEqual(9);
+    expect(hexCounts.fireball).toBeGreaterThanOrEqual(6);
+    expect(hexCounts.fireball).toBeLessThanOrEqual(8);
+    expect(hexCounts.heavy).toBeGreaterThanOrEqual(4);
+    expect(hexCounts.heavy).toBeLessThanOrEqual(6);
+    expect(hexCounts.heavy).toBeLessThan(hexCounts.standard);
+    expect(hexCounts.heavy).toBeLessThan(hexCounts.curve);
+    expect(hexCounts.heavy).toBeLessThan(hexCounts.fireball);
 
     for (const entry of plan.filter((shot) => shot.shot.hex === 'heavy')) {
       expect(entry.shot.originLane).toBe(entry.shot.targetLane);

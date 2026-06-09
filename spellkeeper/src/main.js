@@ -123,8 +123,13 @@ const SAVE_FEEDBACK_DURATION = 0.9;
 const initialMatchState = createMatchState();
 const Match = {
   state: initialMatchState,
+  shotPlanSeed: DEFAULT_SHOT_PLAN_SEED,
   plan: createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: initialMatchState.totalShots }),
 };
+
+export function createRuntimeShotPlanSeed() {
+  return `spellkeeper-match-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 const EMPTY_DIVE_VISUAL_POSE = {
   torso: { x: 0, y: 0 },
@@ -184,7 +189,7 @@ function resetFamiliarPose() {
   Familiar.rightHand = vec2(PITCH_CENTER_X + FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y);
 }
 
-export function gameInit() {
+export function gameInit(options = {}) {
   setCanvasClearColor(COLOR_STADIUM_NIGHT);
   setCameraPos(vec2(PITCH_CENTER_X, CAMERA_CENTER_Y));
   setCameraScale(CAMERA_SCALE);
@@ -193,7 +198,8 @@ export function gameInit() {
   Dive.visualPose = cloneDiveVisualPose();
   Dive.canTrigger = true;
   Match.state = createMatchState();
-  Match.plan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: Match.state.totalShots });
+  Match.shotPlanSeed = options.shotPlanSeed ?? createRuntimeShotPlanSeed();
+  Match.plan = createShotPlan(Match.shotPlanSeed, { totalShots: Match.state.totalShots });
   Ball.saves = 0;
   Ball.conceded = 0;
   Ball.lastSaveResult = null;

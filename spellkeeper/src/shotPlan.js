@@ -2,6 +2,12 @@ const DEFAULT_SHOT_PLAN_TOTAL_SHOTS = 30;
 export const DEFAULT_SHOT_PLAN_SEED = 'spellkeeper-default-shot-plan';
 
 const SHOT_PLAN_REQUIRED_HEXES = ['standard', 'curve', 'fireball', 'heavy'];
+const SHOT_PLAN_HEX_COUNT_RANGES = {
+  standard: { min: 8, max: 10 },
+  curve: { min: 7, max: 9 },
+  fireball: { min: 6, max: 8 },
+  heavy: { min: 4, max: 6 },
+};
 const SHOT_PLAN_DIFFICULTY_BANDS = {
   readable: 'readable variety',
   mixed: 'mixed pressure',
@@ -226,6 +232,10 @@ function buildShotEntry({ index, shot, designer }) {
   };
 }
 
+function createPlanId(seedText) {
+  return `shot-plan-${hashSeed(seedText).toString(36)}`;
+}
+
 function cloneShot(shot) {
   return {
     ...shot,
@@ -279,7 +289,7 @@ function createShotCoordinates(template, rng, jitterAmount = 1) {
   };
 }
 
-function createShotTemplateEntry(template, index, band, rng, jitterAmount = 1) {
+function createShotTemplateEntry(template, index, band, rng, planId, jitterAmount = 1) {
   const coordinates = createShotCoordinates(template.shot, rng, jitterAmount);
   const shot = {
     hex: template.shot.hex,
@@ -301,6 +311,7 @@ function createShotTemplateEntry(template, index, band, rng, jitterAmount = 1) {
       label: template.designer.label,
       difficultyBand: band,
       pressureTags: [...template.designer.pressureTags, coordinates.originLane, coordinates.targetLane, coordinates.placementHeight],
+      planId,
       originLane: coordinates.originLane,
       targetLane: coordinates.targetLane,
       placementHeight: coordinates.placementHeight,
@@ -309,7 +320,7 @@ function createShotTemplateEntry(template, index, band, rng, jitterAmount = 1) {
   });
 }
 
-function createFixedOpenerEntry(template, index) {
+function createFixedOpenerEntry(template, index, planId) {
   const coordinates = createShotCoordinates(template.shot, createRng(`${template.designer.label}-${index}`), 0);
   const shot = {
     hex: template.shot.hex,
@@ -329,6 +340,7 @@ function createFixedOpenerEntry(template, index) {
     shot,
     designer: {
       ...cloneDesigner(template.designer),
+      planId,
       originLane: coordinates.originLane,
       targetLane: coordinates.targetLane,
       placementHeight: coordinates.placementHeight,
@@ -404,8 +416,17 @@ export function getCandidateSelectionWeight(candidate, plan, band) {
   return 0.9;
 }
 
-function pickWeightedCandidate(candidates, plan, band, rng) {
-  const weights = candidates.map((candidate) => getCandidateSelectionWeight(candidate, plan, band));
+function getDistributionWeight(candidate, hexCounts, hexCountTarget) {
+  if (!hexCountTarget) return 1;
+
+  const remainingForHex = hexCountTarget[candidate.shot.hex] - (hexCounts.get(candidate.shot.hex) ?? 0);
+  return Math.max(0.1, remainingForHex);
+}
+
+function pickWeightedCandidate(candidates, plan, band, rng, hexCounts, hexCountTarget) {
+  const weights = candidates.map((candidate) => (
+    getCandidateSelectionWeight(candidate, plan, band) * getDistributionWeight(candidate, hexCounts, hexCountTarget)
+  ));
   const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
   let roll = rng() * totalWeight;
 
@@ -457,17 +478,47 @@ function phaseIndexForBand(band) {
   return 2;
 }
 
-export function createShotPlan(seed, rules = {}) {
-  const normalizedSeed = normalizeSeed(seed);
-  const { totalShots } = normalizeRules(rules);
-  const rng = createRng(normalizedSeed);
+function createHexCountTarget(totalShots, rng) {
+  if (totalShots !== DEFAULT_SHOT_PLAN_TOTAL_SHOTS) return null;
+
+  const validTargets = [];
+  for (let standard = SHOT_PLAN_HEX_COUNT_RANGES.standard.min; standard <= SHOT_PLAN_HEX_COUNT_RANGES.standard.max; standard += 1) {
+    for (let curve = SHOT_PLAN_HEX_COUNT_RANGES.curve.min; curve <= SHOT_PLAN_HEX_COUNT_RANGES.curve.max; curve += 1) {
+      for (let fireball = SHOT_PLAN_HEX_COUNT_RANGES.fireball.min; fireball <= SHOT_PLAN_HEX_COUNT_RANGES.fireball.max; fireball += 1) {
+        for (let heavy = SHOT_PLAN_HEX_COUNT_RANGES.heavy.min; heavy <= SHOT_PLAN_HEX_COUNT_RANGES.heavy.max; heavy += 1) {
+          if (standard + curve + fireball + heavy !== totalShots) continue;
+          if (heavy >= standard || heavy >= curve || heavy >= fireball) continue;
+          validTargets.push({ standard, curve, fireball, heavy });
+        }
+      }
+    }
+  }
+
+  if (validTargets.length === 0) {
+    throw new Error(`Shot plan distribution has no valid target for ${totalShots} shots`);
+  }
+
+  return validTargets[Math.floor(rng() * validTargets.length)];
+}
+
+function candidateFitsDistribution(candidate, hexCounts, hexCountTarget) {
+  if (!hexCountTarget) return true;
+
+  return (hexCounts.get(candidate.shot.hex) ?? 0) < hexCountTarget[candidate.shot.hex];
+}
+
+function generateShotPlanAttempt(normalizedSeed, totalShots, attempt) {
+  const generationSeed = attempt === 0 ? normalizedSeed : `${normalizedSeed}:fallback-${attempt}`;
+  const rng = createRng(generationSeed);
+  const planId = createPlanId(normalizedSeed);
+  const hexCountTarget = createHexCountTarget(totalShots, rng);
   const plan = [];
   const hexCounts = new Map(SHOT_PLAN_REQUIRED_HEXES.map((hex) => [hex, 0]));
 
   for (let index = 0; index < totalShots; index += 1) {
     if (index < FIXED_OPENER_SHOTS.length) {
       const opener = FIXED_OPENER_SHOTS[index];
-      const openerEntry = createFixedOpenerEntry(opener, index);
+      const openerEntry = createFixedOpenerEntry(opener, index, planId);
       openerEntry.designer.opener = true;
       plan.push(openerEntry);
       hexCounts.set(openerEntry.shot.hex, (hexCounts.get(openerEntry.shot.hex) ?? 0) + 1);
@@ -478,16 +529,17 @@ export function createShotPlan(seed, rules = {}) {
     const pool = SHOT_PHASE_POOLS[phaseIndexForBand(band)];
     const remainingSlots = totalShots - index;
     const missingHexes = SHOT_PLAN_REQUIRED_HEXES.filter((hex) => (hexCounts.get(hex) ?? 0) === 0);
-    const forcedHex = missingHexes.length > 0 && remainingSlots <= missingHexes.length
+    const forcedHex = !hexCountTarget && missingHexes.length > 0 && remainingSlots <= missingHexes.length
       ? missingHexes[0]
       : null;
-    const candidates = forcedHex ? pool.filter((template) => template.shot.hex === forcedHex) : pool;
+    const candidates = (forcedHex ? pool.filter((template) => template.shot.hex === forcedHex) : pool)
+      .filter((template) => candidateFitsDistribution(template, hexCounts, hexCountTarget));
 
     let template = null;
     const retries = Math.max(6, candidates.length);
     for (let attempt = 0; attempt < retries && !template; attempt += 1) {
-      const candidate = pickWeightedCandidate(candidates, plan, band, rng);
-      const generated = createShotTemplateEntry(candidate, index, band, rng);
+      const candidate = pickWeightedCandidate(candidates, plan, band, rng, hexCounts, hexCountTarget);
+      const generated = createShotTemplateEntry(candidate, index, band, rng, planId);
       if (isCandidateValid(generated, plan, band)) {
         template = candidate;
         plan.push(generated);
@@ -497,7 +549,7 @@ export function createShotPlan(seed, rules = {}) {
 
     if (!template) {
       for (const fallbackCandidate of candidates) {
-        const generated = createShotTemplateEntry(fallbackCandidate, index, band, rng);
+        const generated = createShotTemplateEntry(fallbackCandidate, index, band, rng, planId);
         if (isCandidateValid(generated, plan, band)) {
           plan.push(generated);
           hexCounts.set(generated.shot.hex, (hexCounts.get(generated.shot.hex) ?? 0) + 1);
@@ -508,11 +560,24 @@ export function createShotPlan(seed, rules = {}) {
     }
 
     if (!template) {
-      throw new Error(`Shot plan generation failed at index ${index} for band ${band}`);
+      return null;
     }
   }
 
   return plan;
+}
+
+export function createShotPlan(seed, rules = {}) {
+  const normalizedSeed = normalizeSeed(seed);
+  const { totalShots } = normalizeRules(rules);
+  const attempts = 24;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const plan = generateShotPlanAttempt(normalizedSeed, totalShots, attempt);
+    if (plan) return plan;
+  }
+
+  throw new Error(`Shot plan generation failed after ${attempts} attempts`);
 }
 
 export function describeShotPlan(plan) {

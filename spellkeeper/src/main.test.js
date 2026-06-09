@@ -190,7 +190,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         const { gameInit, updateBallShot, getBallPose, getMatchState } = await import('./main.js');
         const plan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
 
-        gameInit();
+        gameInit({ shotPlanSeed: DEFAULT_SHOT_PLAN_SEED });
 
         const first = getBallPose();
         expect(first.hex).toBe(plan[0].shot.hex);
@@ -212,7 +212,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         const { gameInit, getMatchState, getShotPlanDebugInfo } = await import('./main.js');
         const expected = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
 
-        gameInit();
+        gameInit({ shotPlanSeed: DEFAULT_SHOT_PLAN_SEED });
 
         const debugPlan = getShotPlanDebugInfo();
 
@@ -223,6 +223,28 @@ describe('Spell Keeper basic gameplay scene', () => {
         debugPlan[0].designer.pressureTags.push('mutated');
         expect(getShotPlanDebugInfo()[0].designer.pressureTags).not.toContain('mutated');
         expect(getMatchState().shotsTaken).toBe(0);
+    });
+
+    it('uses runtime randomness only to choose the default match seed', async () => {
+        const { gameInit, getShotPlanDebugInfo } = await import('./main.js');
+
+        vi.spyOn(Date, 'now')
+            .mockReturnValueOnce(1000)
+            .mockReturnValueOnce(2000);
+        vi.spyOn(Math, 'random')
+            .mockReturnValueOnce(0.123456789)
+            .mockReturnValueOnce(0.987654321);
+
+        gameInit();
+        const firstPlan = getShotPlanDebugInfo();
+        gameInit();
+        const secondPlan = getShotPlanDebugInfo();
+
+        expect(firstPlan[0].designer.planId).toBeTypeOf('string');
+        expect(firstPlan[0].designer.planId).not.toBe(secondPlan[0].designer.planId);
+        expect(firstPlan).not.toEqual(secondPlan);
+
+        vi.restoreAllMocks();
     });
 
     it('resolves a goal-plane overlap as a save when the shot crosses', async () => {
