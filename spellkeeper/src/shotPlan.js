@@ -31,7 +31,7 @@ const TARGET_LANES = {
 
 const PLACEMENT_HEIGHT_ZONES = {
   low: { key: 'low', y: -3.95 },
-  mid: { key: 'mid', y: -3.35 },
+  middle: { key: 'middle', y: -3.35 },
   high: { key: 'high', y: -2.9 },
 };
 const OUTER_LANES = new Set(['outer-left', 'outer-right']);
@@ -56,7 +56,7 @@ const FIXED_OPENER_SHOTS = [
       hex: 'standard',
       originLane: 'innerRight',
       targetLane: 'innerRight',
-      placementHeight: 'mid',
+      placementHeight: 'middle',
     },
     designer: {
       label: 'low corner read',
@@ -86,15 +86,15 @@ const SHOT_PHASE_POOLS = [
       designer: { label: 'build left lane', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['lane', 'read'] },
     },
     {
-      shot: { hex: 'standard', originLane: 'innerRight', targetLane: 'innerRight', placementHeight: 'mid' },
+      shot: { hex: 'standard', originLane: 'innerRight', targetLane: 'innerRight', placementHeight: 'middle' },
       designer: { label: 'build right lane', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['lane', 'read'] },
     },
     {
-      shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'innerLeft', placementHeight: 'mid', curveDirection: 1 },
+      shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'innerLeft', placementHeight: 'middle', curveDirection: 1 },
       designer: { label: 'gentle left curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['curve', 'shape'] },
     },
     {
-      shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'innerRight', placementHeight: 'mid', curveDirection: -1 },
+      shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'innerRight', placementHeight: 'middle', curveDirection: -1 },
       designer: { label: 'gentle right curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['curve', 'shape'] },
     },
     {
@@ -116,11 +116,11 @@ const SHOT_PHASE_POOLS = [
       designer: { label: 'pressure right high', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['wide', 'high'] },
     },
     {
-      shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'innerRight', placementHeight: 'mid', curveDirection: 1 },
+      shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'innerRight', placementHeight: 'middle', curveDirection: 1 },
       designer: { label: 'sweeping left curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['curve', 'switch'] },
     },
     {
-      shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'innerLeft', placementHeight: 'mid', curveDirection: -1 },
+      shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'innerLeft', placementHeight: 'middle', curveDirection: -1 },
       designer: { label: 'sweeping right curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['curve', 'switch'] },
     },
     {
@@ -142,11 +142,11 @@ const SHOT_PHASE_POOLS = [
       designer: { label: 'clutch right squeeze', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['corner', 'late'] },
     },
     {
-      shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'outerRight', placementHeight: 'mid', curveDirection: 1 },
+      shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'outerRight', placementHeight: 'middle', curveDirection: 1 },
       designer: { label: 'late curve switch', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['curve', 'switch'] },
     },
     {
-      shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'outerLeft', placementHeight: 'mid', curveDirection: -1 },
+      shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'outerLeft', placementHeight: 'middle', curveDirection: -1 },
       designer: { label: 'late curve reverse', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['curve', 'switch'] },
     },
     {
