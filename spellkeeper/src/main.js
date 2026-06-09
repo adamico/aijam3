@@ -16,10 +16,13 @@ import {
   shouldTriggerDive,
   startDive,
 } from './diveState.js';
-import { advanceShot, createShot } from './shotTrajectory.js';
 import { DEFAULT_SHOT_PLAN_SEED, createShotPlan, describeShotPlan } from './shotPlan.js';
-import { resolveCrossingSave } from './saveResolver.js';
 import { createMatchState, isMatchComplete, recordShotResult } from './matchState.js';
+import {
+  advanceShotRuntime,
+  createShotRuntime,
+  queueNextShot,
+} from './shotRuntime.js';
 
 // Helper to convert hex to LittleJS Color
 const c = (hex) => new Color().setHex(hex);
@@ -171,6 +174,7 @@ const Ball = {
   feedbackTimer: 0,
   saves: 0,
   conceded: 0,
+  runtime: null,
 };
 
 // --- Camera & Projection Constants ---
@@ -189,6 +193,53 @@ function resetFamiliarPose() {
   Familiar.rightHand = vec2(PITCH_CENTER_X + FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y);
 }
 
+function cloneRuntimeShotSample(sample) {
+  if (!sample) return null;
+
+  return {
+    ...sample,
+    shadow: sample.shadow ? { ...sample.shadow } : null,
+    saveResult: sample.saveResult ? { ...sample.saveResult } : null,
+  };
+}
+
+function syncBallFromRuntime(runtime) {
+  if (!runtime) return;
+
+  Ball.runtime = runtime;
+  Ball.shot = runtime.activeShot ? {
+    ...runtime.activeShot,
+    start: { ...runtime.activeShot.start },
+    target: { ...runtime.activeShot.target },
+    sample: cloneRuntimeShotSample(runtime.activeShot.sample),
+  } : null;
+
+  const sample = runtime.activeShot?.sample;
+  if (sample) {
+    applyShotSample(sample);
+  }
+
+  Ball.shotIndex = runtime.activeShotIndex;
+  Ball.respawnTimer = runtime.respawnTimer ?? 0;
+  Ball.feedbackTimer = runtime.feedback?.timer ?? 0;
+  Ball.lastSaveResult = runtime.feedback?.lastResult ? { ...runtime.feedback.lastResult } : null;
+}
+
+function createBallRuntime() {
+  return createShotRuntime({
+    shotPlan: Match.plan,
+    shotDimensions: {
+      maxZ: BALL_MAX_Z,
+      groundY: GROUND_Y,
+      radius: BALL_RADIUS,
+    },
+    shotTiming: {
+      respawnDelay: SHOT_RESPAWN_DELAY,
+      feedbackDuration: SAVE_FEEDBACK_DURATION,
+    },
+  });
+}
+
 export function gameInit(options = {}) {
   setCanvasClearColor(COLOR_STADIUM_NIGHT);
   setCameraPos(vec2(PITCH_CENTER_X, CAMERA_CENTER_Y));
@@ -200,11 +251,12 @@ export function gameInit(options = {}) {
   Match.state = createMatchState();
   Match.shotPlanSeed = options.shotPlanSeed ?? createRuntimeShotPlanSeed();
   Match.plan = createShotPlan(Match.shotPlanSeed, { totalShots: Match.state.totalShots });
+  Ball.runtime = createBallRuntime();
   Ball.saves = 0;
   Ball.conceded = 0;
   Ball.lastSaveResult = null;
   Ball.feedbackTimer = 0;
-  spawnShot(0);
+  syncBallFromRuntime(Ball.runtime);
 }
 
 export function gameUpdate() {
@@ -224,20 +276,16 @@ export function goalPlaneFromProjectedMouse(projectedMousePos) {
 }
 
 export function spawnShot(index = Ball.shotIndex) {
-  const shotEntry = Match.plan[index];
-  if (!shotEntry) {
+  Ball.runtime = createBallRuntime();
+  for (let shotIndex = 0; shotIndex < index; shotIndex += 1) {
+    Ball.runtime = queueNextShot(Ball.runtime);
+  }
+
+  if (Ball.runtime.activeShotIndex !== index) {
     throw new Error(`Shot plan entry missing for shot index: ${index}`);
   }
 
-  Ball.shotIndex = index;
-  Ball.shot = createShot({
-    ...shotEntry.shot,
-    maxZ: BALL_MAX_Z,
-    groundY: GROUND_Y,
-    radius: BALL_RADIUS,
-  });
-  Ball.respawnTimer = 0;
-  applyShotSample(advanceShot(Ball.shot, 0).sample);
+  syncBallFromRuntime(Ball.runtime);
   return Ball.shot;
 }
 
@@ -262,36 +310,21 @@ export function applyMatchShotOutcome(outcome) {
 }
 
 export function updateBallShot(dt = 1 / 60) {
-  if (!Ball.shot) spawnShot(0);
-
-  if (Ball.feedbackTimer > 0) {
-    Ball.feedbackTimer = Math.max(0, Ball.feedbackTimer - dt);
-  }
+  if (!Ball.runtime) spawnShot(0);
 
   if (isMatchComplete(Match.state)) return getBallPose();
 
-  if (Ball.respawnTimer > 0) {
-    Ball.respawnTimer = Math.max(0, Ball.respawnTimer - dt);
-    if (Ball.respawnTimer === 0 && !isMatchComplete(Match.state)) spawnShot(Ball.shotIndex);
-    return getBallPose();
-  }
+  const { runtime, events } = advanceShotRuntime(Ball.runtime, {
+    dt,
+    saveSegments: getFamiliarSaveSegments(),
+  });
+  syncBallFromRuntime(runtime);
 
-  const previousZ = Ball.z;
-  Ball.shot = advanceShot(Ball.shot, dt);
-  applyShotSample(Ball.shot.sample);
+  for (const event of events) {
+    if (event.type !== 'shot-resolved') continue;
 
-  if (Ball.shot.sample.isComplete) {
-    Ball.lastSaveResult = resolveCrossingSave({
-      previousZ,
-      currentZ: Ball.z,
-      ball: { x: Ball.x, y: Ball.y, radius: Ball.radius },
-      segments: getFamiliarSaveSegments(),
-    });
-
-    applyMatchShotOutcome(Ball.lastSaveResult.outcome);
-
-    Ball.shotIndex = Match.state.shotsTaken;
-    Ball.respawnTimer = isMatchComplete(Match.state) ? 0 : SHOT_RESPAWN_DELAY;
+    applyMatchShotOutcome(event.result.outcome);
+    Ball.lastSaveResult = { ...event.result };
   }
 
   return getBallPose();

@@ -1,4 +1,5 @@
 import { advanceShot, createShot } from './shotTrajectory.js';
+import { resolveCrossingSave } from './saveResolver.js';
 
 export const DEFAULT_SHOT_RUNTIME_DIMENSIONS = {
   maxZ: 11,
@@ -51,6 +52,18 @@ function cloneFeedbackState(feedback) {
   return {
     ...feedback,
     lastResult: feedback.lastResult ? { ...feedback.lastResult } : null,
+  };
+}
+
+function cloneRuntime(runtime) {
+  return {
+    ...runtime,
+    plan: runtime.plan.map(clonePlanEntry),
+    shotDimensions: { ...runtime.shotDimensions },
+    shotTiming: { ...runtime.shotTiming },
+    activeShotEntry: runtime.activeShotEntry ? clonePlanEntry(runtime.activeShotEntry) : null,
+    activeShot: runtime.activeShot ? cloneShot(runtime.activeShot) : null,
+    feedback: cloneFeedbackState(runtime.feedback),
   };
 }
 
@@ -121,6 +134,7 @@ function spawnShotEntry(state, index) {
     activeShotIndex: index,
     activeShotEntry: clonePlanEntry(entry),
     activeShot: cloneShot(activeShot),
+    respawnTimer: 0,
   };
 }
 
@@ -137,6 +151,7 @@ export function createShotRuntime({
     activeShotIndex: 0,
     activeShotEntry: null,
     activeShot: null,
+    respawnTimer: 0,
     feedback: {
       lastResult: null,
       timer: 0,
@@ -146,14 +161,88 @@ export function createShotRuntime({
   return spawnShotEntry(state, 0);
 }
 
-export function advanceShotRuntime(runtime, dt = 1 / 60) {
-  if (!runtime?.activeShot) return runtime;
+function spawnNextShot(runtime) {
+  const nextIndex = runtime.activeShotIndex + 1;
+  if (nextIndex >= runtime.plan.length) {
+    return runtime;
+  }
 
-  const advancedShot = advanceShot(runtime.activeShot, Math.max(0, dt));
-  return {
-    ...runtime,
-    activeShot: cloneShot(advancedShot),
-  };
+  return spawnShotEntry(runtime, nextIndex);
+}
+
+export function advanceShotRuntime(runtime, {
+  dt = 1 / 60,
+  saveSegments = [],
+  resolveSave = resolveCrossingSave,
+} = {}) {
+  if (!runtime) {
+    return { runtime, events: [] };
+  }
+
+  const step = Math.max(0, dt);
+  const nextRuntime = cloneRuntime(runtime);
+  const events = [];
+
+  if (nextRuntime.feedback.timer > 0) {
+    nextRuntime.feedback.timer = Math.max(0, nextRuntime.feedback.timer - step);
+  }
+
+  if (nextRuntime.respawnTimer > 0) {
+    nextRuntime.respawnTimer = Math.max(0, nextRuntime.respawnTimer - step);
+    if (nextRuntime.respawnTimer === 0) {
+      return {
+        runtime: spawnNextShot(nextRuntime),
+        events,
+      };
+    }
+
+    return { runtime: nextRuntime, events };
+  }
+
+  if (!nextRuntime.activeShot) {
+    return { runtime: nextRuntime, events };
+  }
+
+  const previousZ = nextRuntime.activeShot.sample?.z ?? nextRuntime.activeShot.start?.z ?? nextRuntime.activeShot.maxZ;
+  const advancedShot = advanceShot(nextRuntime.activeShot, step);
+
+  nextRuntime.activeShot = cloneShot(advancedShot);
+  nextRuntime.activeShotEntry = nextRuntime.activeShotEntry
+    ? clonePlanEntry(nextRuntime.activeShotEntry)
+    : nextRuntime.plan[nextRuntime.activeShotIndex]
+      ? clonePlanEntry(nextRuntime.plan[nextRuntime.activeShotIndex])
+      : null;
+
+  if (advancedShot.sample?.isComplete) {
+    const result = resolveSave({
+      previousZ,
+      currentZ: advancedShot.sample.z,
+      ball: {
+        x: advancedShot.sample.x,
+        y: advancedShot.sample.y,
+        radius: advancedShot.sample.radius,
+      },
+      segments: saveSegments,
+    });
+
+    nextRuntime.activeShot.sample = {
+      ...nextRuntime.activeShot.sample,
+      saveResult: { ...result },
+    };
+    nextRuntime.feedback = {
+      lastResult: { ...result },
+      timer: nextRuntime.shotTiming.feedbackDuration,
+    };
+    nextRuntime.respawnTimer = nextRuntime.shotTiming.respawnDelay;
+
+    events.push({
+      type: 'shot-resolved',
+      shotIndex: nextRuntime.activeShotIndex,
+      result: { ...result },
+    });
+  }
+
+  return { runtime: nextRuntime, events };
 }
 
 export function recordShotRuntimeFeedback(runtime, result) {
@@ -171,14 +260,7 @@ export function recordShotRuntimeFeedback(runtime, result) {
 export function queueNextShot(runtime) {
   if (!runtime) return runtime;
 
-  const nextIndex = runtime.activeShotIndex + 1;
-  if (nextIndex >= runtime.plan.length) {
-    return runtime;
-  }
-
-  return {
-    ...spawnShotEntry(runtime, nextIndex),
-  };
+  return spawnNextShot(cloneRuntime(runtime));
 }
 
 export function getActiveShot(runtime) {
