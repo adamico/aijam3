@@ -1,4 +1,5 @@
 import { vi, describe, it, expect } from 'vitest';
+import { DEFAULT_SHOT_PLAN_SEED, createShotPlan } from './shotPlan.js';
 
 // Mock littlejsengine BEFORE importing main.js
 vi.mock('littlejsengine', () => {
@@ -185,20 +186,26 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(getDiveState().status).toBe('idle');
     });
 
-    it('updates the active shot with orthographic size and ground shadow cues', async () => {
-        const { spawnShot, updateBallShot, getBallPose } = await import('./main.js');
+    it('spawns shots from the current match plan and advances to the next index after each resolution', async () => {
+        const { gameInit, updateBallShot, getBallPose, getMatchState } = await import('./main.js');
+        const plan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
 
-        spawnShot(0);
-        const start = getBallPose();
-        updateBallShot(0.5);
-        const later = getBallPose();
+        gameInit();
 
-        expect(later.z).toBeLessThan(start.z);
-        expect(later.scale).toBe(start.scale);
-        expect(later.y).toBeGreaterThan(start.y);
-        expect(later.shadow.y).toBe(-5);
-        expect(later.shadow.opacity).toBeLessThan(start.shadow.opacity);
-        expect(later.hex).toBe('standard');
+        const first = getBallPose();
+        expect(first.hex).toBe(plan[0].shot.hex);
+        expect(first.x).toBeCloseTo(plan[0].shot.start.x, 5);
+        expect(first.y).toBeCloseTo(plan[0].shot.start.y, 5);
+        expect(getMatchState().shotsTaken).toBe(0);
+
+        updateBallShot(999);
+        expect(getMatchState().shotsTaken).toBe(1);
+
+        updateBallShot(0.35);
+        const second = getBallPose();
+        expect(second.hex).toBe(plan[1].shot.hex);
+        expect(second.x).toBeCloseTo(plan[1].shot.start.x, 5);
+        expect(second.y).toBeCloseTo(plan[1].shot.start.y, 5);
     });
 
     it('resolves a goal-plane overlap as a save when the shot crosses', async () => {
