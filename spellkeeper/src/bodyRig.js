@@ -1,9 +1,5 @@
 const DEFAULT_EPSILON = 1e-6;
 
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
 function clampStep(current, target, maxDelta) {
   const delta = target - current;
   if (Math.abs(delta) <= maxDelta) return target;
@@ -50,7 +46,7 @@ export function solveTorsoDrag({
   }
 
   const desiredTorsoX = reachableMin <= reachableMax
-    ? clamp(torso.x, reachableMin, reachableMax)
+    ? Math.clamp(torso.x, reachableMin, reachableMax)
     : (reachableMin + reachableMax) / 2;
   const maxDelta = maxSpeed * dt;
   const nextTorsoX = clampStep(torso.x, desiredTorsoX, maxDelta);

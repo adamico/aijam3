@@ -1,15 +1,11 @@
 const DEFAULT_EPSILON = 1e-6;
 
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
 function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
 function easeOutCubic(t) {
-  const clamped = clamp(t, 0, 1);
+  const clamped = Math.clamp(t, 0, 1);
   return 1 - Math.pow(1 - clamped, 3);
 }
 
@@ -129,7 +125,7 @@ export function createDiveState(config = DEFAULT_DIVE_CONFIG) {
 }
 
 function sampleDivePose(elapsed, duration, config) {
-  const progress = duration <= DEFAULT_EPSILON ? 1 : clamp(elapsed / duration, 0, 1);
+  const progress = duration <= DEFAULT_EPSILON ? 1 : Math.clamp(elapsed / duration, 0, 1);
   const commitStart = config.poseEasing.windup;
   const recoveryStart = config.poseEasing.windup + config.poseEasing.commit;
 

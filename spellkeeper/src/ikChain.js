@@ -1,9 +1,5 @@
 const DEFAULT_EPSILON = 1e-6;
 
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
-
 function normalize(vector, fallback = { x: 1, y: 0 }, epsilon = DEFAULT_EPSILON) {
   const length = Math.hypot(vector.x, vector.y);
   if (length <= epsilon) return { x: fallback.x, y: fallback.y };
@@ -64,7 +60,7 @@ export function solveIkChain({
   }
 
   const safeDistance = Math.max(handDistance, epsilon);
-  const cosShoulder = clamp(
+  const cosShoulder = Math.clamp(
     (upperLength ** 2 + safeDistance ** 2 - lowerLength ** 2) / (2 * upperLength * safeDistance),
     -1,
     1,
