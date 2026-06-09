@@ -6,4 +6,7 @@ export default defineConfig({
     // (GitHub Pages project sites, itch.io uploads, etc.). Set to '/' if
     // deploying to a domain root.
     base: './',
+    test: {
+        setupFiles: './src/test/setupLittlejs.js',
+    },
 });

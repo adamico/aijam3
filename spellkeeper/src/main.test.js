@@ -24,6 +24,7 @@ vi.mock('littlejsengine', () => {
         }
     }
     return {
+        clamp: (value, min = 0, max = 1) => (value < min ? min : value > max ? max : value),
         engineInit: vi.fn(),
         mousePos: new MockVector2(0, 0),
         timeDelta: 1 / 60,

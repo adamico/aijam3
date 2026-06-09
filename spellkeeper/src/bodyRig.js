@@ -1,3 +1,5 @@
+import { clamp } from 'littlejsengine';
+
 const DEFAULT_EPSILON = 1e-6;
 
 function clampStep(current, target, maxDelta) {
@@ -46,7 +48,7 @@ export function solveTorsoDrag({
   }
 
   const desiredTorsoX = reachableMin <= reachableMax
-    ? Math.clamp(torso.x, reachableMin, reachableMax)
+    ? clamp(torso.x, reachableMin, reachableMax)
     : (reachableMin + reachableMax) / 2;
   const maxDelta = maxSpeed * dt;
   const nextTorsoX = clampStep(torso.x, desiredTorsoX, maxDelta);

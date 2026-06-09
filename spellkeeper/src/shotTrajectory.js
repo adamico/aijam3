@@ -1,3 +1,5 @@
+import { clamp } from 'littlejsengine';
+
 const DEFAULT_EPSILON = 1e-6;
 
 function lerp(a, b, t) {
@@ -104,7 +106,7 @@ export function createShot({
 }
 
 export function sampleShot(shot, elapsed) {
-  const progress = Math.clamp(elapsed / Math.max(shot.spec.duration, DEFAULT_EPSILON), 0, 1);
+  const progress = clamp(elapsed / Math.max(shot.spec.duration, DEFAULT_EPSILON), 0, 1);
   const baseX = lerp(shot.start.x, shot.target.x, progress);
   const baseY = lerp(shot.start.y, shot.target.y, progress);
   const arc = Math.sin(progress * Math.PI) * shot.spec.arcHeight;
@@ -125,8 +127,8 @@ export function sampleShot(shot, elapsed) {
     shadow: {
       x: baseX + curve,
       y: shot.groundY,
-      scale: scale * Math.clamp(1.2 - heightAboveGround * 0.12, 0.55, 1.1),
-      opacity: Math.clamp(0.28 - heightAboveGround * 0.035, 0.08, 0.28),
+      scale: scale * clamp(1.2 - heightAboveGround * 0.12, 0.55, 1.1),
+      opacity: clamp(0.28 - heightAboveGround * 0.035, 0.08, 0.28),
     },
   };
 }

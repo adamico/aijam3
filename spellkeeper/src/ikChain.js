@@ -1,3 +1,5 @@
+import { clamp } from 'littlejsengine';
+
 const DEFAULT_EPSILON = 1e-6;
 
 function normalize(vector, fallback = { x: 1, y: 0 }, epsilon = DEFAULT_EPSILON) {
@@ -60,7 +62,7 @@ export function solveIkChain({
   }
 
   const safeDistance = Math.max(handDistance, epsilon);
-  const cosShoulder = Math.clamp(
+  const cosShoulder = clamp(
     (upperLength ** 2 + safeDistance ** 2 - lowerLength ** 2) / (2 * upperLength * safeDistance),
     -1,
     1,
