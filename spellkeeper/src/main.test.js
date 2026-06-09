@@ -208,6 +208,67 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(second.y).toBeCloseTo(plan[1].shot.start.y, 5);
     });
 
+    it('keeps shot lifecycle, aggregate counts, and score ownership separated through public orchestration', async () => {
+        const {
+            applyKeeperHandIk,
+            applyMatchShotOutcome,
+            gameInit,
+            getBallPose,
+            getMatchState,
+            getSaveState,
+            updateBallShot,
+        } = await import('./main.js');
+        const plan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
+
+        gameInit({ shotPlanSeed: DEFAULT_SHOT_PLAN_SEED });
+
+        const firstShot = getBallPose();
+        expect(firstShot.hex).toBe(plan[0].shot.hex);
+        expect(firstShot.x).toBeCloseTo(plan[0].shot.start.x, 5);
+        expect(firstShot.y).toBeCloseTo(plan[0].shot.start.y, 5);
+
+        applyKeeperHandIk({ x: -1.2, y: -3.7 });
+        updateBallShot(999);
+
+        expect(getSaveState()).toMatchObject({
+            saves: 1,
+            conceded: 0,
+            lastResult: {
+                outcome: 'save',
+                crossedGoalPlane: true,
+            },
+        });
+        expect(getMatchState()).toMatchObject({
+            shotsTaken: 1,
+            saves: 1,
+            conceded: 0,
+            ongoingScore: 100,
+            score: 0,
+        });
+
+        updateBallShot(0.35);
+
+        expect(getBallPose().hex).toBe(plan[1].shot.hex);
+        expect(getSaveState()).toMatchObject({
+            saves: 1,
+            conceded: 0,
+        });
+
+        applyMatchShotOutcome('conceded');
+
+        expect(getSaveState()).toMatchObject({
+            saves: 1,
+            conceded: 1,
+        });
+        expect(getMatchState()).toMatchObject({
+            shotsTaken: 2,
+            saves: 1,
+            conceded: 1,
+            ongoingScore: 100,
+            score: 0,
+        });
+    });
+
     it('exposes the active shot plan through a debug snapshot without rendering', async () => {
         const { gameInit, getMatchState, getShotPlanDebugInfo } = await import('./main.js');
         const expected = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
@@ -274,7 +335,7 @@ describe('Spell Keeper basic gameplay scene', () => {
 
     it('ends the match and renders a final score after 5 concessions', async () => {
         const engine = await import('littlejsengine');
-        const { gameInit, gameRenderPost, applyMatchShotOutcome, getMatchState } = await import('./main.js');
+        const { gameInit, gameRenderPost, applyMatchShotOutcome, getBallPose, getMatchState, updateBallShot } = await import('./main.js');
 
         gameInit();
         applyMatchShotOutcome('conceded');
@@ -283,11 +344,15 @@ describe('Spell Keeper basic gameplay scene', () => {
         applyMatchShotOutcome('conceded');
         applyMatchShotOutcome('conceded');
         const match = getMatchState();
+        const finalShot = getBallPose();
 
         expect(match.status).toBe('lost');
         expect(match.conceded).toBe(5);
         expect(match.shotsTaken).toBe(5);
         expect(match.score).toBe(0);
+
+        updateBallShot(1);
+        expect(getBallPose()).toEqual(finalShot);
 
         gameRenderPost();
         expect(engine.drawTextScreen).toHaveBeenCalledWith(
