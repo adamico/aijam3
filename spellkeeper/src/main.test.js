@@ -287,10 +287,13 @@ describe('Spell Keeper basic gameplay scene', () => {
             },
             summary: {
                 outcome: 'saved',
+                isSave: true,
+                isSaved: true,
                 saveQuality: 'clean-save',
                 scoreDelta: 100,
                 isCleanSave: true,
                 isDeflection: false,
+                isConcession: false,
             },
         });
         expect(getMatchState()).toMatchObject({
@@ -317,6 +320,13 @@ describe('Spell Keeper basic gameplay scene', () => {
             saves: 1,
             deflections: 0,
             conceded: 1,
+            summary: {
+                outcome: 'conceded',
+                isSave: false,
+                isSaved: false,
+                isDeflection: false,
+                isConcession: true,
+            },
         });
         expect(getMatchState()).toMatchObject({
             shotsTaken: 2,

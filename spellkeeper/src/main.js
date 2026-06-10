@@ -327,6 +327,8 @@ export function getShotResolutionSummary() {
 
   return {
     outcome: canonicalOutcome,
+    isSave: Boolean(result.isSave ?? canonicalOutcome === 'saved'),
+    isSaved: Boolean(result.isSaved ?? canonicalOutcome === 'saved'),
     saveQuality: result.saveQuality ?? (
       canonicalOutcome === 'saved'
         ? 'clean-save'
