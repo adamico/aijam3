@@ -3,7 +3,8 @@ import {
   vec2, setCameraPos, setCameraScale,
   drawLine, drawCircle, drawTextScreen,
   rgb, Color, setCanvasClearColor,
-  mousePos, timeDelta, mainCanvasSize
+  mousePos, timeDelta, mainCanvasSize,
+  setCanvasMaxAspect, setCanvasMaxSize, setCanvasMinAspect
 } from 'littlejsengine';
 import { solveIkChain } from './ikChain.js';
 import { solveTorsoDrag } from './bodyRig.js';
@@ -151,6 +152,20 @@ function cloneDiveVisualPose(pose = EMPTY_DIVE_VISUAL_POSE) {
   };
 }
 
+const RESPONSIVE_CANVAS_ASPECT_RATIO = 16 / 9;
+const RESPONSIVE_CANVAS_MAX_SIZE = vec2(3840, 2160);
+
+function configureResponsiveCanvas() {
+  setCanvasMinAspect(RESPONSIVE_CANVAS_ASPECT_RATIO);
+  setCanvasMaxAspect(RESPONSIVE_CANVAS_ASPECT_RATIO);
+  setCanvasMaxSize(RESPONSIVE_CANVAS_MAX_SIZE);
+}
+
+function updateCameraFraming() {
+  setCameraPos(vec2(PITCH_CENTER_X, CAMERA_CENTER_Y));
+  setCameraScale(mainCanvasSize.y / CAMERA_VISIBLE_HEIGHT);
+}
+
 const Dive = {
   state: createDiveState(),
   visualPose: cloneDiveVisualPose(),
@@ -169,7 +184,7 @@ const CAMERA_TILT_ANGLE = 40.0; // degrees, camera tilt down from horizon
 const COS_THETA = Math.cos((CAMERA_TILT_ANGLE * Math.PI) / 180);
 const SIN_THETA = Math.sin((CAMERA_TILT_ANGLE * Math.PI) / 180);
 const CAMERA_CENTER_Y = -6.0;  // centers the scene vertically on screen
-const CAMERA_SCALE = 96;       // fits the goal and ball on screen
+const CAMERA_VISIBLE_HEIGHT = 10; // selected responsive prototype height-fit framing
 
 function resetFamiliarPose() {
   Familiar.torsoPos = vec2(PITCH_CENTER_X, GROUND_Y + FAMILIAR_INIT_TORSO_Y);
@@ -227,8 +242,7 @@ function createBallRuntime() {
 
 export function gameInit(options = {}) {
   setCanvasClearColor(COLOR_STADIUM_NIGHT);
-  setCameraPos(vec2(PITCH_CENTER_X, CAMERA_CENTER_Y));
-  setCameraScale(CAMERA_SCALE);
+  updateCameraFraming();
   resetFamiliarPose();
   Dive.state = createDiveState();
   Dive.visualPose = cloneDiveVisualPose();
@@ -241,6 +255,7 @@ export function gameInit(options = {}) {
 }
 
 export function gameUpdate() {
+  updateCameraFraming();
   updateKeeperIk(mousePos, timeDelta);
   updateBallShot(timeDelta);
 }
@@ -677,6 +692,7 @@ function drawSaveFeedback() {
 }
 
 // Startup LittleJS Engine only if running in a browser environment
+configureResponsiveCanvas();
 if (typeof window !== 'undefined') {
   engineInit(gameInit, gameUpdate, gameUpdatePost, gameRender, gameRenderPost, []);
 }

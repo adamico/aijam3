@@ -68,6 +68,9 @@ vi.mock('littlejsengine', () => {
         setCameraPos: vi.fn(),
         setCameraScale: vi.fn(),
         setCanvasClearColor: vi.fn(),
+        setCanvasMinAspect: vi.fn(),
+        setCanvasMaxAspect: vi.fn(),
+        setCanvasMaxSize: vi.fn(),
         drawLine: vi.fn((start, end, width, color) => {
             if (!(color instanceof MockColor)) {
                 throw new Error('Assertion failed: color is invalid');
@@ -88,12 +91,50 @@ vi.mock('littlejsengine', () => {
 });
 
 describe('Spell Keeper basic gameplay scene', () => {
+    it('configures a 16:9 responsive canvas with a 4k backing-store cap before engine startup', async () => {
+        vi.clearAllMocks();
+        vi.resetModules();
+
+        const engine = await import('littlejsengine');
+        const previousWindow = globalThis.window;
+        globalThis.window = {};
+
+        try {
+            await import('./main.js');
+        } finally {
+            if (previousWindow === undefined) {
+                delete globalThis.window;
+            } else {
+                globalThis.window = previousWindow;
+            }
+        }
+
+        expect(engine.setCanvasMinAspect).toHaveBeenCalledWith(16 / 9);
+        expect(engine.setCanvasMaxAspect).toHaveBeenCalledWith(16 / 9);
+        expect(engine.setCanvasMaxSize).toHaveBeenCalledWith(expect.objectContaining({ x: 3840, y: 2160 }));
+        expect(engine.engineInit).toHaveBeenCalledTimes(1);
+    });
+
     it('should initialize and render the scene without throwing exceptions', async () => {
         const { gameInit, gameRender, gameRenderPost } = await import('./main.js');
         
         expect(() => gameInit()).not.toThrow();
         expect(() => gameRender()).not.toThrow();
         expect(() => gameRenderPost()).not.toThrow();
+    });
+
+    it('derives camera scale from current canvas height on init and update', async () => {
+        const engine = await import('littlejsengine');
+        const { gameInit, gameUpdate } = await import('./main.js');
+        vi.clearAllMocks();
+
+        engine.mainCanvasSize.y = 720;
+        gameInit({ shotPlanSeed: DEFAULT_SHOT_PLAN_SEED });
+        expect(engine.setCameraScale).toHaveBeenLastCalledWith(720 / 10);
+
+        engine.mainCanvasSize.y = 1080;
+        gameUpdate();
+        expect(engine.setCameraScale).toHaveBeenLastCalledWith(1080 / 10);
     });
 
     it('moves both hands toward the pointer target, not just the keeper-left glove', async () => {
