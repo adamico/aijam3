@@ -1,5 +1,5 @@
 import { vi, describe, it, expect } from 'vitest';
-import { DEFAULT_SHOT_PLAN_SEED, createShotPlan } from './shotPlan.js';
+import { DEFAULT_SHOT_PLAN_SEED, createCalibrationShotChain, createShotPlan } from './shotPlan.js';
 
 // Mock littlejsengine BEFORE importing main.js
 vi.mock('littlejsengine', () => {
@@ -386,6 +386,14 @@ describe('Spell Keeper basic gameplay scene', () => {
                 isCleanSave: true,
                 isDeflection: false,
                 isConcession: false,
+                shotIndex: 0,
+                hex: plan[0].shot.hex,
+                originLane: plan[0].shot.originLane,
+                targetLane: plan[0].shot.targetLane,
+                placementHeight: plan[0].shot.placementHeight,
+                intendedFailureMode: plan[0].designer.intendedFailureMode,
+                shotLabel: plan[0].designer.label,
+                pressureTags: expect.arrayContaining(['readable', 'warmup']),
             },
         });
         expect(getMatchState()).toMatchObject({
@@ -441,32 +449,24 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(debugPlan).toEqual(expected);
         expect(debugPlan[0].designer.label).toBe('straight warmup');
         expect(debugPlan[0].designer.pressureTags).toEqual(expect.arrayContaining(['readable', 'warmup']));
+        expect(debugPlan[0].designer.intendedFailureMode).toBe('setup');
 
         debugPlan[0].designer.pressureTags.push('mutated');
         expect(getShotPlanDebugInfo()[0].designer.pressureTags).not.toContain('mutated');
         expect(getMatchState().shotsTaken).toBe(0);
     });
 
-    it('uses runtime randomness only to choose the default match seed', async () => {
+    it('uses the authored calibration chain by default and seeded plans only when requested', async () => {
         const { gameInit, getShotPlanDebugInfo } = await import('./main.js');
-
-        vi.spyOn(Date, 'now')
-            .mockReturnValueOnce(1000)
-            .mockReturnValueOnce(2000);
-        vi.spyOn(Math, 'random')
-            .mockReturnValueOnce(0.123456789)
-            .mockReturnValueOnce(0.987654321);
+        const calibrationPlan = createCalibrationShotChain({ totalShots: 30 });
 
         gameInit();
-        const firstPlan = getShotPlanDebugInfo();
-        gameInit();
-        const secondPlan = getShotPlanDebugInfo();
+        expect(getShotPlanDebugInfo()).toEqual(calibrationPlan);
+        expect(getShotPlanDebugInfo()[0].designer.intendedFailureMode).toBe('setup');
 
-        expect(firstPlan[0].designer.planId).toBeTypeOf('string');
-        expect(firstPlan[0].designer.planId).not.toBe(secondPlan[0].designer.planId);
-        expect(firstPlan).not.toEqual(secondPlan);
-
-        vi.restoreAllMocks();
+        gameInit({ shotPlanSeed: DEFAULT_SHOT_PLAN_SEED });
+        expect(getShotPlanDebugInfo()).toEqual(createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 }));
+        expect(getShotPlanDebugInfo()).not.toEqual(calibrationPlan);
     });
 
     it('resolves a goal-plane overlap as a save when the shot crosses', async () => {

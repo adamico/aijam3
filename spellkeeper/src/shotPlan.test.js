@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SHOT_PLAN_SEED, createShotPlan, getCandidateSelectionWeight } from './shotPlan.js';
+import { DEFAULT_SHOT_PLAN_SEED, createCalibrationShotChain, createShotPlan, getCandidateSelectionWeight } from './shotPlan.js';
 
 describe('shot plan generator', () => {
   it('creates the same 30-shot plan for the same seed', () => {
@@ -45,6 +45,7 @@ describe('shot plan generator', () => {
           label: expect.any(String),
           difficultyBand: expect.any(String),
           pressureTags: expect.any(Array),
+          intendedFailureMode: expect.any(String),
           planId: expect.any(String),
           opener: expect.any(Boolean),
           originLane: expect.any(String),
@@ -58,10 +59,30 @@ describe('shot plan generator', () => {
     expect(plan[0].designer.difficultyBand).toBe('opener');
     expect(plan[0].designer.label).toBe('straight warmup');
     expect(plan[5].designer.pressureTags.length).toBeGreaterThan(0);
+    expect(plan[5].designer.intendedFailureMode).toBeTypeOf('string');
     expect(difficultyBands).toEqual(new Set(['opener', 'readable variety', 'mixed pressure', 'chaos-but-fair']));
     expect(plan.slice(3, 12).every((entry) => entry.designer.difficultyBand === 'readable variety')).toBe(true);
     expect(plan.slice(12, 21).every((entry) => entry.designer.difficultyBand === 'mixed pressure')).toBe(true);
     expect(plan.slice(21).every((entry) => entry.designer.difficultyBand === 'chaos-but-fair')).toBe(true);
+  });
+
+  it('creates the authored calibration chain with the intended sequence pressure families', () => {
+    const chain = createCalibrationShotChain();
+
+    expect(chain).toHaveLength(30);
+    expect(chain.map((entry) => entry.index)).toEqual(Array.from({ length: 30 }, (_, index) => index));
+    expect(chain[0].designer.difficultyBand).toBe('opener');
+    expect(chain[0].designer.intendedFailureMode).toBe('setup');
+    expect(chain[0].designer.pressureTags).toEqual(expect.arrayContaining(['readable', 'warmup']));
+    expect(chain.some((entry) => entry.designer.pressureTags.includes('heavy-bait'))).toBe(true);
+    expect(chain.some((entry) => entry.designer.pressureTags.includes('curve-bait'))).toBe(true);
+    expect(chain.some((entry) => entry.designer.pressureTags.includes('high-low'))).toBe(true);
+    expect(chain.some((entry) => entry.designer.pressureTags.includes('same-side'))).toBe(true);
+    expect(chain.some((entry) => entry.designer.intendedFailureMode === 'opposite-side-punish')).toBe(true);
+    expect(chain.slice(0, 3).every((entry) => entry.designer.difficultyBand === 'opener')).toBe(true);
+    expect(chain.slice(3, 12).every((entry) => entry.designer.difficultyBand === 'readable variety')).toBe(true);
+    expect(chain.slice(12, 21).every((entry) => entry.designer.difficultyBand === 'mixed pressure')).toBe(true);
+    expect(chain.slice(21).every((entry) => entry.designer.difficultyBand === 'chaos-but-fair')).toBe(true);
   });
 
   it('keeps fireballs fair in readable and mixed acts while allowing a high-corner finale', () => {

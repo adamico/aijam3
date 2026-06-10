@@ -18,7 +18,7 @@ import {
   shouldTriggerDive,
   startDive,
 } from './diveState.js';
-import { DEFAULT_SHOT_PLAN_SEED, createShotPlan, describeShotPlan } from './shotPlan.js';
+import { DEFAULT_SHOT_PLAN_SEED, createCalibrationShotChain, createShotPlan, describeShotPlan } from './shotPlan.js';
 import { createMatchState, isMatchComplete, recordShotResult } from './matchState.js';
 import {
   advanceShotRuntime,
@@ -186,8 +186,8 @@ const COLOR_TUTORIAL_SHOT_TELEGRAPH_CORE = c('#ffffff');
 const initialMatchState = createMatchState();
 const Match = {
   state: initialMatchState,
-  shotPlanSeed: DEFAULT_SHOT_PLAN_SEED,
-  plan: createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: initialMatchState.totalShots }),
+  shotPlanSeed: null,
+  plan: createCalibrationShotChain({ totalShots: initialMatchState.totalShots }),
 };
 
 export function createRuntimeShotPlanSeed() {
@@ -310,8 +310,11 @@ export function gameInit(options = {}) {
   Dive.visualPose = cloneDiveVisualPose();
   Dive.canTrigger = true;
   Match.state = createMatchState();
-  Match.shotPlanSeed = options.shotPlanSeed ?? createRuntimeShotPlanSeed();
-  Match.plan = createShotPlan(Match.shotPlanSeed, { totalShots: Match.state.totalShots });
+  const hasSeed = options.shotPlanSeed !== undefined && options.shotPlanSeed !== null;
+  Match.shotPlanSeed = hasSeed ? options.shotPlanSeed : null;
+  Match.plan = hasSeed
+    ? createShotPlan(Match.shotPlanSeed, { totalShots: Match.state.totalShots })
+    : createCalibrationShotChain({ totalShots: Match.state.totalShots });
   Ball.runtime = createBallRuntime();
   syncBallFromRuntime(Ball.runtime);
   playShotLaunchCue();
@@ -362,9 +365,18 @@ function createFallbackShotResult(outcome) {
   };
 }
 
+function formatPressureTags(pressureTags = []) {
+  if (!Array.isArray(pressureTags) || pressureTags.length === 0) {
+    return 'no tags';
+  }
+
+  return pressureTags.join(', ');
+}
+
 export function getShotResolutionSummary() {
   const feedback = getFeedbackState(Ball.runtime);
   const result = cloneSaveResult(feedback?.lastResult);
+  const shotEntry = feedback?.lastShotEntry ?? Ball.runtime?.activeShotEntry ?? null;
 
   if (!result) return null;
 
@@ -399,6 +411,15 @@ export function getShotResolutionSummary() {
     distance: result.distance ?? null,
     overlapDepth: result.overlapDepth ?? null,
     contactSegments: Array.isArray(result.contactSegments) ? result.contactSegments : [],
+    shotIndex: shotEntry?.index ?? null,
+    hex: shotEntry?.shot?.hex ?? null,
+    originLane: shotEntry?.shot?.originLane ?? null,
+    targetLane: shotEntry?.shot?.targetLane ?? null,
+    placementHeight: shotEntry?.shot?.placementHeight ?? null,
+    pressureTags: Array.isArray(shotEntry?.designer?.pressureTags) ? [...shotEntry.designer.pressureTags] : [],
+    intendedFailureMode: shotEntry?.designer?.intendedFailureMode ?? null,
+    difficultyBand: shotEntry?.designer?.difficultyBand ?? null,
+    shotLabel: shotEntry?.designer?.label ?? null,
     label: resultFeedback.label,
   };
 }
@@ -481,7 +502,10 @@ export function applyMatchShotOutcome(outcome) {
       ? currentFeedback.lastResult
       : createFallbackShotResult(canonicalOutcome);
 
-    Ball.runtime = recordShotRuntimeOutcome(Ball.runtime, runtimeOutcome);
+    Ball.runtime = recordShotRuntimeOutcome(Ball.runtime, {
+      ...runtimeOutcome,
+      shotEntry: Ball.runtime?.activeShotEntry ?? null,
+    });
     syncBallFromRuntime(Ball.runtime);
   }
 
@@ -1212,12 +1236,30 @@ function drawSaveFeedback() {
   }
 
   if (summary && (hasOutcomeFeedback || isMatchComplete(Match.state))) {
+    const shotSummary = summary.shotIndex == null
+      ? 'Shot ?'
+      : `Shot ${summary.shotIndex + 1}`;
+    const designSummary = [
+      summary.hex,
+      `${summary.originLane ?? '?'} -> ${summary.targetLane ?? '?'}`,
+      summary.placementHeight ?? '?',
+      summary.difficultyBand ?? 'unknown band',
+      summary.intendedFailureMode ?? 'unknown failure mode',
+    ].join('   ');
     drawTextScreen(
       `${summary.saveQuality === 'clean-save' ? 'Clean Save' : summary.saveQuality === 'deflection' ? 'Deflection' : 'Concession'}   ${summary.label}   Δ${summary.scoreDelta}   ${formatContactSegments(summary.contactSegments)}`,
       vec2(centerX, summaryY),
       18,
       COLOR_SCORE_FEEDBACK,
       2,
+      COLOR_STADIUM_NIGHT,
+    );
+    drawTextScreen(
+      `${shotSummary}   ${designSummary}   ${formatPressureTags(summary.pressureTags)}`,
+      vec2(centerX, summaryY + 24),
+      14,
+      COLOR_SCORE_FEEDBACK,
+      1,
       COLOR_STADIUM_NIGHT,
     );
   }

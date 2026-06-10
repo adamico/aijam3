@@ -63,6 +63,7 @@ function cloneFeedbackState(feedback) {
   return {
     ...feedback,
     lastResult: cloneSaveResult(feedback.lastResult),
+    lastShotEntry: feedback.lastShotEntry ? clonePlanEntry(feedback.lastShotEntry) : null,
   };
 }
 
@@ -172,6 +173,7 @@ export function createShotRuntime({
     feedback: {
       lastResult: null,
       timer: 0,
+      lastShotEntry: null,
     },
   };
 
@@ -191,6 +193,7 @@ export function recordShotRuntimeOutcome(runtime, {
   result = null,
   nextShotIndex = null,
   matchComplete = false,
+  shotEntry = null,
 } = {}) {
   if (!runtime) return runtime;
 
@@ -200,6 +203,7 @@ export function recordShotRuntimeOutcome(runtime, {
     nextRuntime.feedback = {
       lastResult: cloneSaveResult(result),
       timer: nextRuntime.shotTiming.feedbackDuration,
+      lastShotEntry: shotEntry ? clonePlanEntry(shotEntry) : nextRuntime.feedback.lastShotEntry ?? null,
     };
   }
 
@@ -282,6 +286,7 @@ export function advanceShotRuntime(runtime, {
     nextRuntime.feedback = {
       lastResult: cloneSaveResult(result),
       timer: nextRuntime.shotTiming.feedbackDuration,
+      lastShotEntry: clonePlanEntry(nextRuntime.activeShotEntry),
     };
     nextRuntime.respawnTimer = nextRuntime.shotTiming.respawnDelay;
     nextRuntime.nextShotIndex = nextRuntime.activeShotIndex + 1;
@@ -306,6 +311,7 @@ export function recordShotRuntimeFeedback(runtime, result) {
     feedback: {
       lastResult: cloneSaveResult(result),
       timer: runtime.shotTiming.feedbackDuration,
+      lastShotEntry: runtime.feedback?.lastShotEntry ? clonePlanEntry(runtime.feedback.lastShotEntry) : null,
     },
   };
 }

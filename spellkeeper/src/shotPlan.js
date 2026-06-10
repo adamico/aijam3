@@ -55,6 +55,7 @@ const FIXED_OPENER_SHOTS = [
       label: 'straight warmup',
       difficultyBand: 'opener',
       pressureTags: ['readable', 'warmup'],
+      intendedFailureMode: 'setup',
     },
   },
   {
@@ -68,6 +69,7 @@ const FIXED_OPENER_SHOTS = [
       label: 'low corner read',
       difficultyBand: 'opener',
       pressureTags: ['readable', 'low-corner'],
+      intendedFailureMode: 'setup',
     },
   },
   {
@@ -81,87 +83,122 @@ const FIXED_OPENER_SHOTS = [
       label: 'heavy slow drag',
       difficultyBand: 'opener',
       pressureTags: [...HEAVY_PRESSURE_TAGS, 'drag'],
+      intendedFailureMode: 'setup',
     },
   },
+];
+
+const CALIBRATION_SHOT_CHAIN_BLUEPRINT = [
+  ['standard', 'innerLeft', 'innerLeft', 'low', 'calibration warmup', 'opener', ['readable', 'warmup'], 'setup'],
+  ['standard', 'innerRight', 'innerRight', 'middle', 'calibration mirror', 'opener', ['readable', 'mirror'], 'setup'],
+  ['heavy', 'outerLeft', 'outerLeft', 'low', 'heavy bait opener', 'opener', ['low', 'extreme-side', 'commitment'], 'setup'],
+  ['standard', 'outerRight', 'outerRight', 'low', 'readable right squeeze', SHOT_PLAN_DIFFICULTY_BANDS.readable, ['readable', 'recovery-check'], 'read-check'],
+  ['curve', 'outerLeft', 'innerLeft', 'middle', 'left curve tell', SHOT_PLAN_DIFFICULTY_BANDS.readable, ['curve', 'curve-bait', 'shape'], 'curve-misread', 1],
+  ['fireball', 'center', 'center', 'low', 'central speed check', SHOT_PLAN_DIFFICULTY_BANDS.readable, ['speed', 'center', 'read'], 'read-check'],
+  ['standard', 'outerLeft', 'outerLeft', 'high', 'high-low opener', SHOT_PLAN_DIFFICULTY_BANDS.readable, ['high-low', 'alternation', 'high'], 'high-low-misread'],
+  ['curve', 'outerRight', 'innerRight', 'middle', 'right curve recovery', SHOT_PLAN_DIFFICULTY_BANDS.readable, ['curve', 'late-recovery', 'shape'], 'curve-misread', -1],
+  ['heavy', 'outerRight', 'outerRight', 'low', 'heavy bait right', SHOT_PLAN_DIFFICULTY_BANDS.readable, ['low', 'extreme-side', 'commitment', 'heavy-bait'], 'overcommit-punish'],
+  ['standard', 'innerLeft', 'innerLeft', 'middle', 'same-side squeeze', SHOT_PLAN_DIFFICULTY_BANDS.readable, ['same-side', 'recovery', 'pin'], 'same-side-pinning'],
+  ['curve', 'outerRight', 'innerLeft', 'middle', 'curve bait switch', SHOT_PLAN_DIFFICULTY_BANDS.readable, ['curve', 'switch', 'curve-bait'], 'curve-bait', -1],
+  ['standard', 'outerLeft', 'innerRight', 'high', 'late correction setup', SHOT_PLAN_DIFFICULTY_BANDS.readable, ['late-recovery', 'opposite-side', 'read'], 'late-recovery'],
+  ['heavy', 'outerLeft', 'outerLeft', 'low', 'heavy bait left', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['low', 'extreme-side', 'commitment', 'heavy-bait'], 'heavy-bait'],
+  ['fireball', 'center', 'center', 'high', 'opposite punish speed', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['speed', 'center', 'opposite-punish'], 'opposite-side-punish'],
+  ['standard', 'outerRight', 'outerRight', 'high', 'high-low turn', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['high-low', 'alternation', 'high'], 'high-low-misread'],
+  ['curve', 'outerLeft', 'innerRight', 'middle', 'curve bait late', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['curve', 'curve-bait', 'late-correction'], 'curve-misread', 1],
+  ['standard', 'innerRight', 'innerRight', 'low', 'recovery check right', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['same-side', 'recovery', 'check'], 'recovery-check'],
+  ['heavy', 'outerRight', 'outerRight', 'low', 'same-side pin right', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['same-side', 'pin', 'low', 'extreme-side'], 'same-side-pinning'],
+  ['standard', 'outerLeft', 'outerLeft', 'middle', 'overcommit trap left', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['overcommit', 'recovery', 'left'], 'overcommit-punish'],
+  ['curve', 'outerRight', 'outerLeft', 'middle', 'curve correction reverse', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['curve', 'switch', 'late-correction'], 'curve-misread', -1],
+  ['fireball', 'center', 'center', 'high', 'vertical alternation', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['high-low', 'speed', 'center'], 'high-low-misread'],
+  ['heavy', 'outerLeft', 'outerLeft', 'low', 'late heavy drag', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['low', 'extreme-side', 'commitment', 'drag'], 'late-recovery'],
+  ['standard', 'outerRight', 'outerRight', 'high', 'same-side late squeeze', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['same-side', 'pin', 'late'], 'same-side-pinning'],
+  ['curve', 'outerLeft', 'innerRight', 'middle', 'chaos curve bait', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['curve', 'curve-bait', 'opposite-side'], 'curve-bait', 1],
+  ['standard', 'innerLeft', 'outerLeft', 'high', 'high-low whip', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['high-low', 'late-recovery', 'opposite-side'], 'high-low-misread'],
+  ['heavy', 'outerRight', 'outerRight', 'low', 'pin right again', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['same-side', 'pin', 'low', 'extreme-side'], 'same-side-pinning'],
+  ['fireball', 'center', 'center', 'low', 'speed read', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['speed', 'center', 'read-check'], 'read-check'],
+  ['curve', 'outerRight', 'outerLeft', 'middle', 'final switch', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['curve', 'late-correction', 'switch'], 'curve-misread', -1],
+  ['standard', 'outerLeft', 'outerLeft', 'high', 'final overcommit', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['overcommit', 'same-side', 'punish'], 'overcommit-punish'],
+  ['heavy', 'outerLeft', 'outerLeft', 'low', 'closing drag', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['low', 'extreme-side', 'commitment', 'finish'], 'late-recovery'],
+  ['fireball', 'outerRight', 'outerRight', 'high', 'high corner finish', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['speed', 'corner', 'high-low', 'finish'], 'high-low-misread'],
 ];
 
 const SHOT_PHASE_POOLS = [
   [
     {
       shot: { hex: 'standard', originLane: 'innerLeft', targetLane: 'innerLeft', placementHeight: 'low' },
-      designer: { label: 'build left lane', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['lane', 'read'] },
+      designer: { label: 'build left lane', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['lane', 'read'], intendedFailureMode: 'setup' },
     },
     {
       shot: { hex: 'standard', originLane: 'innerRight', targetLane: 'innerRight', placementHeight: 'middle' },
-      designer: { label: 'build right lane', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['lane', 'read'] },
+      designer: { label: 'build right lane', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['lane', 'read'], intendedFailureMode: 'setup' },
     },
     {
       shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'innerLeft', placementHeight: 'middle', curveDirection: 1 },
-      designer: { label: 'gentle left curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['curve', 'shape'] },
+      designer: { label: 'gentle left curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['curve', 'shape'], intendedFailureMode: 'curve-misread' },
     },
     {
       shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'innerRight', placementHeight: 'middle', curveDirection: -1 },
-      designer: { label: 'gentle right curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['curve', 'shape'] },
+      designer: { label: 'gentle right curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['curve', 'shape'], intendedFailureMode: 'curve-misread' },
     },
     {
       shot: { hex: 'fireball', originLane: 'center', targetLane: 'center', placementHeight: 'low' },
-      designer: { label: 'central speed test', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['speed', 'center'] },
+      designer: { label: 'central speed test', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: ['speed', 'center'], intendedFailureMode: 'read-check' },
     },
     {
       shot: { hex: 'heavy', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'low' },
-      designer: { label: 'cross-body weight', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: [...HEAVY_PRESSURE_TAGS, 'weight', 'cross-body'] },
+      designer: { label: 'cross-body weight', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.readable, pressureTags: [...HEAVY_PRESSURE_TAGS, 'weight', 'cross-body'], intendedFailureMode: 'heavy-bait' },
     },
   ],
   [
     {
       shot: { hex: 'standard', originLane: 'outerLeft', targetLane: 'innerLeft', placementHeight: 'high' },
-      designer: { label: 'pressure left high', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['wide', 'high'] },
+      designer: { label: 'pressure left high', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['wide', 'high'], intendedFailureMode: 'high-low-misread' },
     },
     {
       shot: { hex: 'standard', originLane: 'outerRight', targetLane: 'innerRight', placementHeight: 'high' },
-      designer: { label: 'pressure right high', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['wide', 'high'] },
+      designer: { label: 'pressure right high', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['wide', 'high'], intendedFailureMode: 'high-low-misread' },
     },
     {
       shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'innerRight', placementHeight: 'middle', curveDirection: 1 },
-      designer: { label: 'sweeping left curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['curve', 'switch'] },
+      designer: { label: 'sweeping left curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['curve', 'switch'], intendedFailureMode: 'curve-bait' },
     },
     {
       shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'innerLeft', placementHeight: 'middle', curveDirection: -1 },
-      designer: { label: 'sweeping right curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['curve', 'switch'] },
+      designer: { label: 'sweeping right curve', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['curve', 'switch'], intendedFailureMode: 'curve-bait' },
     },
     {
       shot: { hex: 'fireball', originLane: 'center', targetLane: 'center', placementHeight: 'high' },
-      designer: { label: 'fast central test', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['speed', 'center', 'high'] },
+      designer: { label: 'fast central test', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: ['speed', 'center', 'high'], intendedFailureMode: 'read-check' },
     },
     {
       shot: { hex: 'heavy', originLane: 'outerRight', targetLane: 'outerRight', placementHeight: 'low' },
-      designer: { label: 'heavy cross drag', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: [...HEAVY_PRESSURE_TAGS, 'weight', 'cross-body'] },
+      designer: { label: 'heavy cross drag', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.mixed, pressureTags: [...HEAVY_PRESSURE_TAGS, 'weight', 'cross-body'], intendedFailureMode: 'heavy-bait' },
     },
   ],
   [
     {
       shot: { hex: 'standard', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'high' },
-      designer: { label: 'clutch left squeeze', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['corner', 'late'] },
+      designer: { label: 'clutch left squeeze', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['corner', 'late'], intendedFailureMode: 'same-side-pinning' },
     },
     {
       shot: { hex: 'standard', originLane: 'outerRight', targetLane: 'outerRight', placementHeight: 'high' },
-      designer: { label: 'clutch right squeeze', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['corner', 'late'] },
+      designer: { label: 'clutch right squeeze', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['corner', 'late'], intendedFailureMode: 'same-side-pinning' },
     },
     {
       shot: { hex: 'curve', originLane: 'outerLeft', targetLane: 'outerRight', placementHeight: 'middle', curveDirection: 1 },
-      designer: { label: 'late curve switch', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['curve', 'switch'] },
+      designer: { label: 'late curve switch', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['curve', 'switch'], intendedFailureMode: 'curve-misread' },
     },
     {
       shot: { hex: 'curve', originLane: 'outerRight', targetLane: 'outerLeft', placementHeight: 'middle', curveDirection: -1 },
-      designer: { label: 'late curve reverse', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['curve', 'switch'] },
+      designer: { label: 'late curve reverse', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['curve', 'switch'], intendedFailureMode: 'curve-misread' },
     },
     {
       shot: { hex: 'fireball', originLane: 'outerRight', targetLane: 'outerRight', placementHeight: 'high' },
-      designer: { label: 'late fireball corner', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['speed', 'corner', 'high'] },
+      designer: { label: 'late fireball corner', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: ['speed', 'corner', 'high'], intendedFailureMode: 'opposite-side-punish' },
     },
     {
       shot: { hex: 'heavy', originLane: 'outerLeft', targetLane: 'outerLeft', placementHeight: 'low' },
-      designer: { label: 'late heavy cross', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: [...HEAVY_PRESSURE_TAGS, 'weight', 'finish'] },
+      designer: { label: 'late heavy cross', difficultyBand: SHOT_PLAN_DIFFICULTY_BANDS.chaos, pressureTags: [...HEAVY_PRESSURE_TAGS, 'weight', 'finish'], intendedFailureMode: 'late-recovery' },
     },
   ],
 ];
@@ -171,6 +208,7 @@ function cloneDesigner(designer) {
     label: designer.label,
     difficultyBand: designer.difficultyBand,
     pressureTags: [...designer.pressureTags],
+    intendedFailureMode: designer.intendedFailureMode,
     opener: designer.difficultyBand === 'opener',
   };
 }
@@ -311,6 +349,7 @@ function createShotTemplateEntry(template, index, band, rng, planId, jitterAmoun
       label: template.designer.label,
       difficultyBand: band,
       pressureTags: [...template.designer.pressureTags, coordinates.originLane, coordinates.targetLane, coordinates.placementHeight],
+      intendedFailureMode: template.designer.intendedFailureMode,
       planId,
       originLane: coordinates.originLane,
       targetLane: coordinates.targetLane,
@@ -478,6 +517,38 @@ function phaseIndexForBand(band) {
   return 2;
 }
 
+function buildCalibrationEntry(template, index, planId) {
+  const coordinates = createShotCoordinates(template.shot, createRng(`${planId}:${index}`), 0);
+  const shot = {
+    hex: template.shot.hex,
+    start: coordinates.start,
+    target: coordinates.target,
+    originLane: coordinates.originLane,
+    targetLane: coordinates.targetLane,
+    placementHeight: coordinates.placementHeight,
+  };
+
+  if (template.shot.curveDirection !== undefined) {
+    shot.curveDirection = template.shot.curveDirection;
+  }
+
+  return buildShotEntry({
+    index,
+    shot,
+    designer: {
+      label: template.designer.label,
+      difficultyBand: template.designer.difficultyBand,
+      pressureTags: [...template.designer.pressureTags, coordinates.originLane, coordinates.targetLane, coordinates.placementHeight],
+      intendedFailureMode: template.designer.intendedFailureMode,
+      planId,
+      originLane: coordinates.originLane,
+      targetLane: coordinates.targetLane,
+      placementHeight: coordinates.placementHeight,
+      opener: template.designer.difficultyBand === 'opener',
+    },
+  });
+}
+
 function createHexCountTarget(totalShots, rng) {
   if (totalShots !== DEFAULT_SHOT_PLAN_TOTAL_SHOTS) return null;
 
@@ -578,6 +649,18 @@ export function createShotPlan(seed, rules = {}) {
   }
 
   throw new Error(`Shot plan generation failed after ${attempts} attempts`);
+}
+
+export function createCalibrationShotChain(rules = {}) {
+  const { totalShots = CALIBRATION_SHOT_CHAIN_BLUEPRINT.length } = rules;
+
+  if (!Number.isInteger(totalShots) || totalShots !== CALIBRATION_SHOT_CHAIN_BLUEPRINT.length) {
+    throw new Error(`Calibration Shot Chain must be exactly ${CALIBRATION_SHOT_CHAIN_BLUEPRINT.length} shots: ${totalShots}`);
+  }
+
+  const planId = createPlanId('calibration-shot-chain');
+
+  return CALIBRATION_SHOT_CHAIN_BLUEPRINT.map((template, index) => buildCalibrationEntry(template, index, planId));
 }
 
 export function describeShotPlan(plan) {
