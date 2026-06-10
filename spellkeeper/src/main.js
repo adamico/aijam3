@@ -938,6 +938,17 @@ function drawPapercraftPanel(points, outlineColor, creaseColor, stress = 0) {
   }
 }
 
+function buildTorsoShell(center, radiusX, radiusY, skewX = 0) {
+  return [
+    vec2(center.x - radiusX * 0.35 + skewX * 0.10, center.y + radiusY),
+    vec2(center.x + radiusX * 0.35 + skewX * 0.10, center.y + radiusY),
+    vec2(center.x + radiusX, center.y + radiusY * 0.70),
+    vec2(center.x + radiusX * 0.60 + skewX * 0.15, center.y - radiusY * 0.95),
+    vec2(center.x - radiusX * 0.60 + skewX * 0.15, center.y - radiusY * 0.95),
+    vec2(center.x - radiusX, center.y + radiusY * 0.70),
+  ];
+}
+
 function buildPaperShell(center, radiusX, radiusY, skewX = 0) {
   return [
     vec2(center.x + skewX * 0.12, center.y + radiusY),
@@ -1040,7 +1051,7 @@ function drawKeeper() {
   ) * 1.8 + 0.66);
   const torsoSkew = paper.torso.lean * 0.24 * Math.sign(Familiar.rightShoulder.x - Familiar.leftShoulder.x || 1);
   drawPapercraftPanel(
-    buildPaperShell(torsoCenter, torsoWidth, torsoHeight, torsoSkew),
+    buildTorsoShell(torsoCenter, torsoWidth, torsoHeight, torsoSkew),
     COLOR_FAMILIAR_TORSO,
     FAMILIAR_PAPER_EDGE_COLOR,
     paper.torso.squash,
