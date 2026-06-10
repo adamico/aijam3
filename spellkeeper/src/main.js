@@ -932,32 +932,33 @@ function drawPapercraftPanel(points, outlineColor, creaseColor, stress = 0) {
     drawLine(start, end, 0.065 + stress * 0.02, outlineColor);
   }
 
-  if (points.length >= 4) {
+  if (points.length === 6) {
+    drawLine(points[0], points[2], 0.03 + stress * 0.01, creaseColor);
+    drawLine(points[1], points[3], 0.025 + stress * 0.01, creaseColor);
+  } else if (points.length >= 8) {
+    const half = Math.floor(points.length / 2);
+    drawLine(points[0], points[half], 0.03 + stress * 0.01, creaseColor);
+    drawLine(points[Math.floor(half / 2)], points[Math.floor(half / 2) + half], 0.025 + stress * 0.01, creaseColor);
+  } else if (points.length >= 4) {
     drawLine(points[0], points[2], 0.03 + stress * 0.01, creaseColor);
     drawLine(points[1], points[3], 0.025 + stress * 0.01, creaseColor);
   }
 }
 
-function buildTorsoShell(center, radiusX, radiusY, skewX = 0) {
-  return [
-    vec2(center.x - radiusX * 0.35 + skewX * 0.10, center.y + radiusY),
-    vec2(center.x + radiusX * 0.35 + skewX * 0.10, center.y + radiusY),
-    vec2(center.x + radiusX, center.y + radiusY * 0.70),
-    vec2(center.x + radiusX * 0.60 + skewX * 0.15, center.y - radiusY * 0.95),
-    vec2(center.x - radiusX * 0.60 + skewX * 0.15, center.y - radiusY * 0.95),
-    vec2(center.x - radiusX, center.y + radiusY * 0.70),
-  ];
-}
+function buildEllipseShell(center, radiusX, radiusY, skewX = 0) {
+  const points = [];
+  const segments = 12;
+  for (let i = 0; i < segments; i += 1) {
+    const theta = (i / segments) * Math.PI * 2;
+    const px = Math.cos(theta) * radiusX;
+    const py = Math.sin(theta) * radiusY;
 
-function buildPaperShell(center, radiusX, radiusY, skewX = 0) {
-  return [
-    vec2(center.x + skewX * 0.12, center.y + radiusY),
-    vec2(center.x + radiusX, center.y + radiusY * 0.36),
-    vec2(center.x + radiusX * 1.02, center.y - radiusY * 0.38),
-    vec2(center.x + skewX * 0.15, center.y - radiusY),
-    vec2(center.x - radiusX * 1.02, center.y - radiusY * 0.38),
-    vec2(center.x - radiusX, center.y + radiusY * 0.36),
-  ];
+    // Apply shear/lean proportional to height
+    const skewOffset = (py / radiusY) * skewX;
+
+    points.push(vec2(center.x + px + skewOffset, center.y + py));
+  }
+  return points;
 }
 
 function drawPaperStrip(start, end, width, baseColor, stress, accentColor) {
@@ -1051,14 +1052,14 @@ function drawKeeper() {
   ) * 1.8 + 0.66);
   const torsoSkew = paper.torso.lean * 0.24 * Math.sign(Familiar.rightShoulder.x - Familiar.leftShoulder.x || 1);
   drawPapercraftPanel(
-    buildTorsoShell(torsoCenter, torsoWidth, torsoHeight, torsoSkew),
+    buildEllipseShell(torsoCenter, torsoWidth, torsoHeight, torsoSkew),
     COLOR_FAMILIAR_TORSO,
     FAMILIAR_PAPER_EDGE_COLOR,
     paper.torso.squash,
   );
 
   const head = fam(Familiar.headPos.x, Familiar.headPos.y);
-  const headShell = buildPaperShell(
+  const headShell = buildEllipseShell(
     addPoint(head.pos, vec2((paper.head.lagX - 0.5) * 0.08 * Math.sign(Familiar.rightShoulder.x - Familiar.leftShoulder.x || 1), -paper.head.lagY * 0.12)),
     Familiar.headRadius * (1.02 + paper.head.wobble * 0.14),
     Familiar.headRadius * (1.15 + paper.head.wobble * 0.18),
@@ -1134,10 +1135,10 @@ function drawKeeper() {
   drawPaperLimb(lHip.pos, lKnee.pos, lFoot.pos, FAMILIAR_THIGH_THICKNESS, paper.leftLeg.stress * 0.88);
   drawPaperLimb(rHip.pos, rKnee.pos, rFoot.pos, FAMILIAR_THIGH_THICKNESS, paper.rightLeg.stress * 0.88);
 
-  drawPapercraftPanel(buildPaperShell(lHand.pos, Familiar.handRadius * 0.95, Familiar.handRadius * 0.75, paper.leftArm.flap * 0.18), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.leftArm.flap);
-  drawPapercraftPanel(buildPaperShell(rHand.pos, Familiar.handRadius * 0.95, Familiar.handRadius * 0.75, paper.rightArm.flap * 0.18), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.rightArm.flap);
-  drawPapercraftPanel(buildPaperShell(lFoot.pos, Familiar.footRadius * 1.05, Familiar.footRadius * 0.65, paper.leftLeg.flap * 0.12), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.leftLeg.flap);
-  drawPapercraftPanel(buildPaperShell(rFoot.pos, Familiar.footRadius * 1.05, Familiar.footRadius * 0.65, paper.rightLeg.flap * 0.12), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.rightLeg.flap);
+  drawPapercraftPanel(buildEllipseShell(lHand.pos, Familiar.handRadius * 0.95, Familiar.handRadius * 0.75, paper.leftArm.flap * 0.18), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.leftArm.flap);
+  drawPapercraftPanel(buildEllipseShell(rHand.pos, Familiar.handRadius * 0.95, Familiar.handRadius * 0.75, paper.rightArm.flap * 0.18), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.rightArm.flap);
+  drawPapercraftPanel(buildEllipseShell(lFoot.pos, Familiar.footRadius * 1.05, Familiar.footRadius * 0.65, paper.leftLeg.flap * 0.12), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.leftLeg.flap);
+  drawPapercraftPanel(buildEllipseShell(rFoot.pos, Familiar.footRadius * 1.05, Familiar.footRadius * 0.65, paper.rightLeg.flap * 0.12), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.rightLeg.flap);
 }
 
 function drawBall() {
