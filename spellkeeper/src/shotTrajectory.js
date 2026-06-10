@@ -2,7 +2,7 @@ import { clamp, lerp } from 'littlejsengine';
 
 const DEFAULT_EPSILON = 1e-6;
 
-const BASE_SHOT_DURATION = 1.3;
+const BASE_SHOT_DURATION = 0.9;
 const BASE_SHOT_ARC_HEIGHT = 2.6;
 const BASE_SHOT_CURVE_AMPLITUDE = 1.1;
 const BASE_SHOT_RADIUS_SCALE = 1;
@@ -11,7 +11,7 @@ const SHOT_DURATION_MODIFIERS = {
   standard: 1,
   fireball: 0.7,
   curve: 1,
-  heavy: 2.15,
+  heavy: 1.6,
 };
 
 const SHOT_ARC_HEIGHT_MODIFIERS = {

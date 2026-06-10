@@ -117,7 +117,7 @@ const FAMILIAR_HAND_IK = {
     fallbackDirection: { x: 1, y: 0 },
   },
 };
-const FAMILIAR_TORSO_DRAG_MAX_SPEED = 2.2; // meters/second; intentionally heavy
+const FAMILIAR_TORSO_DRAG_MAX_SPEED = 4.0; // meters/second; snappy and athletic
 const FAMILIAR_DIVE_VERTICAL_LIFT_SCALE = 0.32;
 const FAMILIAR_DIVE_HEAD_LEAD_SCALE = 0.45;
 const FAMILIAR_DIVE_SHOULDER_LEAD_SCALE = 0.28;

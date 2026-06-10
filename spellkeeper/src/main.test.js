@@ -161,7 +161,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(result.body.isDragging).toBe(true);
         expect(pose.torso.x).toBeGreaterThan(0);
         expect(pose.torso.x).toBeLessThan(result.body.desiredTorso.x);
-        expect(result.body.velocity.x).toBeLessThanOrEqual(2.2);
+        expect(result.body.velocity.x).toBeLessThanOrEqual(4.0);
         expect(pose.head.x).toBeCloseTo(pose.torso.x, 5);
         expect(pose.rightShoulder.x).toBeCloseTo(pose.torso.x + 0.3, 5);
     });
