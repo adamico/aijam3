@@ -2,15 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SHOT_PLAN_SEED, PHASE_LAYOUTS, createCalibrationShotChain, createShotPlan, getCandidateSelectionWeight } from './shotPlan.js';
 
 describe('shot plan generator', () => {
-  it('uses phase layouts that mix isolated shots and setpieces across all three acts', () => {
-    const layoutShotCount = (layout) => layout.reduce((total, slot) => total + (slot === 'setpiece' ? 2 : 1), 0);
-
-    expect(PHASE_LAYOUTS.readable).toEqual(expect.arrayContaining(['isolated', 'setpiece']));
-    expect(PHASE_LAYOUTS.mixed).toEqual(expect.arrayContaining(['isolated', 'setpiece']));
-    expect(PHASE_LAYOUTS.chaos).toEqual(expect.arrayContaining(['isolated', 'setpiece']));
-    expect(layoutShotCount(PHASE_LAYOUTS.readable)).toBe(9);
-    expect(layoutShotCount(PHASE_LAYOUTS.mixed)).toBe(9);
-    expect(layoutShotCount(PHASE_LAYOUTS.chaos)).toBe(9);
+  it('uses the authored phase pacing templates for each act', () => {
+    expect(PHASE_LAYOUTS.readable).toEqual(['isolated', 'isolated', 'setpiece', 'isolated', 'setpiece', 'isolated']);
+    expect(PHASE_LAYOUTS.mixed).toEqual(['isolated', 'setpiece', 'isolated', 'setpiece', 'isolated', 'isolated']);
+    expect(PHASE_LAYOUTS.chaos).toEqual(['setpiece', 'isolated', 'setpiece', 'isolated', 'setpiece']);
   });
 
   it('creates the same 30-shot plan for the same seed', () => {

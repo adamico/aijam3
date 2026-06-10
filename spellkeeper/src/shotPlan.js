@@ -47,9 +47,9 @@ const HEAVY_PRESSURE_TAGS = ['low', 'extreme-side', 'commitment'];
 const PHASE_SHOT_COUNT = 9;
 
 export const PHASE_LAYOUTS = {
-  readable: ['isolated', 'isolated', 'setpiece', 'isolated', 'isolated', 'isolated', 'isolated', 'isolated'],
-  mixed: ['isolated', 'setpiece', 'isolated', 'isolated', 'setpiece', 'isolated', 'isolated'],
-  chaos: ['setpiece', 'isolated', 'isolated', 'setpiece', 'isolated', 'isolated', 'isolated'],
+  readable: ['isolated', 'isolated', 'setpiece', 'isolated', 'setpiece', 'isolated'],
+  mixed: ['isolated', 'setpiece', 'isolated', 'setpiece', 'isolated', 'isolated'],
+  chaos: ['setpiece', 'isolated', 'setpiece', 'isolated', 'setpiece'],
 };
 
 const FIXED_OPENER_SHOTS = [
@@ -784,6 +784,22 @@ function generateShotPlanAttempt(normalizedSeed, totalShots, attempt) {
       plan.push(secondFallback);
       hexCounts.set(secondFallback.shot.hex, (hexCounts.get(secondFallback.shot.hex) ?? 0) + 1);
       bandShotCount += 2;
+    }
+
+    while (bandShotCount < PHASE_SHOT_COUNT) {
+      const remainingShots = totalShots - plan.length;
+      const missingHexes = SHOT_PLAN_REQUIRED_HEXES.filter((hex) => (hexCounts.get(hex) ?? 0) === 0);
+      const forcedHex = !hexCountTarget && missingHexes.length > 0 && remainingShots <= missingHexes.length
+        ? missingHexes[0]
+        : null;
+      const generated = buildIsolatedEntry(plan.length, band, plan, rng, planId, hexCounts, hexCountTarget, forcedHex);
+      if (!generated) {
+        return null;
+      }
+
+      plan.push(generated);
+      hexCounts.set(generated.shot.hex, (hexCounts.get(generated.shot.hex) ?? 0) + 1);
+      bandShotCount += 1;
     }
 
     if (bandShotCount !== PHASE_SHOT_COUNT) {
