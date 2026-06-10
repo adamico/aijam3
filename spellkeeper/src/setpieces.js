@@ -327,7 +327,7 @@ const SETPIECE_LIBRARY = {
           },
           designer: {
             label: 'pin low',
-            pressureTags: ['low', 'extreme-side', 'finish'],
+            pressureTags: ['low', 'extreme-side', 'commitment', 'finish'],
           },
         },
       ],
