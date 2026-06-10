@@ -325,7 +325,7 @@ export function updateBallShot(dt = 1 / 60) {
   for (const event of events) {
     if (event.type !== 'shot-resolved') continue;
 
-    applyMatchShotOutcome(event.result.outcome);
+    applyMatchShotOutcome(event.result?.outcome ?? event.outcome);
   }
 
   return getBallPose();

@@ -94,6 +94,8 @@ describe('shot runtime', () => {
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       type: 'shot-resolved',
+      outcome: 'saved',
+      crossedGoalPlane: true,
       result: {
         outcome: 'saved',
         isSave: true,
@@ -129,6 +131,10 @@ describe('shot runtime', () => {
       outcome: 'deflected',
       isSave: false,
       segmentId: 'torso',
+    });
+    expect(events[0]).toMatchObject({
+      outcome: 'deflected',
+      crossedGoalPlane: true,
     });
     expect(advanced.feedback.lastResult).toMatchObject({ outcome: 'deflected' });
     expect(advanced.activeShot.sample.saveResult).toMatchObject({ outcome: 'deflected' });

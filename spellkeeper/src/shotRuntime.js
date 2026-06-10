@@ -279,6 +279,7 @@ export function advanceShotRuntime(runtime, {
     events.push({
       type: 'shot-resolved',
       shotIndex: nextRuntime.activeShotIndex,
+      ...result,
       result: { ...result },
     });
   }
