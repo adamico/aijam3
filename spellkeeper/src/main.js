@@ -1,5 +1,6 @@
 import {
   engineInit,
+  clamp,
   vec2, setCameraPos, setCameraScale,
   drawLine, drawCircle, drawTextScreen,
   rgb, Color, setCanvasClearColor,
@@ -27,6 +28,7 @@ import {
   recordShotRuntimeOutcome,
   queueNextShot,
 } from './shotRuntime.js';
+import { sampleShotPath } from './shotTrajectory.js';
 
 // Helper to convert hex to LittleJS Color
 const c = (hex) => new Color().setHex(hex);
@@ -154,6 +156,10 @@ const COLOR_BALL = c('#ffffff');
 const COLOR_BALL_DETAIL = c('#AABBBB');
 const SHOT_RESPAWN_DELAY = 0.35;
 const SAVE_FEEDBACK_DURATION = 0.9;
+const TUTORIAL_SHOT_TELEGRAPH_SHOTS = 2;
+const TUTORIAL_SHOT_TELEGRAPH_FADE_DURATION = 0.85;
+const TUTORIAL_SHOT_TELEGRAPH_SEGMENTS = 10;
+const COLOR_TUTORIAL_SHOT_TELEGRAPH_CORE = c('#ffffff');
 
 const initialMatchState = createMatchState();
 const Match = {
@@ -791,10 +797,57 @@ function drawBall() {
   const shadowRadius = ball.radius * ball.scale * BALL_SHADOW_SCALE * ball.shadow.scale;
   drawCircle(shadowPos, shadowRadius, rgb(1, 1, 1, ball.shadow.opacity));
 
+  drawTutorialShotTelegraph();
+
   // Draw projected Ball with per-hex tint. Orthographic projection keeps size constant.
   drawCircle(ballPos, ball.radius * ball.scale, ball.color ? c(ball.color) : COLOR_BALL);
   // Ball outline/inner detail to distinguish it.
   drawCircle(ballPos, ball.radius * ball.scale * BALL_DETAIL_SCALE, COLOR_BALL_DETAIL);
+}
+
+export function getTutorialShotTelegraph(runtime = Ball.runtime) {
+  const shot = runtime?.activeShot;
+  if (!shot || runtime.shotResolved || runtime.activeShotIndex >= TUTORIAL_SHOT_TELEGRAPH_SHOTS) {
+    return null;
+  }
+
+  const visibility = clamp(1 - (shot.elapsed ?? 0) / TUTORIAL_SHOT_TELEGRAPH_FADE_DURATION, 0, 1);
+  if (visibility <= 0) {
+    return null;
+  }
+
+  return {
+    shotIndex: runtime.activeShotIndex,
+    visibility,
+    points: sampleShotPath(shot, TUTORIAL_SHOT_TELEGRAPH_SEGMENTS),
+  };
+}
+
+function drawTutorialShotTelegraph() {
+  const telegraph = getTutorialShotTelegraph();
+  if (!telegraph) return;
+
+  const pathColor = rgb(0.87, 0.96, 1, telegraph.visibility * 0.4);
+  const targetColor = rgb(1, 1, 1, telegraph.visibility * 0.55);
+  const startColor = rgb(0.87, 0.96, 1, telegraph.visibility * 0.28);
+
+  for (let index = 1; index < telegraph.points.length; index += 1) {
+    const previous = telegraph.points[index - 1];
+    const current = telegraph.points[index];
+    const previousProjection = project(previous.x, previous.y, BALL_MAX_Z - previous.z);
+    const currentProjection = project(current.x, current.y, BALL_MAX_Z - current.z);
+
+    drawLine(previousProjection.pos, currentProjection.pos, 0.045, pathColor);
+  }
+
+  const start = telegraph.points[0];
+  const target = telegraph.points[telegraph.points.length - 1];
+  const startProjection = project(start.x, start.y, BALL_MAX_Z - start.z);
+  const targetProjection = project(target.x, target.y, BALL_MAX_Z - target.z);
+
+  drawCircle(targetProjection.pos, 0.18, targetColor);
+  drawCircle(targetProjection.pos, 0.075, COLOR_TUTORIAL_SHOT_TELEGRAPH_CORE);
+  drawCircle(startProjection.pos, 0.12, startColor);
 }
 
 export function gameRender() {

@@ -129,6 +129,17 @@ export function sampleShot(shot, elapsed) {
   };
 }
 
+export function sampleShotPath(shot, segments = 12) {
+  const sampleCount = Math.max(1, Math.floor(segments));
+  const points = [];
+
+  for (let index = 0; index <= sampleCount; index += 1) {
+    points.push(sampleShot(shot, shot.spec.duration * (index / sampleCount)));
+  }
+
+  return points;
+}
+
 export function advanceShot(shot, dt) {
   const elapsed = shot.elapsed + Math.max(0, dt);
   return {

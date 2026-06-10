@@ -256,7 +256,7 @@ describe('Spell Keeper basic gameplay scene', () => {
     });
 
     it('spawns shots from the current match plan and advances to the next index after each resolution', async () => {
-        const { gameInit, updateBallShot, getBallPose, getMatchState } = await import('./main.js');
+        const { gameInit, updateBallShot, getBallPose, getMatchState, getTutorialShotTelegraph } = await import('./main.js');
         const plan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
 
         gameInit({ shotPlanSeed: DEFAULT_SHOT_PLAN_SEED });
@@ -266,15 +266,27 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(first.x).toBeCloseTo(plan[0].shot.start.x, 5);
         expect(first.y).toBeCloseTo(plan[0].shot.start.y, 5);
         expect(getMatchState().shotsTaken).toBe(0);
+        expect(getTutorialShotTelegraph()).toMatchObject({
+            shotIndex: 0,
+            visibility: 1,
+        });
 
         updateBallShot(999);
         expect(getMatchState().shotsTaken).toBe(1);
+        expect(getTutorialShotTelegraph()).toBeNull();
 
         updateBallShot(0.35);
         const second = getBallPose();
         expect(second.hex).toBe(plan[1].shot.hex);
         expect(second.x).toBeCloseTo(plan[1].shot.start.x, 5);
         expect(second.y).toBeCloseTo(plan[1].shot.start.y, 5);
+
+        expect(getTutorialShotTelegraph()).toMatchObject({
+            shotIndex: 1,
+        });
+
+        updateBallShot(999);
+        expect(getTutorialShotTelegraph()).toBeNull();
     });
 
     it('keeps shot lifecycle, aggregate counts, and score ownership separated through public orchestration', async () => {

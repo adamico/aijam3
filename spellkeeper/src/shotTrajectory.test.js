@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createShot, sampleShot, SHOT_HEXES } from './shotTrajectory.js';
+import { createShot, sampleShot, sampleShotPath, SHOT_HEXES } from './shotTrajectory.js';
 
 const shotConfig = {
   start: { x: -2, y: -4.4 },
@@ -55,5 +55,16 @@ describe('shot trajectory', () => {
     expect(heavy.radius).toBeGreaterThan(fireball.radius);
     expect(curve.spec.color).not.toBe(standard.spec.color);
     expect(curveMid.x - standardMid.x).toBeGreaterThan(2);
+  });
+
+  it('samples a telegraph path from launch to landing for tutorial cues', () => {
+    const shot = createShot({ ...shotConfig, hex: 'standard' });
+    const path = sampleShotPath(shot, 4);
+
+    expect(path).toHaveLength(5);
+    expect(path[0].x).toBeCloseTo(shot.start.x, 5);
+    expect(path[0].y).toBeCloseTo(shot.start.y, 5);
+    expect(path.at(-1)?.x).toBeCloseTo(shot.target.x, 5);
+    expect(path.at(-1)?.y).toBeCloseTo(shot.target.y, 5);
   });
 });
