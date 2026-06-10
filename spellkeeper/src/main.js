@@ -63,14 +63,14 @@ const GOAL_CROSSBAR_LEFT = vec2(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y + GOAL
 const GOAL_CROSSBAR_RIGHT = vec2(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT);
 
 // --- Goalkeeper (Familiar) Initial Joints/Structure ---
-const FAMILIAR_TORSO_RADIUS = 0.65;
-const FAMILIAR_HEAD_RADIUS = 0.45;
-const FAMILIAR_HAND_RADIUS = 0.3;
-const FAMILIAR_FOOT_RADIUS = 0.18;
-const FAMILIAR_UPPER_ARM_THICKNESS = 0.18;
-const FAMILIAR_FOREARM_THICKNESS = 0.15;
-const FAMILIAR_THIGH_THICKNESS = 0.16;
-const FAMILIAR_SHIN_THICKNESS = 0.14;
+const FAMILIAR_TORSO_RADIUS = 0.35;
+const FAMILIAR_HEAD_RADIUS = 0.25;
+const FAMILIAR_HAND_RADIUS = 0.18;
+const FAMILIAR_FOOT_RADIUS = 0.12;
+const FAMILIAR_UPPER_ARM_THICKNESS = 0.10;
+const FAMILIAR_FOREARM_THICKNESS = 0.08;
+const FAMILIAR_THIGH_THICKNESS = 0.10;
+const FAMILIAR_SHIN_THICKNESS = 0.08;
 const COLOR_FAMILIAR_TORSO = c('#4d82cb');
 const COLOR_FAMILIAR_HEAD = c('#2c4d7e');
 const COLOR_FAMILIAR_ARM = c('#3d6db0');
@@ -169,7 +169,7 @@ const Familiar = {
 };
 
 // --- Ball Structure at Spawn ---
-const BALL_RADIUS = 0.45;           // larger than real ball (0.11m) for visual clarity
+const BALL_RADIUS = 0.25;           // larger than real ball (0.11m) for visual clarity
 const BALL_MAX_Z = 11.0;            // distance between starting position and goal line in Z axis
 const BALL_SHADOW_SCALE = 0.9;
 const BALL_SHADOW_OPACITY = 0.18;

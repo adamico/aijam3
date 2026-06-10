@@ -360,7 +360,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(firstShot.x).toBeCloseTo(plan[0].shot.start.x, 5);
         expect(firstShot.y).toBeCloseTo(plan[0].shot.start.y, 5);
 
-        applyKeeperHandIk({ x: -1.2, y: -3.7 });
+        applyKeeperHandIk({ x: -1.3, y: -3.95 }, 0.3);
         updateBallShot(999);
 
         expect(getSaveState()).toMatchObject({
@@ -474,7 +474,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         const { gameInit, gameRenderPost, applyKeeperHandIk, getFamiliarRevealState, getSaveState, getShotResultFeedback, updateBallShot } = await import('./main.js');
 
         gameInit();
-        applyKeeperHandIk({ x: -1.2, y: -3.7 });
+        applyKeeperHandIk({ x: -1.3, y: -3.95 }, 0.3);
         updateBallShot(999);
         const saves = getSaveState();
 
@@ -507,7 +507,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         const { gameInit, gameRender, applyKeeperHandIk, applyMatchShotOutcome, getFamiliarRevealState, updateBallShot } = await import('./main.js');
 
         gameInit();
-        applyKeeperHandIk({ x: -1.2, y: -3.7 });
+        applyKeeperHandIk({ x: -1.3, y: -3.95 }, 0.3);
         updateBallShot(999);
         vi.clearAllMocks();
         gameRender();
