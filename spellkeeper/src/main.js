@@ -112,6 +112,15 @@ const FAMILIAR_TORSO_DRAG_MAX_SPEED = 2.2; // meters/second; intentionally heavy
 const FAMILIAR_DIVE_VERTICAL_LIFT_SCALE = 0.32;
 const FAMILIAR_DIVE_HEAD_LEAD_SCALE = 0.45;
 const FAMILIAR_DIVE_SHOULDER_LEAD_SCALE = 0.28;
+const FAMILIAR_REVEAL_EYE_GLOW_COLOR = c('#e8ffff');
+const FAMILIAR_REVEAL_TAIL_COLOR = c('#9af7ff');
+const FAMILIAR_REVEAL_AURA_COLOR = c('#b6ffff');
+const FAMILIAR_REVEAL_EYE_OFFSET_X = 0.12;
+const FAMILIAR_REVEAL_EYE_OFFSET_Y = 0.06;
+const FAMILIAR_REVEAL_TAIL_OFFSET_X = 0.2;
+const FAMILIAR_REVEAL_TAIL_OFFSET_Y = -0.15;
+const FAMILIAR_REVEAL_TAIL_LENGTH = 0.42;
+const FAMILIAR_REVEAL_TAIL_WIDTH = 0.06;
 const FAMILIAR_BODY_OFFSETS = {
   head: { x: 0, y: FAMILIAR_INIT_HEAD_Y - FAMILIAR_INIT_TORSO_Y },
   leftShoulder: { x: -FAMILIAR_INIT_SHOULDER_X, y: FAMILIAR_INIT_SHOULDER_Y - FAMILIAR_INIT_TORSO_Y },
@@ -377,6 +386,23 @@ export function getShotResolutionSummary() {
     overlapDepth: result.overlapDepth ?? null,
     contactSegments: Array.isArray(result.contactSegments) ? result.contactSegments : [],
     label: resultFeedback.label,
+  };
+}
+
+export function getFamiliarRevealState() {
+  const feedback = getFeedbackState(Ball.runtime);
+  const result = feedback?.lastResult;
+  const isCleanSave = Boolean(result?.isCleanSave);
+  const duration = Ball.runtime?.shotTiming?.feedbackDuration ?? SAVE_FEEDBACK_DURATION;
+  const visibility = isCleanSave && feedback?.timer > 0 && duration > 0
+    ? clamp(feedback.timer / duration, 0, 1)
+    : 0;
+
+  return {
+    isActive: visibility > 0,
+    visibility,
+    isCleanSave,
+    segmentId: result?.segmentId ?? null,
   };
 }
 
@@ -749,12 +775,64 @@ function drawGoal() {
 function drawKeeper() {
   const goalDepth = BALL_MAX_Z;
   const fam = (x, y) => project(x, y, goalDepth);
+  const reveal = getFamiliarRevealState();
+  const revealGlowScale = 1 + reveal.visibility * 0.35;
 
   const torso = fam(Familiar.torsoPos.x, Familiar.torsoPos.y);
   drawCircle(torso.pos, Familiar.torsoRadius * torso.scale, COLOR_FAMILIAR_TORSO);
 
   const head = fam(Familiar.headPos.x, Familiar.headPos.y);
   drawCircle(head.pos, Familiar.headRadius * head.scale, COLOR_FAMILIAR_HEAD);
+
+  if (reveal.isActive) {
+    const leftEye = vec2(
+      head.pos.x - FAMILIAR_REVEAL_EYE_OFFSET_X * revealGlowScale,
+      head.pos.y + FAMILIAR_REVEAL_EYE_OFFSET_Y * revealGlowScale,
+    );
+    const rightEye = vec2(
+      head.pos.x + FAMILIAR_REVEAL_EYE_OFFSET_X * revealGlowScale,
+      head.pos.y + FAMILIAR_REVEAL_EYE_OFFSET_Y * revealGlowScale,
+    );
+    const tailStart = vec2(
+      torso.pos.x + FAMILIAR_REVEAL_TAIL_OFFSET_X,
+      torso.pos.y + FAMILIAR_REVEAL_TAIL_OFFSET_Y,
+    );
+    const tailEnd = vec2(
+      tailStart.x - FAMILIAR_REVEAL_TAIL_LENGTH * revealGlowScale,
+      tailStart.y - FAMILIAR_REVEAL_TAIL_LENGTH * 0.15,
+    );
+    const tailTip = vec2(
+      tailEnd.x - FAMILIAR_REVEAL_TAIL_LENGTH * 0.08,
+      tailEnd.y + FAMILIAR_REVEAL_TAIL_LENGTH * 0.06,
+    );
+
+    drawCircle(
+      head.pos,
+      Familiar.headRadius * head.scale * 1.08 * revealGlowScale,
+      FAMILIAR_REVEAL_AURA_COLOR,
+    );
+    drawCircle(
+      leftEye,
+      Familiar.headRadius * 0.09 * revealGlowScale,
+      FAMILIAR_REVEAL_EYE_GLOW_COLOR,
+    );
+    drawCircle(
+      rightEye,
+      Familiar.headRadius * 0.09 * revealGlowScale,
+      FAMILIAR_REVEAL_EYE_GLOW_COLOR,
+    );
+    drawLine(
+      tailStart,
+      tailEnd,
+      FAMILIAR_REVEAL_TAIL_WIDTH * revealGlowScale,
+      FAMILIAR_REVEAL_TAIL_COLOR,
+    );
+    drawCircle(
+      tailTip,
+      FAMILIAR_REVEAL_TAIL_WIDTH * 1.2 * revealGlowScale,
+      FAMILIAR_REVEAL_TAIL_COLOR,
+    );
+  }
 
   const lShoulder = fam(Familiar.leftShoulder.x, Familiar.leftShoulder.y);
   const lElbow = fam(Familiar.leftElbow.x, Familiar.leftElbow.y);

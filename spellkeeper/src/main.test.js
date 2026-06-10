@@ -419,7 +419,7 @@ describe('Spell Keeper basic gameplay scene', () => {
 
     it('resolves a goal-plane overlap as a save when the shot crosses', async () => {
         const engine = await import('littlejsengine');
-        const { gameInit, gameRenderPost, applyKeeperHandIk, getSaveState, getShotResultFeedback, updateBallShot } = await import('./main.js');
+        const { gameInit, gameRenderPost, applyKeeperHandIk, getFamiliarRevealState, getSaveState, getShotResultFeedback, updateBallShot } = await import('./main.js');
 
         gameInit();
         applyKeeperHandIk({ x: -1.2, y: -3.7 });
@@ -444,6 +444,40 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(getShotResultFeedback('saved')).toMatchObject({ label: 'SAVE +100' });
         expect(getShotResultFeedback('deflected')).toMatchObject({ label: 'DEFLECTED +25' });
         expect(getShotResultFeedback('conceded')).toMatchObject({ label: 'GOAL +0' });
+        expect(getFamiliarRevealState()).toMatchObject({
+            isActive: true,
+            isCleanSave: true,
+        });
+    });
+
+    it('draws a cosmetic Familiar reveal only for clean saves', async () => {
+        const engine = await import('littlejsengine');
+        const { gameInit, gameRender, applyKeeperHandIk, applyMatchShotOutcome, getFamiliarRevealState, updateBallShot } = await import('./main.js');
+
+        gameInit();
+        applyKeeperHandIk({ x: -1.2, y: -3.7 });
+        updateBallShot(999);
+        vi.clearAllMocks();
+        gameRender();
+
+        expect(getFamiliarRevealState()).toMatchObject({
+            isActive: true,
+            isCleanSave: true,
+        });
+        expect(engine.drawCircle.mock.calls.some(([, , color]) => color?.hex === '#e8ffff')).toBe(true);
+        expect(engine.drawLine.mock.calls.some(([, , , color]) => color?.hex === '#9af7ff')).toBe(true);
+
+        gameInit();
+        applyMatchShotOutcome('conceded');
+        vi.clearAllMocks();
+        gameRender();
+
+        expect(getFamiliarRevealState()).toMatchObject({
+            isActive: false,
+            isCleanSave: false,
+        });
+        expect(engine.drawCircle.mock.calls.some(([, , color]) => color?.hex === '#e8ffff')).toBe(false);
+        expect(engine.drawLine.mock.calls.some(([, , , color]) => color?.hex === '#9af7ff')).toBe(false);
     });
 
     it('ends the match and renders a final score after 5 concessions', async () => {
