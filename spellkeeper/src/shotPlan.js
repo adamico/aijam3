@@ -111,7 +111,6 @@ const CALIBRATION_SHOT_CHAIN_BLUEPRINT = [
   ['curve', 'outerRight', 'outerLeft', 'middle', 'curve correction reverse', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['curve', 'switch', 'late-correction'], 'curve-misread', -1],
   ['fireball', 'center', 'center', 'high', 'vertical alternation', SHOT_PLAN_DIFFICULTY_BANDS.mixed, ['high-low', 'speed', 'center'], 'high-low-misread'],
   ['heavy', 'outerLeft', 'outerLeft', 'low', 'late heavy drag', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['low', 'extreme-side', 'commitment', 'drag'], 'late-recovery'],
-  ['standard', 'outerRight', 'outerRight', 'high', 'same-side late squeeze', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['same-side', 'pin', 'late'], 'same-side-pinning'],
   ['curve', 'outerLeft', 'innerRight', 'middle', 'chaos curve bait', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['curve', 'curve-bait', 'opposite-side'], 'curve-bait', 1],
   ['standard', 'innerLeft', 'outerLeft', 'high', 'high-low whip', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['high-low', 'late-recovery', 'opposite-side'], 'high-low-misread'],
   ['heavy', 'outerRight', 'outerRight', 'low', 'pin right again', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['same-side', 'pin', 'low', 'extreme-side'], 'same-side-pinning'],
@@ -120,7 +119,21 @@ const CALIBRATION_SHOT_CHAIN_BLUEPRINT = [
   ['standard', 'outerLeft', 'outerLeft', 'high', 'final overcommit', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['overcommit', 'same-side', 'punish'], 'overcommit-punish'],
   ['heavy', 'outerLeft', 'outerLeft', 'low', 'closing drag', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['low', 'extreme-side', 'commitment', 'finish'], 'late-recovery'],
   ['fireball', 'outerRight', 'outerRight', 'high', 'high corner finish', SHOT_PLAN_DIFFICULTY_BANDS.chaos, ['speed', 'corner', 'high-low', 'finish'], 'high-low-misread'],
-];
+].map(([hex, originLane, targetLane, placementHeight, label, difficultyBand, pressureTags, intendedFailureMode, curveDirection]) => ({
+  shot: {
+    hex,
+    originLane,
+    targetLane,
+    placementHeight,
+    ...(curveDirection !== undefined ? { curveDirection } : {}),
+  },
+  designer: {
+    label,
+    difficultyBand,
+    pressureTags,
+    intendedFailureMode,
+  },
+}));
 
 const SHOT_PHASE_POOLS = [
   [
