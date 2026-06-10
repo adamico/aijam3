@@ -356,7 +356,7 @@ describe('Spell Keeper basic gameplay scene', () => {
 
     it('resolves a goal-plane overlap as a save when the shot crosses', async () => {
         const engine = await import('littlejsengine');
-        const { gameInit, gameRenderPost, applyKeeperHandIk, getSaveState, updateBallShot } = await import('./main.js');
+        const { gameInit, gameRenderPost, applyKeeperHandIk, getSaveState, getShotResultFeedback, updateBallShot } = await import('./main.js');
 
         gameInit();
         applyKeeperHandIk({ x: -1.2, y: -3.7 });
@@ -370,13 +370,17 @@ describe('Spell Keeper basic gameplay scene', () => {
 
         gameRenderPost();
         expect(engine.drawTextScreen).toHaveBeenCalledWith(
-            'SAVE!',
+            'SAVE +100',
             expect.anything(),
             56,
             expect.anything(),
             5,
             expect.anything(),
         );
+
+        expect(getShotResultFeedback('saved')).toMatchObject({ label: 'SAVE +100' });
+        expect(getShotResultFeedback('deflected')).toMatchObject({ label: 'DEFLECTED +25' });
+        expect(getShotResultFeedback('conceded')).toMatchObject({ label: 'GOAL +0' });
     });
 
     it('ends the match and renders a final score after 5 concessions', async () => {

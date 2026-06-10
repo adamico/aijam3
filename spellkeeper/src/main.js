@@ -45,8 +45,14 @@ const GOAL_HEIGHT = 2.44;  // standard height proportion
 const GOAL_POST_THICKNESS = 0.2;
 const COLOR_GOAL_FRAME = c('#ffffff');
 const COLOR_SAVE_FEEDBACK = c('#66ff99');
+const COLOR_DEFLECTION_FEEDBACK = c('#ffbf66');
 const COLOR_MISS_FEEDBACK = c('#ff6677');
 const COLOR_SCORE_FEEDBACK = c('#d7e8ff');
+const SHOT_RESULT_FEEDBACK = {
+  saved: { label: 'SAVE +100', color: COLOR_SAVE_FEEDBACK },
+  deflected: { label: 'DEFLECTED +25', color: COLOR_DEFLECTION_FEEDBACK },
+  conceded: { label: 'GOAL +0', color: COLOR_MISS_FEEDBACK },
+};
 
 const GOAL_LEFT_POST = vec2(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y);
 const GOAL_RIGHT_POST = vec2(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y);
@@ -252,6 +258,11 @@ export function gameInit(options = {}) {
   Match.plan = createShotPlan(Match.shotPlanSeed, { totalShots: Match.state.totalShots });
   Ball.runtime = createBallRuntime();
   syncBallFromRuntime(Ball.runtime);
+}
+
+export function getShotResultFeedback(outcome) {
+  const canonicalOutcome = outcome === 'save' ? 'saved' : outcome;
+  return SHOT_RESULT_FEEDBACK[canonicalOutcome] ?? SHOT_RESULT_FEEDBACK.conceded;
 }
 
 export function gameUpdate() {
@@ -658,10 +669,23 @@ function drawSaveFeedback() {
     COLOR_STADIUM_NIGHT,
   );
 
+  const feedback = getFeedbackState(Ball.runtime);
+  if (!feedback?.lastResult || feedback.timer <= 0) return;
+
+  const resultFeedback = getShotResultFeedback(feedback.lastResult.outcome);
+  drawTextScreen(
+    resultFeedback.label,
+    vec2(centerX, 86),
+    56,
+    resultFeedback.color,
+    5,
+    COLOR_STADIUM_NIGHT,
+  );
+
   if (isMatchComplete(Match.state)) {
     drawTextScreen(
       Match.state.status === 'won' ? 'MATCH WON!' : 'MATCH LOST',
-      vec2(centerX, 86),
+      vec2(centerX, 136),
       48,
       Match.state.status === 'won' ? COLOR_SAVE_FEEDBACK : COLOR_MISS_FEEDBACK,
       5,
@@ -669,37 +693,13 @@ function drawSaveFeedback() {
     );
     drawTextScreen(
       `Final Score ${Match.state.score}`,
-      vec2(centerX, 136),
+      vec2(centerX, 186),
       32,
       COLOR_SCORE_FEEDBACK,
       4,
       COLOR_STADIUM_NIGHT,
     );
-    return;
   }
-
-  const feedback = getFeedbackState(Ball.runtime);
-  if (!feedback?.lastResult || feedback.timer <= 0) return;
-
-  const outcome = feedback.lastResult.outcome === 'save' ? 'saved' : feedback.lastResult.outcome;
-  const label = outcome === 'saved'
-    ? 'SAVE!'
-    : outcome === 'deflected'
-      ? 'DEFLECTED!'
-      : 'GOAL!';
-  const color = outcome === 'saved'
-    ? COLOR_SAVE_FEEDBACK
-    : outcome === 'deflected'
-      ? COLOR_SCORE_FEEDBACK
-      : COLOR_MISS_FEEDBACK;
-  drawTextScreen(
-    label,
-    vec2(centerX, 86),
-    56,
-    color,
-    5,
-    COLOR_STADIUM_NIGHT,
-  );
 }
 
 // Startup LittleJS Engine only if running in a browser environment
