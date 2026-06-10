@@ -70,8 +70,9 @@ describe('shot runtime', () => {
     const shotPlan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
     const runtime = createShotRuntime({ shotPlan, shotDimensions, shotTiming });
     const resolveSave = vi.fn(() => ({
-      outcome: 'save',
+      outcome: 'saved',
       isSave: true,
+      isSaved: true,
       segmentId: 'rightHand',
       distance: 0.5,
       overlapDepth: 0.2,
@@ -94,25 +95,26 @@ describe('shot runtime', () => {
     expect(events[0]).toMatchObject({
       type: 'shot-resolved',
       result: {
-        outcome: 'save',
+        outcome: 'saved',
         isSave: true,
         segmentId: 'rightHand',
       },
     });
-    expect(advanced.feedback.lastResult).toMatchObject({ outcome: 'save' });
+    expect(advanced.feedback.lastResult).toMatchObject({ outcome: 'saved' });
     expect(advanced.respawnTimer).toBeCloseTo(0.35);
-    expect(advanced.activeShot.sample.saveResult).toMatchObject({ outcome: 'save' });
+    expect(advanced.activeShot.sample.saveResult).toMatchObject({ outcome: 'saved' });
   });
 
-  it('emits a conceded resolution event when the resolver reports a miss', () => {
+  it('emits a deflected resolution event when the resolver reports body contact', () => {
     const shotPlan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
     const runtime = createShotRuntime({ shotPlan, shotDimensions, shotTiming });
     const resolveSave = vi.fn(() => ({
-      outcome: 'conceded',
+      outcome: 'deflected',
       isSave: false,
-      segmentId: null,
-      distance: null,
-      overlapDepth: null,
+      isSaved: false,
+      segmentId: 'torso',
+      distance: 0.5,
+      overlapDepth: 0.2,
       crossedGoalPlane: true,
     }));
 
@@ -124,20 +126,21 @@ describe('shot runtime', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0].result).toMatchObject({
-      outcome: 'conceded',
+      outcome: 'deflected',
       isSave: false,
-      segmentId: null,
+      segmentId: 'torso',
     });
-    expect(advanced.feedback.lastResult).toMatchObject({ outcome: 'conceded' });
-    expect(advanced.activeShot.sample.saveResult).toMatchObject({ outcome: 'conceded' });
+    expect(advanced.feedback.lastResult).toMatchObject({ outcome: 'deflected' });
+    expect(advanced.activeShot.sample.saveResult).toMatchObject({ outcome: 'deflected' });
   });
 
   it('keeps feedback alive for the configured duration and respawns after the delay', () => {
     const shotPlan = createShotPlan(DEFAULT_SHOT_PLAN_SEED, { totalShots: 30 });
     const runtime = createShotRuntime({ shotPlan, shotDimensions, shotTiming });
     const resolveSave = vi.fn(() => ({
-      outcome: 'save',
+      outcome: 'saved',
       isSave: true,
+      isSaved: true,
       segmentId: 'rightHand',
       distance: 0.5,
       overlapDepth: 0.2,
@@ -172,6 +175,7 @@ describe('shot runtime', () => {
     const resolveSave = vi.fn(() => ({
       outcome: 'conceded',
       isSave: false,
+      isSaved: false,
       segmentId: null,
       distance: null,
       overlapDepth: null,

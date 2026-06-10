@@ -14,17 +14,31 @@ const arm = {
 };
 
 describe('SaveResolver', () => {
-  it('registers a save when any body segment overlaps the ball at the crossing frame', () => {
+  it('registers a saved outcome when both gloves overlap the ball at the crossing frame', () => {
     const result = resolveCrossingSave({
       previousZ: 0.2,
       currentZ: 0,
       ball: { x: 1.2, y: -3.5, radius: 0.45 },
-      segments: [glove],
+      segments: [glove, { ...glove, id: 'leftHand', center: { x: 0.8, y: -3.5 } }, arm],
     });
 
     expect(result.crossedGoalPlane).toBe(true);
-    expect(result.outcome).toBe('save');
+    expect(result.outcome).toBe('saved');
     expect(result.isSave).toBe(true);
+    expect(result.segmentId).toBe('rightHand');
+  });
+
+  it('counts a goal-plane crossing as deflected when a single glove contacts the ball', () => {
+    const result = resolveCrossingSave({
+      previousZ: 0.2,
+      currentZ: 0,
+      ball: { x: 1.2, y: -3.5, radius: 0.45 },
+      segments: [glove, arm],
+    });
+
+    expect(result.crossedGoalPlane).toBe(true);
+    expect(result.outcome).toBe('deflected');
+    expect(result.isSave).toBe(false);
     expect(result.segmentId).toBe('rightHand');
   });
 
@@ -33,7 +47,7 @@ describe('SaveResolver', () => {
       previousZ: 0.2,
       currentZ: 0,
       ball: { x: -2, y: -2, radius: 0.45 },
-      segments: [glove, arm],
+      segments: [{ ...glove, center: { x: 1, y: -3.5 } }, { ...arm, start: { x: 0, y: -4 }, end: { x: 2, y: -4 } }],
     });
 
     expect(result.crossedGoalPlane).toBe(true);
@@ -61,7 +75,7 @@ describe('SaveResolver', () => {
 
     expect(overlap.distance).toBeCloseTo(0.75, 5);
     expect(overlap.overlaps).toBe(true);
-    expect(result.outcome).toBe('save');
+    expect(result.outcome).toBe('saved');
   });
 
   it('uses capsule distance for arm and torso/body segment overlap', () => {
@@ -70,7 +84,7 @@ describe('SaveResolver', () => {
       segments: [arm],
     });
 
-    expect(result.outcome).toBe('save');
+    expect(result.outcome).toBe('deflected');
     expect(result.segmentId).toBe('rightForearm');
   });
 });

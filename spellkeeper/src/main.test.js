@@ -273,15 +273,17 @@ describe('Spell Keeper basic gameplay scene', () => {
 
         expect(getSaveState()).toMatchObject({
             saves: 1,
+            deflections: 0,
             conceded: 0,
             lastResult: {
-                outcome: 'save',
+                outcome: 'saved',
                 crossedGoalPlane: true,
             },
         });
         expect(getMatchState()).toMatchObject({
             shotsTaken: 1,
             saves: 1,
+            deflections: 0,
             conceded: 0,
             ongoingScore: 100,
             score: 0,
@@ -292,6 +294,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(getBallPose().hex).toBe(plan[1].shot.hex);
         expect(getSaveState()).toMatchObject({
             saves: 1,
+            deflections: 0,
             conceded: 0,
         });
 
@@ -299,11 +302,13 @@ describe('Spell Keeper basic gameplay scene', () => {
 
         expect(getSaveState()).toMatchObject({
             saves: 1,
+            deflections: 0,
             conceded: 1,
         });
         expect(getMatchState()).toMatchObject({
             shotsTaken: 2,
             saves: 1,
+            deflections: 0,
             conceded: 1,
             ongoingScore: 100,
             score: 0,
@@ -360,7 +365,7 @@ describe('Spell Keeper basic gameplay scene', () => {
 
         expect(saves.saves).toBe(1);
         expect(saves.conceded).toBe(0);
-        expect(saves.lastResult.outcome).toBe('save');
+        expect(saves.lastResult.outcome).toBe('saved');
         expect(saves.lastResult.crossedGoalPlane).toBe(true);
 
         gameRenderPost();

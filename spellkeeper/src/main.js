@@ -371,6 +371,7 @@ export function getSaveState() {
 
   return {
     saves: Match.state.saves,
+    deflections: Match.state.deflections,
     conceded: Match.state.conceded,
     feedbackTimer: feedback?.timer ?? 0,
     lastResult: feedback?.lastResult ? { ...feedback.lastResult } : null,
@@ -649,7 +650,7 @@ export function gameRenderPost() {
 function drawSaveFeedback() {
   const centerX = mainCanvasSize.x / 2;
   drawTextScreen(
-    `Shot ${Match.state.shotsTaken}/${Match.state.totalShots}   Saves ${Match.state.saves}   Misses ${Match.state.conceded}   Score ${Match.state.ongoingScore}`,
+    `Shot ${Match.state.shotsTaken}/${Match.state.totalShots}   Saves ${Match.state.saves}   Deflections ${Match.state.deflections}   Goals ${Match.state.conceded}   Score ${Match.state.ongoingScore}`,
     vec2(centerX, 34),
     28,
     COLOR_SCORE_FEEDBACK,
@@ -680,12 +681,22 @@ function drawSaveFeedback() {
   const feedback = getFeedbackState(Ball.runtime);
   if (!feedback?.lastResult || feedback.timer <= 0) return;
 
-  const isSave = feedback.lastResult.outcome === 'save';
+  const outcome = feedback.lastResult.outcome === 'save' ? 'saved' : feedback.lastResult.outcome;
+  const label = outcome === 'saved'
+    ? 'SAVE!'
+    : outcome === 'deflected'
+      ? 'DEFLECTED!'
+      : 'GOAL!';
+  const color = outcome === 'saved'
+    ? COLOR_SAVE_FEEDBACK
+    : outcome === 'deflected'
+      ? COLOR_SCORE_FEEDBACK
+      : COLOR_MISS_FEEDBACK;
   drawTextScreen(
-    isSave ? 'SAVE!' : 'MISS!',
+    label,
     vec2(centerX, 86),
     56,
-    isSave ? COLOR_SAVE_FEEDBACK : COLOR_MISS_FEEDBACK,
+    color,
     5,
     COLOR_STADIUM_NIGHT,
   );

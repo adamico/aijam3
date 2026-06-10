@@ -8,7 +8,7 @@ import {
 } from './matchState.js';
 
 describe('MatchState', () => {
-  it('starts a 30-shot active match with no saves or concessions', () => {
+  it('starts a 30-shot active match with no saves, deflections, or concessions', () => {
     const match = createMatchState();
 
     expect(match.status).toBe('active');
@@ -17,22 +17,24 @@ describe('MatchState', () => {
     expect(match.maxConcessions).toBe(5);
     expect(match.score).toBe(0);
     expect(match.ongoingScore).toBe(0);
+    expect(match.deflections).toBe(0);
   });
 
-  it('advances shots and counts saves without computing score before match end', () => {
-    const match = recordShotResult(createMatchState(), 'save');
+  it('advances shots and counts saves and deflections without computing score before match end', () => {
+    const match = recordShotResult(recordShotResult(createMatchState(), 'saved'), 'deflected');
 
     expect(match.status).toBe('active');
-    expect(match.shotsTaken).toBe(1);
+    expect(match.shotsTaken).toBe(2);
     expect(match.saves).toBe(1);
+    expect(match.deflections).toBe(1);
     expect(match.conceded).toBe(0);
     expect(match.score).toBe(0);
-    expect(match.ongoingScore).toBe(100);
-    expect(computeOngoingScore(match)).toBe(100);
+    expect(match.ongoingScore).toBe(125);
+    expect(computeOngoingScore(match)).toBe(125);
   });
 
   it('loses immediately on the fifth concession', () => {
-    const matchBeforeLoss = ['conceded', 'save', 'conceded', 'save', 'conceded', 'save', 'conceded'].reduce(
+    const matchBeforeLoss = ['conceded', 'saved', 'conceded', 'saved', 'conceded', 'saved', 'conceded'].reduce(
       (state, outcome) => recordShotResult(state, outcome),
       createMatchState(),
     );
@@ -46,12 +48,12 @@ describe('MatchState', () => {
 
   it('wins by surviving all 30 shots with fewer than 5 concessions', () => {
     const outcomes = [
-      'save', 'save', 'conceded', 'save', 'save',
-      'save', 'save', 'conceded', 'save', 'save',
-      'save', 'save', 'save', 'save', 'save',
-      'save', 'save', 'save', 'save', 'save',
-      'save', 'save', 'save', 'save', 'save',
-      'save', 'save', 'save', 'save', 'save',
+      'saved', 'saved', 'conceded', 'saved', 'saved',
+      'saved', 'saved', 'conceded', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
     ];
     const match = outcomes.reduce(
       (state, outcome) => recordShotResult(state, outcome),
@@ -64,18 +66,18 @@ describe('MatchState', () => {
     expect(match.conceded).toBe(2);
   });
 
-  it('computes final score as save points plus clean-sheet bonus at match end', () => {
-    const cleanSheet = Array.from({ length: 30 }, () => 'save').reduce(
+  it('computes final score as save and deflection points plus clean-sheet bonus at match end', () => {
+    const cleanSheet = Array.from({ length: 30 }, () => 'saved').reduce(
       (state, outcome) => recordShotResult(state, outcome),
       createMatchState(),
     );
     const dirtyWin = [
-      'save', 'save', 'conceded', 'save', 'save',
-      'save', 'save', 'conceded', 'save', 'save',
-      'save', 'save', 'save', 'save', 'save',
-      'save', 'save', 'save', 'save', 'save',
-      'save', 'save', 'save', 'save', 'save',
-      'save', 'save', 'save', 'save', 'save',
+      'saved', 'saved', 'conceded', 'saved', 'saved',
+      'saved', 'saved', 'conceded', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
     ].reduce(
       (state, outcome) => recordShotResult(state, outcome),
       createMatchState(),
@@ -88,12 +90,36 @@ describe('MatchState', () => {
     expect(cleanSheet.score).toBeGreaterThan(dirtyWin.score);
   });
 
+  it('scores deflections below saves while preserving the clean-sheet bonus', () => {
+    const outcomeChain = [
+      'saved', 'saved', 'deflected', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+      'saved', 'saved', 'saved', 'saved', 'saved',
+    ];
+
+    const match = outcomeChain.reduce(
+      (state, outcome) => recordShotResult(state, outcome),
+      createMatchState(),
+    );
+
+    expect(match.status).toBe('won');
+    expect(match.saves).toBe(29);
+    expect(match.deflections).toBe(1);
+    expect(match.conceded).toBe(0);
+    expect(match.ongoingScore).toBe(2925);
+    expect(match.score).toBe(3425);
+    expect(match.score).toBe(computeMatchScore(match));
+  });
+
   it('ignores additional shot results after the match ends cleanly', () => {
     const loss = ['conceded', 'conceded', 'conceded', 'conceded', 'conceded'].reduce(
       (state, outcome) => recordShotResult(state, outcome),
       createMatchState(),
     );
 
-    expect(recordShotResult(loss, 'save')).toBe(loss);
+    expect(recordShotResult(loss, 'saved')).toBe(loss);
   });
 });

@@ -2,6 +2,10 @@ import { clamp, vec2 } from 'littlejsengine';
 
 const DEFAULT_EPSILON = 1e-6;
 
+function isGloveSegment(segment) {
+  return typeof segment?.id === 'string' && /hand$/i.test(segment.id);
+}
+
 function segmentDistanceSquared(point, start, end) {
   const pointVector = vec2(point.x, point.y);
   const startVector = vec2(start.x, start.y);
@@ -56,22 +60,51 @@ export function resolveGoalPlaneSave({ ball, segments, epsilon = DEFAULT_EPSILON
   if (!ball) throw new Error('SaveResolver ball is required');
   if (!Array.isArray(segments)) throw new Error('SaveResolver segments must be an array');
 
+  const contacts = [];
+
   for (const segment of segments) {
     const overlap = segmentOverlapsBall(segment, ball, epsilon);
-    if (overlap.overlaps) {
-      return {
-        outcome: 'save',
-        isSave: true,
-        segmentId: segment.id,
-        distance: overlap.distance,
-        overlapDepth: overlap.overlapDepth,
-      };
-    }
+    if (!overlap.overlaps) continue;
+
+    contacts.push({
+      segment,
+      overlap,
+      isGlove: isGloveSegment(segment),
+    });
+  }
+
+  const gloveContacts = contacts.filter(contact => contact.isGlove);
+
+  if (gloveContacts.length >= 2) {
+    const primaryContact = gloveContacts[0] ?? contacts[0];
+
+    return {
+      outcome: 'saved',
+      isSave: true,
+      isSaved: true,
+      segmentId: primaryContact?.segment?.id ?? null,
+      distance: primaryContact?.overlap.distance ?? null,
+      overlapDepth: primaryContact?.overlap.overlapDepth ?? null,
+    };
+  }
+
+  if (contacts.length > 0) {
+    const primaryContact = gloveContacts[0] ?? contacts[0];
+
+    return {
+      outcome: 'deflected',
+      isSave: false,
+      isSaved: false,
+      segmentId: primaryContact?.segment?.id ?? null,
+      distance: primaryContact?.overlap.distance ?? null,
+      overlapDepth: primaryContact?.overlap.overlapDepth ?? null,
+    };
   }
 
   return {
     outcome: 'conceded',
     isSave: false,
+    isSaved: false,
     segmentId: null,
     distance: null,
     overlapDepth: null,
@@ -85,7 +118,10 @@ export function resolveCrossingSave({ previousZ, currentZ, ball, segments, epsil
     return {
       outcome: 'in-flight',
       isSave: false,
+      isSaved: false,
       segmentId: null,
+      distance: null,
+      overlapDepth: null,
       crossedGoalPlane: false,
     };
   }
