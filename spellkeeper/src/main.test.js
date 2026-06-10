@@ -175,7 +175,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(pose.torso.x).toBeLessThan(result.body.desiredTorso.x);
         expect(result.body.velocity.x).toBeLessThanOrEqual(4.0);
         expect(pose.head.x).toBeCloseTo(pose.torso.x, 5);
-        expect(pose.rightShoulder.x).toBeCloseTo(pose.torso.x + 0.3, 5);
+        expect(pose.rightShoulder.x).toBeCloseTo(pose.torso.x + 0.2, 5);
     });
 
     it('raises papercraft stress when the keeper stretches or dives', async () => {

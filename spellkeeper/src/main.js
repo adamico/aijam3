@@ -63,7 +63,7 @@ const GOAL_CROSSBAR_LEFT = vec2(PITCH_CENTER_X - GOAL_WIDTH / 2, GROUND_Y + GOAL
 const GOAL_CROSSBAR_RIGHT = vec2(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y + GOAL_HEIGHT);
 
 // --- Goalkeeper (Familiar) Initial Joints/Structure ---
-const FAMILIAR_TORSO_RADIUS = 0.35;
+const FAMILIAR_TORSO_RADIUS = 0.60;
 const FAMILIAR_HEAD_RADIUS = 0.25;
 const FAMILIAR_HAND_RADIUS = 0.18;
 const FAMILIAR_FOOT_RADIUS = 0.12;
@@ -77,16 +77,16 @@ const COLOR_FAMILIAR_ARM = c('#3d6db0');
 const COLOR_FAMILIAR_HAND = c('#d95763');
 
 // Initial joint layout offsets (in meters relative to ground/center)
-const FAMILIAR_INIT_HEAD_Y = 1.7;
+const FAMILIAR_INIT_HEAD_Y = 1.55;
 const FAMILIAR_INIT_TORSO_Y = 1;
-const FAMILIAR_INIT_SHOULDER_X = 0.3;
-const FAMILIAR_INIT_SHOULDER_Y = 1.2;
+const FAMILIAR_INIT_SHOULDER_X = 0.2;
+const FAMILIAR_INIT_SHOULDER_Y = 1.15;
 const FAMILIAR_INIT_ELBOW_X = 0.8;
 const FAMILIAR_INIT_ELBOW_Y = 0.9;
 const FAMILIAR_INIT_HAND_X = 1.2;
 const FAMILIAR_INIT_HAND_Y = 1.2;
-const FAMILIAR_INIT_HIP_X = 0.22;
-const FAMILIAR_INIT_HIP_Y = 0.45;
+const FAMILIAR_INIT_HIP_X = 0.15;
+const FAMILIAR_INIT_HIP_Y = 0.8;
 const FAMILIAR_INIT_KNEE_X = 0.34;
 const FAMILIAR_INIT_KNEE_Y = -0.05;
 const FAMILIAR_INIT_FOOT_X = 0.48;
@@ -130,10 +130,7 @@ const FAMILIAR_REVEAL_TAIL_OFFSET_X = 0.2;
 const FAMILIAR_REVEAL_TAIL_OFFSET_Y = -0.15;
 const FAMILIAR_REVEAL_TAIL_LENGTH = 0.42;
 const FAMILIAR_REVEAL_TAIL_WIDTH = 0.06;
-const FAMILIAR_PAPER_EDGE_COLOR = rgb(0.97, 0.98, 1, 0.7);
-const FAMILIAR_PAPER_CREASE_COLOR = rgb(0.84, 0.9, 1, 0.52);
-const FAMILIAR_PAPER_FLAP_COLOR = rgb(1, 0.93, 0.8, 0.7);
-const FAMILIAR_PAPER_GHOST_COLOR = rgb(1, 1, 1, 0.15);
+
 const FAMILIAR_BODY_OFFSETS = {
   head: { x: 0, y: FAMILIAR_INIT_HEAD_Y - FAMILIAR_INIT_TORSO_Y },
   leftShoulder: { x: -FAMILIAR_INIT_SHOULDER_X, y: FAMILIAR_INIT_SHOULDER_Y - FAMILIAR_INIT_TORSO_Y },
@@ -804,20 +801,7 @@ function normalizePoint(point) {
 
 
 
-function addPoint(point, offset) {
-  return vec2(point.x + offset.x, point.y + offset.y);
-}
 
-function scalePoint(point, scale) {
-  return vec2(point.x * scale, point.y * scale);
-}
-
-function perpendicularUnit(start, end) {
-  const delta = pointDelta(start, end);
-  const length = pointLength(delta);
-  if (!length) return vec2(0, 0);
-  return vec2(-delta.y / length, delta.x / length);
-}
 
 function jointBend(start, joint, end) {
   const incoming = normalizePoint(pointDelta(joint, start));
@@ -918,85 +902,14 @@ function drawGoal() {
   drawLine(postTopL.pos, postTopR.pos, lineW, COLOR_GOAL_FRAME); // crossbar
 }
 
-function drawPapercraftCircle(pos, radius, fillColor, outlineColor, creaseColor, stress = 0) {
+function drawPapercraftCircle(pos, radius, fillColor, outlineColor, stress = 0) {
   const borderThickness = 0.065 + stress * 0.02;
   drawCircle(pos, radius, fillColor, borderThickness, outlineColor);
-
-  const creaseThickness = 0.025 + stress * 0.01;
-  const angle1 = 0.5;
-  const angle2 = 2.0;
-
-  const p1 = vec2(pos.x + Math.cos(angle1) * radius * 0.95, pos.y + Math.sin(angle1) * radius * 0.95);
-  const p2 = vec2(pos.x - Math.cos(angle1) * radius * 0.95, pos.y - Math.sin(angle1) * radius * 0.95);
-  const p3 = vec2(pos.x + Math.cos(angle2) * radius * 0.95, pos.y + Math.sin(angle2) * radius * 0.95);
-  const p4 = vec2(pos.x - Math.cos(angle2) * radius * 0.95, pos.y - Math.sin(angle2) * radius * 0.95);
-
-  drawLine(p1, p2, creaseThickness * 1.2, creaseColor);
-  drawLine(p3, p4, creaseThickness, creaseColor);
-}
-
-function drawPaperStrip(start, end, width, baseColor, stress, accentColor) {
-  const delta = pointDelta(start, end);
-  const length = pointLength(delta);
-  if (!length) return;
-
-  const direction = normalizePoint(delta);
-  const perp = perpendicularUnit(start, end);
-  const edgeOffset = width * (0.45 + stress * 0.35);
-  const creaseOffset = width * (0.14 + stress * 0.12);
-  const ghostOffset = scalePoint(direction, -width * (0.24 + stress * 0.18));
-  const startGhost = addPoint(start, ghostOffset);
-  const endGhost = addPoint(end, scalePoint(ghostOffset, 0.35));
-
-  drawLine(start, end, width * (1 + stress * 0.12), baseColor);
-  drawLine(
-    addPoint(start, scalePoint(perp, edgeOffset)),
-    addPoint(end, scalePoint(perp, edgeOffset * 0.72)),
-    width * 0.18,
-    accentColor,
-  );
-  drawLine(
-    addPoint(start, scalePoint(perp, -edgeOffset)),
-    addPoint(end, scalePoint(perp, -edgeOffset * 0.72)),
-    width * 0.18,
-    accentColor,
-  );
-  drawLine(startGhost, endGhost, width * 0.08, FAMILIAR_PAPER_GHOST_COLOR);
-  drawLine(
-    addPoint(startGhost, scalePoint(perp, creaseOffset)),
-    addPoint(endGhost, scalePoint(perp, creaseOffset * 0.4)),
-    width * 0.06,
-    accentColor,
-  );
-
-  if (stress > 0.28) {
-    const flapBase = addPoint(end, scalePoint(direction, width * 0.2));
-    const flapTip = addPoint(
-      flapBase,
-      addPoint(scalePoint(direction, width * (0.45 + stress * 0.35)), scalePoint(perp, width * (0.28 + stress * 0.45))),
-    );
-    drawLine(end, flapBase, width * 0.11, accentColor);
-    drawLine(flapBase, flapTip, width * 0.08, FAMILIAR_PAPER_FLAP_COLOR);
-  }
-}
-
-function drawPaperHinge(joint, start, end, width, stress, accentColor) {
-  const incoming = normalizePoint(pointDelta(joint, start));
-  const outgoing = normalizePoint(pointDelta(joint, end));
-  const bisector = normalizePoint(vec2(incoming.x + outgoing.x, incoming.y + outgoing.y));
-  const perp = vec2(-bisector.y, bisector.x);
-  const hingeLength = width * (0.34 + stress * 0.22);
-  const hingeTip = addPoint(joint, scalePoint(bisector, hingeLength));
-  const hingeFlap = addPoint(joint, scalePoint(perp, hingeLength * 0.7));
-
-  drawLine(joint, hingeTip, width * 0.08, accentColor);
-  drawLine(joint, hingeFlap, width * 0.05, FAMILIAR_PAPER_FLAP_COLOR);
 }
 
 function drawPaperLimb(start, joint, end, width, stress) {
-  drawPaperStrip(start, joint, width, COLOR_FAMILIAR_ARM, stress, FAMILIAR_PAPER_CREASE_COLOR);
-  drawPaperHinge(joint, start, end, width, stress, FAMILIAR_PAPER_FLAP_COLOR);
-  drawPaperStrip(joint, end, width * 0.9, COLOR_FAMILIAR_ARM, stress, FAMILIAR_PAPER_CREASE_COLOR);
+  drawLine(start, joint, width * (1 + stress * 0.12), COLOR_FAMILIAR_ARM);
+  drawLine(joint, end, width * 0.9 * (1 + stress * 0.12), COLOR_FAMILIAR_ARM);
 }
 
 function drawKeeper() {
@@ -1007,23 +920,29 @@ function drawKeeper() {
   const revealGlowScale = 1 + reveal.visibility * 0.35;
 
   const torsoAnchor = fam(Familiar.torsoPos.x, Familiar.torsoPos.y);
+  const head = fam(Familiar.headPos.x, Familiar.headPos.y);
+  const headPosWithLag = vec2(
+    head.pos.x + (paper.head.lagX - 0.5) * 0.08 * Math.sign(Familiar.rightShoulder.x - Familiar.leftShoulder.x || 1),
+    head.pos.y - paper.head.lagY * 0.12,
+  );
+
+  // Draw neck connection
+  const neckWidth = 0.22 * torsoAnchor.scale;
+  drawLine(torsoAnchor.pos, headPosWithLag, neckWidth, COLOR_FAMILIAR_ARM);
+
   drawPapercraftCircle(
     torsoAnchor.pos,
     Familiar.torsoRadius * torsoAnchor.scale,
     COLOR_FAMILIAR_TORSO.copy().setAlpha(0.85),
     COLOR_FAMILIAR_TORSO,
-    FAMILIAR_PAPER_EDGE_COLOR,
     paper.torso.squash,
   );
 
-  const head = fam(Familiar.headPos.x, Familiar.headPos.y);
-  const headPosWithLag = addPoint(head.pos, vec2((paper.head.lagX - 0.5) * 0.08 * Math.sign(Familiar.rightShoulder.x - Familiar.leftShoulder.x || 1), -paper.head.lagY * 0.12));
   drawPapercraftCircle(
     headPosWithLag,
     Familiar.headRadius * head.scale,
     COLOR_FAMILIAR_HEAD.copy().setAlpha(0.85),
     COLOR_FAMILIAR_HEAD,
-    FAMILIAR_PAPER_EDGE_COLOR,
     paper.head.wobble,
   );
 
@@ -1095,10 +1014,10 @@ function drawKeeper() {
   drawPaperLimb(lHip.pos, lKnee.pos, lFoot.pos, FAMILIAR_THIGH_THICKNESS, paper.leftLeg.stress * 0.88);
   drawPaperLimb(rHip.pos, rKnee.pos, rFoot.pos, FAMILIAR_THIGH_THICKNESS, paper.rightLeg.stress * 0.88);
 
-  drawPapercraftCircle(lHand.pos, Familiar.handRadius * lHand.scale, COLOR_FAMILIAR_HAND.copy().setAlpha(0.85), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.leftArm.flap);
-  drawPapercraftCircle(rHand.pos, Familiar.handRadius * rHand.scale, COLOR_FAMILIAR_HAND.copy().setAlpha(0.85), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.rightArm.flap);
-  drawPapercraftCircle(lFoot.pos, Familiar.footRadius * lFoot.scale, COLOR_FAMILIAR_ARM.copy().setAlpha(0.85), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.leftLeg.flap);
-  drawPapercraftCircle(rFoot.pos, Familiar.footRadius * rFoot.scale, COLOR_FAMILIAR_ARM.copy().setAlpha(0.85), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.rightLeg.flap);
+  drawPapercraftCircle(lHand.pos, Familiar.handRadius * lHand.scale, COLOR_FAMILIAR_HAND.copy().setAlpha(0.85), COLOR_FAMILIAR_HAND, paper.leftArm.flap);
+  drawPapercraftCircle(rHand.pos, Familiar.handRadius * rHand.scale, COLOR_FAMILIAR_HAND.copy().setAlpha(0.85), COLOR_FAMILIAR_HAND, paper.rightArm.flap);
+  drawPapercraftCircle(lFoot.pos, Familiar.footRadius * lFoot.scale, COLOR_FAMILIAR_ARM.copy().setAlpha(0.85), COLOR_FAMILIAR_ARM, paper.leftLeg.flap);
+  drawPapercraftCircle(rFoot.pos, Familiar.footRadius * rFoot.scale, COLOR_FAMILIAR_ARM.copy().setAlpha(0.85), COLOR_FAMILIAR_ARM, paper.rightLeg.flap);
 }
 
 function drawBall() {
