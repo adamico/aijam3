@@ -114,6 +114,19 @@ describe('MatchState', () => {
     expect(match.score).toBe(computeMatchScore(match));
   });
 
+  it('counts a concession as zero points while still advancing the loss counter', () => {
+    const match = recordShotResult(createMatchState(), 'conceded');
+
+    expect(match.status).toBe('active');
+    expect(match.shotsTaken).toBe(1);
+    expect(match.saves).toBe(0);
+    expect(match.deflections).toBe(0);
+    expect(match.conceded).toBe(1);
+    expect(match.ongoingScore).toBe(0);
+    expect(match.score).toBe(0);
+    expect(computeOngoingScore(match)).toBe(0);
+  });
+
   it('ignores additional shot results after the match ends cleanly', () => {
     const loss = ['conceded', 'conceded', 'conceded', 'conceded', 'conceded'].reduce(
       (state, outcome) => recordShotResult(state, outcome),
