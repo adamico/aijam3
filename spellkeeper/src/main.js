@@ -670,22 +670,27 @@ function drawSaveFeedback() {
   );
 
   const feedback = getFeedbackState(Ball.runtime);
-  if (!feedback?.lastResult || feedback.timer <= 0) return;
+  const hasOutcomeFeedback = Boolean(feedback?.lastResult && feedback.timer > 0);
+  const outcomeY = 86;
+  const matchBannerY = hasOutcomeFeedback ? 136 : 86;
+  const finalScoreY = hasOutcomeFeedback ? 186 : 136;
 
-  const resultFeedback = getShotResultFeedback(feedback.lastResult.outcome);
-  drawTextScreen(
-    resultFeedback.label,
-    vec2(centerX, 86),
-    56,
-    resultFeedback.color,
-    5,
-    COLOR_STADIUM_NIGHT,
-  );
+  if (hasOutcomeFeedback) {
+    const resultFeedback = getShotResultFeedback(feedback.lastResult.outcome);
+    drawTextScreen(
+      resultFeedback.label,
+      vec2(centerX, outcomeY),
+      56,
+      resultFeedback.color,
+      5,
+      COLOR_STADIUM_NIGHT,
+    );
+  }
 
   if (isMatchComplete(Match.state)) {
     drawTextScreen(
       Match.state.status === 'won' ? 'MATCH WON!' : 'MATCH LOST',
-      vec2(centerX, 136),
+      vec2(centerX, matchBannerY),
       48,
       Match.state.status === 'won' ? COLOR_SAVE_FEEDBACK : COLOR_MISS_FEEDBACK,
       5,
@@ -693,7 +698,7 @@ function drawSaveFeedback() {
     );
     drawTextScreen(
       `Final Score ${Match.state.score}`,
-      vec2(centerX, 186),
+      vec2(centerX, finalScoreY),
       32,
       COLOR_SCORE_FEEDBACK,
       4,
