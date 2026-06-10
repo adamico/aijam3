@@ -312,6 +312,7 @@ describe('Spell Keeper basic gameplay scene', () => {
             applyMatchShotOutcome('conceded');
             applyMatchShotOutcome('conceded');
             applyMatchShotOutcome('conceded');
+            applyMatchShotOutcome('conceded');
             expect(outcomeCue).toHaveBeenLastCalledWith('conceded', { matchComplete: true });
         } finally {
             vi.doUnmock('./audioCues.js');
