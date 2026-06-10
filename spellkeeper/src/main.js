@@ -405,14 +405,16 @@ export function applyMatchShotOutcome(outcome) {
 
   if (Ball.runtime) {
     const currentFeedback = getFeedbackState(Ball.runtime);
+    const canonicalOutcome = outcome === 'save' ? 'saved' : outcome;
+    const feedbackMatchesOutcome = currentFeedback?.lastResult?.outcome === canonicalOutcome;
     const runtimeOutcome = {
       nextShotIndex: Match.state.shotsTaken,
       matchComplete: isMatchComplete(Match.state),
     };
 
-    if (!currentFeedback?.lastResult) {
-      runtimeOutcome.result = createFallbackShotResult(outcome);
-    }
+    runtimeOutcome.result = feedbackMatchesOutcome
+      ? currentFeedback.lastResult
+      : createFallbackShotResult(canonicalOutcome);
 
     Ball.runtime = recordShotRuntimeOutcome(Ball.runtime, runtimeOutcome);
     syncBallFromRuntime(Ball.runtime);
