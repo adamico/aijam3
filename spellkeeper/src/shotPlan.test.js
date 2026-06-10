@@ -358,7 +358,7 @@ describe('shot plan generator', () => {
       shotsConsumed: 1,
       slotType: 'isolated',
     });
-    expect(validator).toHaveBeenCalledTimes(2);
+    expect(validator).toHaveBeenCalledTimes(4);
     expect(buildIsolated).toHaveBeenCalledWith(
       4,
       'readable variety',
