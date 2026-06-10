@@ -485,6 +485,46 @@ function validateSetpieceEntries(entries, plan, band, validator = isCandidateVal
   return firstValid && secondValid;
 }
 
+export function resolveSetpieceSlot({
+  index,
+  band,
+  plan,
+  rng,
+  planId,
+  hexCounts,
+  hexCountTarget,
+  validator = isCandidateValid,
+  instantiate = instantiateSetpiece,
+  templates = getSetpieceTemplatesForBand(band),
+  shuffle = shuffleWithRng,
+  buildIsolated = buildIsolatedEntry,
+} = {}) {
+  const setpieceEntries = pickSetpieceEntries({
+    index,
+    band,
+    plan,
+    rng,
+    planId,
+    hexCounts,
+    hexCountTarget,
+    validator,
+    instantiate,
+    templates,
+    shuffle,
+  });
+
+  if (setpieceEntries) {
+    return { entries: setpieceEntries, shotsConsumed: 2, slotType: 'setpiece' };
+  }
+
+  const fallbackEntry = buildIsolated(index, band, plan, rng, planId, hexCounts, hexCountTarget);
+  if (!fallbackEntry) {
+    return null;
+  }
+
+  return { entries: [fallbackEntry], shotsConsumed: 1, slotType: 'isolated' };
+}
+
 export function pickSetpieceEntries({
   index,
   band,
@@ -777,7 +817,7 @@ function generateShotPlanAttempt(normalizedSeed, totalShots, attempt) {
         continue;
       }
 
-      const setpieceEntries = pickSetpieceEntries({
+      const slot = resolveSetpieceSlot({
         index: plan.length,
         band,
         plan,
@@ -786,31 +826,15 @@ function generateShotPlanAttempt(normalizedSeed, totalShots, attempt) {
         hexCounts,
         hexCountTarget,
       });
-      if (setpieceEntries) {
-        for (const entry of setpieceEntries) {
-          plan.push(entry);
-          hexCounts.set(entry.shot.hex, (hexCounts.get(entry.shot.hex) ?? 0) + 1);
-        }
-        bandShotCount += 2;
-        continue;
-      }
-
-      const firstFallback = buildIsolatedEntry(plan.length, band, plan, rng, planId, hexCounts, hexCountTarget);
-      if (!firstFallback) {
+      if (!slot) {
         return null;
       }
 
-      plan.push(firstFallback);
-      hexCounts.set(firstFallback.shot.hex, (hexCounts.get(firstFallback.shot.hex) ?? 0) + 1);
-
-      const secondFallback = buildIsolatedEntry(plan.length, band, plan, rng, planId, hexCounts, hexCountTarget);
-      if (!secondFallback) {
-        return null;
+      for (const entry of slot.entries) {
+        plan.push(entry);
+        hexCounts.set(entry.shot.hex, (hexCounts.get(entry.shot.hex) ?? 0) + 1);
       }
-
-      plan.push(secondFallback);
-      hexCounts.set(secondFallback.shot.hex, (hexCounts.get(secondFallback.shot.hex) ?? 0) + 1);
-      bandShotCount += 2;
+      bandShotCount += slot.shotsConsumed;
     }
 
     while (bandShotCount < PHASE_SHOT_COUNT) {

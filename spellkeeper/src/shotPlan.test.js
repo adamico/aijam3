@@ -6,6 +6,7 @@ import {
   createShotPlan,
   getCandidateSelectionWeight,
   pickSetpieceEntries,
+  resolveSetpieceSlot,
 } from './shotPlan.js';
 import { SETPIECE_LIBRARY } from './setpieces.js';
 
@@ -286,6 +287,87 @@ describe('shot plan generator', () => {
       'curve bait',
       'switchback',
     ]);
+  });
+
+  it('falls back to a single isolated shot when both setpiece sides fail validation', () => {
+    const validator = vi.fn().mockReturnValue(false);
+    const buildIsolated = vi.fn().mockReturnValue({
+      index: 4,
+      shot: {
+        hex: 'standard',
+        originLane: 'inner-left',
+        targetLane: 'inner-left',
+        placementHeight: 'low',
+      },
+      designer: {
+        label: 'fallback isolated',
+      },
+    });
+
+    const slot = resolveSetpieceSlot({
+      index: 4,
+      band: 'readable variety',
+      plan: [
+        { shot: { hex: 'standard', targetLane: 'inner-left' } },
+        { shot: { hex: 'curve', targetLane: 'outer-left' } },
+      ],
+      rng: () => 0,
+      planId: 'test-plan',
+      hexCounts: new Map(),
+      hexCountTarget: null,
+      validator,
+      instantiate: () => ({
+        shots: [
+          {
+            shot: {
+              hex: 'curve',
+              originLane: 'outer-left',
+              targetLane: 'inner-right',
+              placementHeight: 'middle',
+            },
+            designer: {
+              label: 'setpiece first',
+              difficultyBand: 'readable variety',
+              pressureTags: ['setpiece'],
+              intendedFailureMode: 'fail',
+            },
+          },
+          {
+            shot: {
+              hex: 'curve',
+              originLane: 'outer-right',
+              targetLane: 'inner-left',
+              placementHeight: 'middle',
+            },
+            designer: {
+              label: 'setpiece second',
+              difficultyBand: 'readable variety',
+              pressureTags: ['setpiece'],
+              intendedFailureMode: 'fail',
+            },
+          },
+        ],
+      }),
+      templates: [{ shots: [] }],
+      shuffle: (items) => items,
+      buildIsolated,
+    });
+
+    expect(slot).toEqual({
+      entries: [expect.objectContaining({ designer: expect.objectContaining({ label: 'fallback isolated' }) })],
+      shotsConsumed: 1,
+      slotType: 'isolated',
+    });
+    expect(validator).toHaveBeenCalledTimes(2);
+    expect(buildIsolated).toHaveBeenCalledWith(
+      4,
+      'readable variety',
+      expect.any(Array),
+      expect.any(Function),
+      'test-plan',
+      expect.any(Map),
+      null,
+    );
   });
 
   it('rejects invalid generation inputs predictably', () => {
