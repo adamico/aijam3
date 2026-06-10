@@ -321,8 +321,8 @@ describe('shot plan generator', () => {
           {
             shot: {
               hex: 'curve',
-              originLane: 'outer-left',
-              targetLane: 'inner-right',
+              originLane: 'outerLeft',
+              targetLane: 'innerRight',
               placementHeight: 'middle',
             },
             designer: {
@@ -335,8 +335,8 @@ describe('shot plan generator', () => {
           {
             shot: {
               hex: 'curve',
-              originLane: 'outer-right',
-              targetLane: 'inner-left',
+              originLane: 'outerRight',
+              targetLane: 'innerLeft',
               placementHeight: 'middle',
             },
             designer: {

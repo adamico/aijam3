@@ -817,7 +817,7 @@ function generateShotPlanAttempt(normalizedSeed, totalShots, attempt) {
         continue;
       }
 
-      const slot = resolveSetpieceSlot({
+      const resolvedSlot = resolveSetpieceSlot({
         index: plan.length,
         band,
         plan,
@@ -826,15 +826,15 @@ function generateShotPlanAttempt(normalizedSeed, totalShots, attempt) {
         hexCounts,
         hexCountTarget,
       });
-      if (!slot) {
+      if (!resolvedSlot) {
         return null;
       }
 
-      for (const entry of slot.entries) {
+      for (const entry of resolvedSlot.entries) {
         plan.push(entry);
         hexCounts.set(entry.shot.hex, (hexCounts.get(entry.shot.hex) ?? 0) + 1);
       }
-      bandShotCount += slot.shotsConsumed;
+      bandShotCount += resolvedSlot.shotsConsumed;
     }
 
     while (bandShotCount < PHASE_SHOT_COUNT) {
