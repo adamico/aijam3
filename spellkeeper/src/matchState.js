@@ -18,11 +18,17 @@ export function computeOngoingScore(state, rules = DEFAULT_MATCH_RULES) {
   return ((state.saves ?? 0) * activeRules.savePoints) + ((state.deflections ?? 0) * activeRules.deflectionPoints);
 }
 
+export function hasCleanSheet(state) {
+  return state.status === 'won' && (state.conceded ?? 0) === 0;
+}
+
+export function hasPerfectControl(state) {
+  return hasCleanSheet(state) && (state.deflections ?? 0) === 0;
+}
+
 export function computeMatchScore(state, rules = DEFAULT_MATCH_RULES) {
   const activeRules = normalizeRules(rules);
-  const cleanSheetBonus = state.status === 'won' && state.conceded === 0
-    ? activeRules.cleanSheetBonus
-    : 0;
+  const cleanSheetBonus = hasCleanSheet(state) ? activeRules.cleanSheetBonus : 0;
 
   return computeOngoingScore(state, activeRules) + cleanSheetBonus;
 }
@@ -37,6 +43,8 @@ export function createMatchState(rules = DEFAULT_MATCH_RULES) {
     deflections: 0,
     conceded: 0,
     maxConcessions: activeRules.maxConcessions,
+    cleanSheet: false,
+    perfectControl: false,
     score: 0,
     ongoingScore: 0,
   };
@@ -65,6 +73,8 @@ export function recordShotResult(state, outcome, rules = DEFAULT_MATCH_RULES) {
     next.status = 'won';
   }
 
+  next.cleanSheet = hasCleanSheet(next);
+  next.perfectControl = hasPerfectControl(next);
   next.ongoingScore = computeOngoingScore(next, activeRules);
   next.score = isMatchComplete(next) ? computeMatchScore(next, activeRules) : 0;
   return next;
