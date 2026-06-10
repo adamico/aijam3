@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { DEFAULT_SHOT_PLAN_SEED, PHASE_LAYOUTS, createCalibrationShotChain, createShotPlan, getCandidateSelectionWeight } from './shotPlan.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  DEFAULT_SHOT_PLAN_SEED,
+  PHASE_LAYOUTS,
+  createCalibrationShotChain,
+  createShotPlan,
+  getCandidateSelectionWeight,
+  pickSetpieceEntries,
+} from './shotPlan.js';
+import { SETPIECE_LIBRARY } from './setpieces.js';
 
 describe('shot plan generator', () => {
   it('uses the authored phase pacing templates for each act', () => {
@@ -204,6 +212,80 @@ describe('shot plan generator', () => {
     expect(getCandidateSelectionWeight(opposite, lastHeavyLeft, 'readable variety')).toBe(1);
     expect(getCandidateSelectionWeight(center, lastHeavyLeft, 'mixed pressure')).toBeGreaterThan(1);
     expect(getCandidateSelectionWeight(sameSide, lastHeavyLeft, 'mixed pressure')).toBeLessThan(1);
+  });
+
+  it('tries the mirrored setpiece side before moving to another template', () => {
+    const validator = vi.fn()
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true);
+
+    const entries = pickSetpieceEntries({
+      index: 3,
+      band: 'readable variety',
+      plan: [
+        { shot: { hex: 'standard', targetLane: 'inner-left' } },
+        { shot: { hex: 'curve', targetLane: 'outer-left' } },
+      ],
+      rng: () => 0,
+      planId: 'test-plan',
+      hexCounts: new Map(),
+      hexCountTarget: null,
+      validator,
+      templates: [SETPIECE_LIBRARY['curve-bait-switch'], SETPIECE_LIBRARY['same-side-pin']],
+      shuffle: (items) => items,
+    });
+
+    expect(entries).not.toBeNull();
+    expect(entries[0].designer.label).toBe('curve bait');
+    expect(entries[1].designer.label).toBe('switchback');
+    expect(validator).toHaveBeenCalledTimes(6);
+    expect(validator.mock.calls.map(([candidate]) => candidate.designer.label)).toEqual([
+      'curve bait',
+      'switchback',
+      'curve bait',
+      'switchback',
+      'pin high',
+      'pin low',
+    ]);
+  });
+
+  it('keeps validating both shots before accepting a mirrored setpiece', () => {
+    const validator = vi.fn()
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true);
+
+    const entries = pickSetpieceEntries({
+      index: 3,
+      band: 'readable variety',
+      plan: [
+        { shot: { hex: 'standard', targetLane: 'inner-left' } },
+        { shot: { hex: 'curve', targetLane: 'outer-left' } },
+      ],
+      rng: () => 0,
+      planId: 'test-plan',
+      hexCounts: new Map(),
+      hexCountTarget: null,
+      validator,
+      templates: [SETPIECE_LIBRARY['curve-bait-switch']],
+      shuffle: (items) => items,
+    });
+
+    expect(entries).not.toBeNull();
+    expect(entries[0].designer.label).toBe('curve bait');
+    expect(entries[1].designer.label).toBe('switchback');
+    expect(validator).toHaveBeenCalledTimes(4);
+    expect(validator.mock.calls.map(([candidate]) => candidate.designer.label)).toEqual([
+      'curve bait',
+      'switchback',
+      'curve bait',
+      'switchback',
+    ]);
   });
 
   it('rejects invalid generation inputs predictably', () => {

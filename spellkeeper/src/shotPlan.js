@@ -478,23 +478,42 @@ function buildIsolatedEntry(index, band, plan, rng, planId, hexCounts, hexCountT
   return null;
 }
 
-function buildSetpieceEntries(index, band, plan, rng, planId, hexCounts, hexCountTarget) {
-  const templates = shuffleWithRng(getSetpieceTemplatesForBand(band).filter((template) => setpieceFitsDistribution(template, hexCounts, hexCountTarget)), rng);
+function validateSetpieceEntries(entries, plan, band, validator = isCandidateValid) {
+  const firstValid = validator(entries[0], plan, band);
+  const secondValid = validator(entries[1], [...plan, entries[0]], band);
 
-  if (templates.length === 0) {
+  return firstValid && secondValid;
+}
+
+export function pickSetpieceEntries({
+  index,
+  band,
+  plan,
+  rng,
+  planId,
+  hexCounts,
+  hexCountTarget,
+  validator = isCandidateValid,
+  instantiate = instantiateSetpiece,
+  templates = getSetpieceTemplatesForBand(band),
+  shuffle = shuffleWithRng,
+} = {}) {
+  const availableTemplates = shuffle(
+    templates.filter((template) => setpieceFitsDistribution(template, hexCounts, hexCountTarget)),
+    rng,
+  );
+
+  if (availableTemplates.length === 0) {
     return null;
   }
 
-  for (const template of templates) {
+  for (const template of availableTemplates) {
     const primarySide = rng() < 0.5 ? 'left' : 'right';
     for (const side of [primarySide, mirrorSide(primarySide)]) {
-      const resolved = instantiateSetpiece(template, side);
+      const resolved = instantiate(template, side);
       const generatedEntries = resolved.shots.map((shotTemplate, offset) => createShotTemplateEntry(shotTemplate, index + offset, band, rng, planId));
 
-      const firstValid = isCandidateValid(generatedEntries[0], plan, band);
-      const secondValid = firstValid && isCandidateValid(generatedEntries[1], [...plan, generatedEntries[0]], band);
-
-      if (firstValid && secondValid) {
+      if (validateSetpieceEntries(generatedEntries, plan, band, validator)) {
         return generatedEntries;
       }
     }
@@ -758,7 +777,15 @@ function generateShotPlanAttempt(normalizedSeed, totalShots, attempt) {
         continue;
       }
 
-      const setpieceEntries = buildSetpieceEntries(plan.length, band, plan, rng, planId, hexCounts, hexCountTarget);
+      const setpieceEntries = pickSetpieceEntries({
+        index: plan.length,
+        band,
+        plan,
+        rng,
+        planId,
+        hexCounts,
+        hexCountTarget,
+      });
       if (setpieceEntries) {
         for (const entry of setpieceEntries) {
           plan.push(entry);
