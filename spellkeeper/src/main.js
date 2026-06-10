@@ -99,6 +99,14 @@ const FAMILIAR_FOREARM_LENGTH = Math.hypot(
   FAMILIAR_INIT_HAND_X - FAMILIAR_INIT_ELBOW_X,
   FAMILIAR_INIT_HAND_Y - FAMILIAR_INIT_ELBOW_Y,
 );
+const FAMILIAR_THIGH_LENGTH = Math.hypot(
+  FAMILIAR_INIT_KNEE_X - FAMILIAR_INIT_HIP_X,
+  FAMILIAR_INIT_KNEE_Y - FAMILIAR_INIT_HIP_Y,
+);
+const FAMILIAR_SHIN_LENGTH = Math.hypot(
+  FAMILIAR_INIT_FOOT_X - FAMILIAR_INIT_KNEE_X,
+  FAMILIAR_INIT_FOOT_Y - FAMILIAR_INIT_KNEE_Y,
+);
 const FAMILIAR_HAND_IK = {
   left: {
     elbowSign: -1,
@@ -122,6 +130,10 @@ const FAMILIAR_REVEAL_TAIL_OFFSET_X = 0.2;
 const FAMILIAR_REVEAL_TAIL_OFFSET_Y = -0.15;
 const FAMILIAR_REVEAL_TAIL_LENGTH = 0.42;
 const FAMILIAR_REVEAL_TAIL_WIDTH = 0.06;
+const FAMILIAR_PAPER_EDGE_COLOR = rgb(0.97, 0.98, 1, 0.7);
+const FAMILIAR_PAPER_CREASE_COLOR = rgb(0.84, 0.9, 1, 0.52);
+const FAMILIAR_PAPER_FLAP_COLOR = rgb(1, 0.93, 0.8, 0.7);
+const FAMILIAR_PAPER_GHOST_COLOR = rgb(1, 1, 1, 0.15);
 const FAMILIAR_BODY_OFFSETS = {
   head: { x: 0, y: FAMILIAR_INIT_HEAD_Y - FAMILIAR_INIT_TORSO_Y },
   leftShoulder: { x: -FAMILIAR_INIT_SHOULDER_X, y: FAMILIAR_INIT_SHOULDER_Y - FAMILIAR_INIT_TORSO_Y },
@@ -749,6 +761,110 @@ export function getFamiliarSaveSegments() {
   ];
 }
 
+function clamp01(value) {
+  return clamp(value, 0, 1);
+}
+
+function pointDelta(a, b) {
+  return vec2(b.x - a.x, b.y - a.y);
+}
+
+function pointLength(point) {
+  return Math.hypot(point.x, point.y);
+}
+
+function normalizePoint(point) {
+  const length = pointLength(point);
+  return length > 0 ? vec2(point.x / length, point.y / length) : vec2(0, 0);
+}
+
+function midpoint(a, b) {
+  return vec2((a.x + b.x) / 2, (a.y + b.y) / 2);
+}
+
+function addPoint(point, offset) {
+  return vec2(point.x + offset.x, point.y + offset.y);
+}
+
+function scalePoint(point, scale) {
+  return vec2(point.x * scale, point.y * scale);
+}
+
+function perpendicularUnit(start, end) {
+  const delta = pointDelta(start, end);
+  const length = pointLength(delta);
+  if (!length) return vec2(0, 0);
+  return vec2(-delta.y / length, delta.x / length);
+}
+
+function jointBend(start, joint, end) {
+  const incoming = normalizePoint(pointDelta(joint, start));
+  const outgoing = normalizePoint(pointDelta(joint, end));
+  const dot = clamp(incoming.x * outgoing.x + incoming.y * outgoing.y, -1, 1);
+  return Math.acos(dot);
+}
+
+function segmentStress(start, joint, end, restLength, diveBias = 0) {
+  const reach = Math.hypot(end.x - start.x, end.y - start.y) / Math.max(restLength, 0.0001);
+  const extension = clamp01((reach - 0.64) / 0.36);
+  const straightness = clamp01(1 - jointBend(start, joint, end) / Math.PI);
+  return {
+    extension,
+    straightness,
+    bend: clamp01(1 - straightness),
+    stress: clamp01(extension * 0.62 + straightness * 0.38 + diveBias),
+    flap: clamp01(extension * 0.52 + straightness * 0.3 + diveBias * 0.8),
+  };
+}
+
+export function getFamiliarPapercraftState(pose = getFamiliarPose(), diveState = getDiveState()) {
+  if (!pose) {
+    return {
+      torso: { shiftX: 0, liftY: 0, lean: 0, squash: 0, flap: 0 },
+      head: { lagX: 0, lagY: 0, wobble: 0, flap: 0 },
+      leftArm: { extension: 0, straightness: 0, bend: 0, stress: 0, flap: 0 },
+      rightArm: { extension: 0, straightness: 0, bend: 0, stress: 0, flap: 0 },
+      leftLeg: { extension: 0, straightness: 0, bend: 0, stress: 0, flap: 0 },
+      rightLeg: { extension: 0, straightness: 0, bend: 0, stress: 0, flap: 0 },
+    };
+  }
+
+  const diveExtension = clamp01(diveState?.pose?.extension ?? 0);
+  const diveDirection = diveState?.direction ?? { x: 0, y: 0 };
+  const torsoShiftX = clamp01(Math.abs(pose.torso.x - PITCH_CENTER_X) / 2.4);
+  const torsoLiftY = clamp01(Math.max(0, pose.torso.y - (GROUND_Y + FAMILIAR_INIT_TORSO_Y)) / 0.85);
+  const torsoLean = clamp01(torsoShiftX * 0.5 + Math.abs(diveDirection.x) * diveExtension * 0.35);
+  const torsoSquash = clamp01(torsoShiftX * 0.28 + torsoLiftY * 0.52 + diveExtension * 0.7);
+  const torsoFlap = clamp01(torsoShiftX * 0.4 + torsoLiftY * 0.25 + diveExtension * 0.9);
+  const headOffsetX = pose.head.x - pose.torso.x - FAMILIAR_BODY_OFFSETS.head.x;
+  const headOffsetY = pose.head.y - pose.torso.y - FAMILIAR_BODY_OFFSETS.head.y;
+  const headLagX = clamp01(Math.abs(headOffsetX) / 0.95 + torsoShiftX * 0.2);
+  const headLagY = clamp01(Math.max(0, headOffsetY) / 0.55 + torsoLiftY * 0.5);
+  const headWobble = clamp01(Math.hypot(headOffsetX, headOffsetY) / 1.05 + diveExtension * 0.45);
+  const headFlap = clamp01(headWobble * 0.8 + torsoShiftX * 0.2);
+  const limbBias = torsoShiftX * 0.15 + diveExtension * 0.45 + torsoLiftY * 0.2;
+
+  return {
+    torso: {
+      shiftX: torsoShiftX,
+      liftY: torsoLiftY,
+      lean: torsoLean,
+      squash: torsoSquash,
+      flap: torsoFlap,
+    },
+    head: {
+      lagX: headLagX,
+      lagY: headLagY,
+      wobble: headWobble,
+      flap: headFlap,
+    },
+    leftArm: segmentStress(pose.leftShoulder, pose.leftElbow, pose.leftHand, FAMILIAR_UPPER_ARM_LENGTH + FAMILIAR_FOREARM_LENGTH, limbBias),
+    rightArm: segmentStress(pose.rightShoulder, pose.rightElbow, pose.rightHand, FAMILIAR_UPPER_ARM_LENGTH + FAMILIAR_FOREARM_LENGTH, limbBias),
+    leftLeg: segmentStress(pose.leftHip, pose.leftKnee, pose.leftFoot, FAMILIAR_THIGH_LENGTH + FAMILIAR_SHIN_LENGTH, torsoShiftX * 0.08 + diveExtension * 0.18),
+    rightLeg: segmentStress(pose.rightHip, pose.rightKnee, pose.rightFoot, FAMILIAR_THIGH_LENGTH + FAMILIAR_SHIN_LENGTH, torsoShiftX * 0.08 + diveExtension * 0.18),
+  };
+}
+
 function project(x3d, y3d, depthFromCamera) {
   // depthFromCamera = BALL_MAX_Z - z3d -> z3d = BALL_MAX_Z - depthFromCamera
   const z3d = BALL_MAX_Z - depthFromCamera;
@@ -780,17 +896,137 @@ function drawGoal() {
   drawLine(postTopL.pos, postTopR.pos, lineW, COLOR_GOAL_FRAME); // crossbar
 }
 
+function drawPapercraftPanel(points, outlineColor, creaseColor, stress = 0) {
+  if (!points || points.length < 3) return;
+
+  for (let index = 0; index < points.length; index += 1) {
+    const start = points[index];
+    const end = points[(index + 1) % points.length];
+    drawLine(start, end, 0.065 + stress * 0.02, outlineColor);
+  }
+
+  if (points.length >= 4) {
+    drawLine(points[0], points[2], 0.03 + stress * 0.01, creaseColor);
+    drawLine(points[1], points[3], 0.025 + stress * 0.01, creaseColor);
+  }
+}
+
+function buildPaperShell(center, radiusX, radiusY, skewX = 0) {
+  return [
+    vec2(center.x + skewX * 0.12, center.y + radiusY),
+    vec2(center.x + radiusX, center.y + radiusY * 0.36),
+    vec2(center.x + radiusX * 1.02, center.y - radiusY * 0.38),
+    vec2(center.x + skewX * 0.15, center.y - radiusY),
+    vec2(center.x - radiusX * 1.02, center.y - radiusY * 0.38),
+    vec2(center.x - radiusX, center.y + radiusY * 0.36),
+  ];
+}
+
+function drawPaperStrip(start, end, width, baseColor, stress, accentColor) {
+  const delta = pointDelta(start, end);
+  const length = pointLength(delta);
+  if (!length) return;
+
+  const direction = normalizePoint(delta);
+  const perp = perpendicularUnit(start, end);
+  const edgeOffset = width * (0.45 + stress * 0.35);
+  const creaseOffset = width * (0.14 + stress * 0.12);
+  const ghostOffset = scalePoint(direction, -width * (0.24 + stress * 0.18));
+  const startGhost = addPoint(start, ghostOffset);
+  const endGhost = addPoint(end, scalePoint(ghostOffset, 0.35));
+
+  drawLine(start, end, width * (1 + stress * 0.12), baseColor);
+  drawLine(
+    addPoint(start, scalePoint(perp, edgeOffset)),
+    addPoint(end, scalePoint(perp, edgeOffset * 0.72)),
+    width * 0.18,
+    accentColor,
+  );
+  drawLine(
+    addPoint(start, scalePoint(perp, -edgeOffset)),
+    addPoint(end, scalePoint(perp, -edgeOffset * 0.72)),
+    width * 0.18,
+    accentColor,
+  );
+  drawLine(startGhost, endGhost, width * 0.08, FAMILIAR_PAPER_GHOST_COLOR);
+  drawLine(
+    addPoint(startGhost, scalePoint(perp, creaseOffset)),
+    addPoint(endGhost, scalePoint(perp, creaseOffset * 0.4)),
+    width * 0.06,
+    accentColor,
+  );
+
+  if (stress > 0.28) {
+    const flapBase = addPoint(end, scalePoint(direction, width * 0.2));
+    const flapTip = addPoint(
+      flapBase,
+      addPoint(scalePoint(direction, width * (0.45 + stress * 0.35)), scalePoint(perp, width * (0.28 + stress * 0.45))),
+    );
+    drawLine(end, flapBase, width * 0.11, accentColor);
+    drawLine(flapBase, flapTip, width * 0.08, FAMILIAR_PAPER_FLAP_COLOR);
+  }
+}
+
+function drawPaperHinge(joint, start, end, width, stress, accentColor) {
+  const incoming = normalizePoint(pointDelta(joint, start));
+  const outgoing = normalizePoint(pointDelta(joint, end));
+  const bisector = normalizePoint(vec2(incoming.x + outgoing.x, incoming.y + outgoing.y));
+  const perp = vec2(-bisector.y, bisector.x);
+  const hingeLength = width * (0.34 + stress * 0.22);
+  const hingeTip = addPoint(joint, scalePoint(bisector, hingeLength));
+  const hingeFlap = addPoint(joint, scalePoint(perp, hingeLength * 0.7));
+
+  drawLine(joint, hingeTip, width * 0.08, accentColor);
+  drawLine(joint, hingeFlap, width * 0.05, FAMILIAR_PAPER_FLAP_COLOR);
+}
+
+function drawPaperLimb(start, joint, end, width, stress) {
+  drawPaperStrip(start, joint, width, COLOR_FAMILIAR_ARM, stress, FAMILIAR_PAPER_CREASE_COLOR);
+  drawPaperHinge(joint, start, end, width, stress, FAMILIAR_PAPER_FLAP_COLOR);
+  drawPaperStrip(joint, end, width * 0.9, COLOR_FAMILIAR_ARM, stress, FAMILIAR_PAPER_CREASE_COLOR);
+}
+
 function drawKeeper() {
   const goalDepth = BALL_MAX_Z;
   const fam = (x, y) => project(x, y, goalDepth);
   const reveal = getFamiliarRevealState();
+  const paper = getFamiliarPapercraftState();
   const revealGlowScale = 1 + reveal.visibility * 0.35;
 
-  const torso = fam(Familiar.torsoPos.x, Familiar.torsoPos.y);
-  drawCircle(torso.pos, Familiar.torsoRadius * torso.scale, COLOR_FAMILIAR_TORSO);
+  const torsoCenter = midpoint(
+    midpoint(fam(Familiar.leftShoulder.x, Familiar.leftShoulder.y).pos, fam(Familiar.rightShoulder.x, Familiar.rightShoulder.y).pos),
+    midpoint(fam(Familiar.leftHip.x, Familiar.leftHip.y).pos, fam(Familiar.rightHip.x, Familiar.rightHip.y).pos),
+  );
+  const shoulderSpan = Math.hypot(
+    fam(Familiar.rightShoulder.x, Familiar.rightShoulder.y).pos.x - fam(Familiar.leftShoulder.x, Familiar.leftShoulder.y).pos.x,
+    fam(Familiar.rightShoulder.x, Familiar.rightShoulder.y).pos.y - fam(Familiar.leftShoulder.x, Familiar.leftShoulder.y).pos.y,
+  );
+  const hipSpan = Math.hypot(
+    fam(Familiar.rightHip.x, Familiar.rightHip.y).pos.x - fam(Familiar.leftHip.x, Familiar.leftHip.y).pos.x,
+    fam(Familiar.rightHip.x, Familiar.rightHip.y).pos.y - fam(Familiar.leftHip.x, Familiar.leftHip.y).pos.y,
+  );
+  const torsoWidth = Math.max(0.42, Math.max(shoulderSpan, hipSpan) * (0.48 + paper.torso.flap * 0.08));
+  const torsoAnchor = fam(Familiar.torsoPos.x, Familiar.torsoPos.y);
+  const torsoHeight = Math.max(0.72, Math.hypot(
+    torsoCenter.x - torsoAnchor.pos.x,
+    torsoCenter.y - torsoAnchor.pos.y,
+  ) * 1.8 + 0.66);
+  const torsoSkew = paper.torso.lean * 0.24 * Math.sign(Familiar.rightShoulder.x - Familiar.leftShoulder.x || 1);
+  drawPapercraftPanel(
+    buildPaperShell(torsoCenter, torsoWidth, torsoHeight, torsoSkew),
+    COLOR_FAMILIAR_TORSO,
+    FAMILIAR_PAPER_EDGE_COLOR,
+    paper.torso.squash,
+  );
 
   const head = fam(Familiar.headPos.x, Familiar.headPos.y);
-  drawCircle(head.pos, Familiar.headRadius * head.scale, COLOR_FAMILIAR_HEAD);
+  const headShell = buildPaperShell(
+    addPoint(head.pos, vec2((paper.head.lagX - 0.5) * 0.08 * Math.sign(Familiar.rightShoulder.x - Familiar.leftShoulder.x || 1), -paper.head.lagY * 0.12)),
+    Familiar.headRadius * (1.02 + paper.head.wobble * 0.14),
+    Familiar.headRadius * (1.15 + paper.head.wobble * 0.18),
+    (paper.head.lagX - 0.5) * 0.18,
+  );
+  drawPapercraftPanel(headShell, COLOR_FAMILIAR_HEAD, FAMILIAR_PAPER_EDGE_COLOR, paper.head.wobble);
 
   if (reveal.isActive) {
     const leftEye = vec2(
@@ -802,8 +1038,8 @@ function drawKeeper() {
       head.pos.y + FAMILIAR_REVEAL_EYE_OFFSET_Y * revealGlowScale,
     );
     const tailStart = vec2(
-      torso.pos.x + FAMILIAR_REVEAL_TAIL_OFFSET_X,
-      torso.pos.y + FAMILIAR_REVEAL_TAIL_OFFSET_Y,
+      torsoAnchor.pos.x + FAMILIAR_REVEAL_TAIL_OFFSET_X,
+      torsoAnchor.pos.y + FAMILIAR_REVEAL_TAIL_OFFSET_Y,
     );
     const tailEnd = vec2(
       tailStart.x - FAMILIAR_REVEAL_TAIL_LENGTH * revealGlowScale,
@@ -855,19 +1091,15 @@ function drawKeeper() {
   const rKnee = fam(Familiar.rightKnee.x, Familiar.rightKnee.y);
   const rFoot = fam(Familiar.rightFoot.x, Familiar.rightFoot.y);
 
-  drawLine(lShoulder.pos, lElbow.pos, FAMILIAR_UPPER_ARM_THICKNESS * lShoulder.scale, COLOR_FAMILIAR_ARM);
-  drawLine(lElbow.pos, lHand.pos, FAMILIAR_FOREARM_THICKNESS * lElbow.scale, COLOR_FAMILIAR_ARM);
-  drawLine(rShoulder.pos, rElbow.pos, FAMILIAR_UPPER_ARM_THICKNESS * rShoulder.scale, COLOR_FAMILIAR_ARM);
-  drawLine(rElbow.pos, rHand.pos, FAMILIAR_FOREARM_THICKNESS * rElbow.scale, COLOR_FAMILIAR_ARM);
-  drawLine(lHip.pos, lKnee.pos, FAMILIAR_THIGH_THICKNESS * lHip.scale, COLOR_FAMILIAR_ARM);
-  drawLine(lKnee.pos, lFoot.pos, FAMILIAR_SHIN_THICKNESS * lKnee.scale, COLOR_FAMILIAR_ARM);
-  drawLine(rHip.pos, rKnee.pos, FAMILIAR_THIGH_THICKNESS * rHip.scale, COLOR_FAMILIAR_ARM);
-  drawLine(rKnee.pos, rFoot.pos, FAMILIAR_SHIN_THICKNESS * rKnee.scale, COLOR_FAMILIAR_ARM);
+  drawPaperLimb(lShoulder.pos, lElbow.pos, lHand.pos, FAMILIAR_UPPER_ARM_THICKNESS, paper.leftArm.stress);
+  drawPaperLimb(rShoulder.pos, rElbow.pos, rHand.pos, FAMILIAR_UPPER_ARM_THICKNESS, paper.rightArm.stress);
+  drawPaperLimb(lHip.pos, lKnee.pos, lFoot.pos, FAMILIAR_THIGH_THICKNESS, paper.leftLeg.stress * 0.88);
+  drawPaperLimb(rHip.pos, rKnee.pos, rFoot.pos, FAMILIAR_THIGH_THICKNESS, paper.rightLeg.stress * 0.88);
 
-  drawCircle(lHand.pos, Familiar.handRadius * lHand.scale, COLOR_FAMILIAR_HAND);
-  drawCircle(rHand.pos, Familiar.handRadius * rHand.scale, COLOR_FAMILIAR_HAND);
-  drawCircle(lFoot.pos, Familiar.footRadius * lFoot.scale, COLOR_FAMILIAR_ARM);
-  drawCircle(rFoot.pos, Familiar.footRadius * rFoot.scale, COLOR_FAMILIAR_ARM);
+  drawPapercraftPanel(buildPaperShell(lHand.pos, Familiar.handRadius * 0.95, Familiar.handRadius * 0.75, paper.leftArm.flap * 0.18), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.leftArm.flap);
+  drawPapercraftPanel(buildPaperShell(rHand.pos, Familiar.handRadius * 0.95, Familiar.handRadius * 0.75, paper.rightArm.flap * 0.18), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.rightArm.flap);
+  drawPapercraftPanel(buildPaperShell(lFoot.pos, Familiar.footRadius * 1.05, Familiar.footRadius * 0.65, paper.leftLeg.flap * 0.12), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.leftLeg.flap);
+  drawPapercraftPanel(buildPaperShell(rFoot.pos, Familiar.footRadius * 1.05, Familiar.footRadius * 0.65, paper.rightLeg.flap * 0.12), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.rightLeg.flap);
 }
 
 function drawBall() {

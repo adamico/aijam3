@@ -166,6 +166,27 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(pose.rightShoulder.x).toBeCloseTo(pose.torso.x + 0.3, 5);
     });
 
+    it('raises papercraft stress when the keeper stretches or dives', async () => {
+        const { gameInit, applyKeeperHandIk, updateBallShot, getFamiliarPapercraftState } = await import('./main.js');
+
+        gameInit();
+        const neutral = getFamiliarPapercraftState();
+
+        applyKeeperHandIk({ x: 5, y: -3.8 }, 0.1);
+        const stretched = getFamiliarPapercraftState();
+
+        expect(stretched.torso.shiftX).toBeGreaterThan(neutral.torso.shiftX);
+        expect(stretched.rightArm.stress).toBeGreaterThan(neutral.rightArm.stress);
+
+        gameInit();
+        updateBallShot(1.0);
+        applyKeeperHandIk({ x: 4.4, y: -3.4 }, 0.1);
+        const diving = getFamiliarPapercraftState();
+
+        expect(diving.torso.liftY).toBeGreaterThan(neutral.torso.liftY);
+        expect(diving.head.wobble).toBeGreaterThan(neutral.head.wobble);
+    });
+
     it('shows dangling lower limbs that move with the torso instead of planting on the ground', async () => {
         const { gameInit, getFamiliarPose } = await import('./main.js');
 
