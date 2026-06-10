@@ -1,9 +1,34 @@
 import { clamp, vec2 } from 'littlejsengine';
+import { DEFAULT_MATCH_RULES } from './matchState.js';
 
 const DEFAULT_EPSILON = 1e-6;
 
 function isGloveSegment(segment) {
   return typeof segment?.id === 'string' && /hand$/i.test(segment.id);
+}
+
+function getSegmentType(segment, isGlove) {
+  if (typeof segment?.type === 'string' && segment.type.length > 0) {
+    return segment.type;
+  }
+
+  return isGlove ? 'glove' : 'body';
+}
+
+function getScoreDelta(outcome) {
+  if (outcome === 'saved') return DEFAULT_MATCH_RULES.savePoints;
+  if (outcome === 'deflected') return DEFAULT_MATCH_RULES.deflectionPoints;
+  return 0;
+}
+
+function cloneContactSummary(contact) {
+  return {
+    id: contact.segment?.id ?? null,
+    segmentType: getSegmentType(contact.segment, contact.isGlove),
+    isGlove: contact.isGlove,
+    distance: contact.overlap.distance,
+    overlapDepth: contact.overlap.overlapDepth,
+  };
 }
 
 function segmentDistanceSquared(point, start, end) {
@@ -74,17 +99,24 @@ export function resolveGoalPlaneSave({ ball, segments, epsilon = DEFAULT_EPSILON
   }
 
   const gloveContacts = contacts.filter(contact => contact.isGlove);
+  const contactSegments = contacts.map(cloneContactSummary);
 
   if (gloveContacts.length >= 2) {
     const primaryContact = gloveContacts[0] ?? contacts[0];
 
     return {
       outcome: 'saved',
+      saveQuality: 'clean-save',
       isSave: true,
       isSaved: true,
+      isCleanSave: true,
+      isDeflection: false,
+      isConcession: false,
+      scoreDelta: getScoreDelta('saved'),
       segmentId: primaryContact?.segment?.id ?? null,
       distance: primaryContact?.overlap.distance ?? null,
       overlapDepth: primaryContact?.overlap.overlapDepth ?? null,
+      contactSegments,
     };
   }
 
@@ -93,21 +125,33 @@ export function resolveGoalPlaneSave({ ball, segments, epsilon = DEFAULT_EPSILON
 
     return {
       outcome: 'deflected',
+      saveQuality: 'deflection',
       isSave: false,
       isSaved: false,
+      isCleanSave: false,
+      isDeflection: true,
+      isConcession: false,
+      scoreDelta: getScoreDelta('deflected'),
       segmentId: primaryContact?.segment?.id ?? null,
       distance: primaryContact?.overlap.distance ?? null,
       overlapDepth: primaryContact?.overlap.overlapDepth ?? null,
+      contactSegments,
     };
   }
 
   return {
     outcome: 'conceded',
+    saveQuality: 'concession',
     isSave: false,
     isSaved: false,
+    isCleanSave: false,
+    isDeflection: false,
+    isConcession: true,
+    scoreDelta: getScoreDelta('conceded'),
     segmentId: null,
     distance: null,
     overlapDepth: null,
+    contactSegments,
   };
 }
 
@@ -117,11 +161,17 @@ export function resolveCrossingSave({ previousZ, currentZ, ball, segments, epsil
   if (!crossedGoalPlane) {
     return {
       outcome: 'in-flight',
+      saveQuality: 'in-flight',
       isSave: false,
       isSaved: false,
+      isCleanSave: false,
+      isDeflection: false,
+      isConcession: false,
+      scoreDelta: 0,
       segmentId: null,
       distance: null,
       overlapDepth: null,
+      contactSegments: [],
       crossedGoalPlane: false,
     };
   }

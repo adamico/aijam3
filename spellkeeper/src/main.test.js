@@ -278,6 +278,19 @@ describe('Spell Keeper basic gameplay scene', () => {
             lastResult: {
                 outcome: 'saved',
                 crossedGoalPlane: true,
+                saveQuality: 'clean-save',
+                scoreDelta: 100,
+                contactSegments: expect.arrayContaining([
+                    expect.objectContaining({ id: 'leftHand', segmentType: 'glove' }),
+                    expect.objectContaining({ id: 'rightHand', segmentType: 'glove' }),
+                ]),
+            },
+            summary: {
+                outcome: 'saved',
+                saveQuality: 'clean-save',
+                scoreDelta: 100,
+                isCleanSave: true,
+                isDeflection: false,
             },
         });
         expect(getMatchState()).toMatchObject({

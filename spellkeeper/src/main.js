@@ -207,7 +207,18 @@ function cloneRuntimeShotSample(sample) {
   return {
     ...sample,
     shadow: sample.shadow ? { ...sample.shadow } : null,
-    saveResult: sample.saveResult ? { ...sample.saveResult } : null,
+    saveResult: cloneSaveResult(sample.saveResult),
+  };
+}
+
+function cloneSaveResult(result) {
+  if (!result) return null;
+
+  return {
+    ...result,
+    contactSegments: Array.isArray(result.contactSegments)
+      ? result.contactSegments.map(contact => ({ ...contact }))
+      : [],
   };
 }
 
@@ -265,6 +276,85 @@ export function getShotResultFeedback(outcome) {
   return SHOT_RESULT_FEEDBACK[canonicalOutcome] ?? SHOT_RESULT_FEEDBACK.conceded;
 }
 
+function formatContactSegments(contactSegments = []) {
+  if (!Array.isArray(contactSegments) || contactSegments.length === 0) {
+    return 'no contact';
+  }
+
+  return contactSegments
+    .map(contact => `${contact.id ?? 'unknown'}(${contact.segmentType ?? 'body'})`)
+    .join(', ');
+}
+
+function createFallbackShotResult(outcome) {
+  const canonicalOutcome = outcome === 'save' ? 'saved' : outcome;
+  if (canonicalOutcome !== 'saved' && canonicalOutcome !== 'deflected' && canonicalOutcome !== 'conceded') {
+    return null;
+  }
+
+  return {
+    outcome: canonicalOutcome,
+    saveQuality: canonicalOutcome === 'saved'
+      ? 'clean-save'
+      : canonicalOutcome === 'deflected'
+        ? 'deflection'
+        : 'concession',
+    isSave: canonicalOutcome === 'saved',
+    isSaved: canonicalOutcome === 'saved',
+    isCleanSave: canonicalOutcome === 'saved',
+    isDeflection: canonicalOutcome === 'deflected',
+    isConcession: canonicalOutcome === 'conceded',
+    scoreDelta: canonicalOutcome === 'saved'
+      ? 100
+      : canonicalOutcome === 'deflected'
+        ? 25
+        : 0,
+    segmentId: null,
+    distance: null,
+    overlapDepth: null,
+    contactSegments: [],
+  };
+}
+
+export function getShotResolutionSummary() {
+  const feedback = getFeedbackState(Ball.runtime);
+  const result = cloneSaveResult(feedback?.lastResult);
+
+  if (!result) return null;
+
+  const canonicalOutcome = result.outcome === 'save' ? 'saved' : result.outcome;
+  const resultFeedback = getShotResultFeedback(canonicalOutcome);
+
+  return {
+    outcome: canonicalOutcome,
+    saveQuality: result.saveQuality ?? (
+      canonicalOutcome === 'saved'
+        ? 'clean-save'
+        : canonicalOutcome === 'deflected'
+          ? 'deflection'
+          : canonicalOutcome === 'concession'
+            ? 'concession'
+            : 'in-flight'
+    ),
+    scoreDelta: result.scoreDelta ?? (
+      canonicalOutcome === 'saved'
+        ? 100
+        : canonicalOutcome === 'deflected'
+          ? 25
+          : 0
+    ),
+    isCleanSave: Boolean(result.isCleanSave ?? canonicalOutcome === 'saved'),
+    isDeflection: Boolean(result.isDeflection ?? canonicalOutcome === 'deflected'),
+    isConcession: Boolean(result.isConcession ?? canonicalOutcome === 'conceded'),
+    crossedGoalPlane: Boolean(result.crossedGoalPlane),
+    segmentId: result.segmentId ?? null,
+    distance: result.distance ?? null,
+    overlapDepth: result.overlapDepth ?? null,
+    contactSegments: Array.isArray(result.contactSegments) ? result.contactSegments : [],
+    label: resultFeedback.label,
+  };
+}
+
 export function gameUpdate() {
   updateCameraFraming();
   updateKeeperIk(mousePos, timeDelta);
@@ -312,10 +402,17 @@ export function applyMatchShotOutcome(outcome) {
   Match.state = recordShotResult(Match.state, outcome);
 
   if (Ball.runtime) {
-    Ball.runtime = recordShotRuntimeOutcome(Ball.runtime, {
+    const currentFeedback = getFeedbackState(Ball.runtime);
+    const runtimeOutcome = {
       nextShotIndex: Match.state.shotsTaken,
       matchComplete: isMatchComplete(Match.state),
-    });
+    };
+
+    if (!currentFeedback?.lastResult) {
+      runtimeOutcome.result = createFallbackShotResult(outcome);
+    }
+
+    Ball.runtime = recordShotRuntimeOutcome(Ball.runtime, runtimeOutcome);
     syncBallFromRuntime(Ball.runtime);
   }
 
@@ -373,7 +470,7 @@ export function getBallPose() {
     color: sample.color,
     shadow: { ...sample.shadow },
     hex: Ball.shot?.hex,
-    saveResult: sample.saveResult ? { ...sample.saveResult } : null,
+    saveResult: cloneSaveResult(sample.saveResult),
   };
 }
 
@@ -385,7 +482,8 @@ export function getSaveState() {
     deflections: Match.state.deflections,
     conceded: Match.state.conceded,
     feedbackTimer: feedback?.timer ?? 0,
-    lastResult: feedback?.lastResult ? { ...feedback.lastResult } : null,
+    lastResult: cloneSaveResult(feedback?.lastResult),
+    summary: getShotResolutionSummary(),
   };
 }
 
@@ -670,10 +768,14 @@ function drawSaveFeedback() {
   );
 
   const feedback = getFeedbackState(Ball.runtime);
+  const summary = getShotResolutionSummary();
   const hasOutcomeFeedback = Boolean(feedback?.lastResult && feedback.timer > 0);
   const outcomeY = 86;
   const matchBannerY = hasOutcomeFeedback ? 136 : 86;
   const finalScoreY = hasOutcomeFeedback ? 186 : 136;
+  const summaryY = isMatchComplete(Match.state)
+    ? (hasOutcomeFeedback ? 232 : 186)
+    : 136;
 
   if (hasOutcomeFeedback) {
     const resultFeedback = getShotResultFeedback(feedback.lastResult.outcome);
@@ -683,6 +785,17 @@ function drawSaveFeedback() {
       56,
       resultFeedback.color,
       5,
+      COLOR_STADIUM_NIGHT,
+    );
+  }
+
+  if (summary && (hasOutcomeFeedback || isMatchComplete(Match.state))) {
+    drawTextScreen(
+      `${summary.saveQuality === 'clean-save' ? 'Clean Save' : summary.saveQuality === 'deflection' ? 'Deflection' : 'Concession'}   ${summary.label}   Δ${summary.scoreDelta}   ${formatContactSegments(summary.contactSegments)}`,
+      vec2(centerX, summaryY),
+      18,
+      COLOR_SCORE_FEEDBACK,
+      2,
       COLOR_STADIUM_NIGHT,
     );
   }

@@ -24,8 +24,16 @@ describe('SaveResolver', () => {
 
     expect(result.crossedGoalPlane).toBe(true);
     expect(result.outcome).toBe('saved');
+    expect(result.saveQuality).toBe('clean-save');
     expect(result.isSave).toBe(true);
+    expect(result.scoreDelta).toBe(100);
     expect(result.segmentId).toBe('rightHand');
+    expect(result.contactSegments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'rightHand', segmentType: 'glove', isGlove: true }),
+        expect.objectContaining({ id: 'leftHand', segmentType: 'glove', isGlove: true }),
+      ]),
+    );
   });
 
   it('counts a goal-plane crossing as deflected when a single glove contacts the ball', () => {
@@ -38,8 +46,16 @@ describe('SaveResolver', () => {
 
     expect(result.crossedGoalPlane).toBe(true);
     expect(result.outcome).toBe('deflected');
+    expect(result.saveQuality).toBe('deflection');
     expect(result.isSave).toBe(false);
+    expect(result.scoreDelta).toBe(25);
     expect(result.segmentId).toBe('rightHand');
+    expect(result.contactSegments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'rightHand', segmentType: 'glove', isGlove: true }),
+        expect.objectContaining({ id: 'rightForearm', segmentType: 'body', isGlove: false }),
+      ]),
+    );
   });
 
   it('counts a goal-plane crossing as conceded when all body segments miss', () => {
@@ -52,8 +68,11 @@ describe('SaveResolver', () => {
 
     expect(result.crossedGoalPlane).toBe(true);
     expect(result.outcome).toBe('conceded');
+    expect(result.saveQuality).toBe('concession');
     expect(result.isSave).toBe(false);
+    expect(result.scoreDelta).toBe(0);
     expect(result.segmentId).toBeNull();
+    expect(result.contactSegments).toEqual([]);
   });
 
   it('does not resolve shots that have not crossed the goal plane yet', () => {
@@ -66,6 +85,9 @@ describe('SaveResolver', () => {
 
     expect(result.crossedGoalPlane).toBe(false);
     expect(result.outcome).toBe('in-flight');
+    expect(result.saveQuality).toBe('in-flight');
+    expect(result.scoreDelta).toBe(0);
+    expect(result.contactSegments).toEqual([]);
   });
 
   it('treats tangent boundary contact as a deterministic deflection', () => {
@@ -76,6 +98,7 @@ describe('SaveResolver', () => {
     expect(overlap.distance).toBeCloseTo(0.75, 5);
     expect(overlap.overlaps).toBe(true);
     expect(result.outcome).toBe('deflected');
+    expect(result.saveQuality).toBe('deflection');
   });
 
   it('uses capsule distance for arm and torso/body segment overlap', () => {

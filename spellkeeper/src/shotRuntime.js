@@ -18,7 +18,18 @@ function cloneShotPose(pose) {
   return {
     ...pose,
     shadow: pose.shadow ? { ...pose.shadow } : null,
-    saveResult: pose.saveResult ? { ...pose.saveResult } : null,
+    saveResult: cloneSaveResult(pose.saveResult),
+  };
+}
+
+function cloneSaveResult(result) {
+  if (!result) return null;
+
+  return {
+    ...result,
+    contactSegments: Array.isArray(result.contactSegments)
+      ? result.contactSegments.map(contact => ({ ...contact }))
+      : [],
   };
 }
 
@@ -51,7 +62,7 @@ function clonePlanEntry(entry) {
 function cloneFeedbackState(feedback) {
   return {
     ...feedback,
-    lastResult: feedback.lastResult ? { ...feedback.lastResult } : null,
+    lastResult: cloneSaveResult(feedback.lastResult),
   };
 }
 
@@ -187,7 +198,7 @@ export function recordShotRuntimeOutcome(runtime, {
 
   if (result) {
     nextRuntime.feedback = {
-      lastResult: { ...result },
+      lastResult: cloneSaveResult(result),
       timer: nextRuntime.shotTiming.feedbackDuration,
     };
   }
@@ -266,10 +277,10 @@ export function advanceShotRuntime(runtime, {
 
     nextRuntime.activeShot.sample = {
       ...nextRuntime.activeShot.sample,
-      saveResult: { ...result },
+      saveResult: cloneSaveResult(result),
     };
     nextRuntime.feedback = {
-      lastResult: { ...result },
+      lastResult: cloneSaveResult(result),
       timer: nextRuntime.shotTiming.feedbackDuration,
     };
     nextRuntime.respawnTimer = nextRuntime.shotTiming.respawnDelay;
@@ -293,7 +304,7 @@ export function recordShotRuntimeFeedback(runtime, result) {
   return {
     ...runtime,
     feedback: {
-      lastResult: result ? { ...result } : null,
+      lastResult: cloneSaveResult(result),
       timer: runtime.shotTiming.feedbackDuration,
     },
   };
