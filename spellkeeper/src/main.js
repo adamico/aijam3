@@ -302,6 +302,7 @@ export function gameInit(options = {}) {
   Match.plan = createShotPlan(Match.shotPlanSeed, { totalShots: Match.state.totalShots });
   Ball.runtime = createBallRuntime();
   syncBallFromRuntime(Ball.runtime);
+  playShotLaunchCue();
 }
 
 export function getShotResultFeedback(outcome) {
