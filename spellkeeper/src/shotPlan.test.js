@@ -218,8 +218,8 @@ describe('shot plan generator', () => {
     const validator = vi.fn()
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true)
-      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(false)
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(true);
 
