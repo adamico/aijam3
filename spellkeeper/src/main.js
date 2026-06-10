@@ -29,6 +29,7 @@ import {
   queueNextShot,
 } from './shotRuntime.js';
 import { sampleShotPath } from './shotTrajectory.js';
+import { playShotLaunchCue, playShotOutcomeCue } from './audioCues.js';
 
 // Helper to convert hex to LittleJS Color
 const c = (hex) => new Color().setHex(hex);
@@ -434,6 +435,7 @@ export function spawnShot(index = Ball.shotIndex) {
   }
 
   syncBallFromRuntime(Ball.runtime);
+  playShotLaunchCue();
   return Ball.shot;
 }
 
@@ -451,6 +453,7 @@ export function applyMatchShotOutcome(outcome) {
   if (isMatchComplete(Match.state)) return getMatchState();
 
   Match.state = recordShotResult(Match.state, outcome);
+  const matchComplete = isMatchComplete(Match.state);
 
   if (Ball.runtime) {
     const currentFeedback = getFeedbackState(Ball.runtime);
@@ -468,6 +471,10 @@ export function applyMatchShotOutcome(outcome) {
     Ball.runtime = recordShotRuntimeOutcome(Ball.runtime, runtimeOutcome);
     syncBallFromRuntime(Ball.runtime);
   }
+
+  playShotOutcomeCue(outcome, {
+    matchComplete,
+  });
 
   return getMatchState();
 }

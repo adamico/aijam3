@@ -289,6 +289,36 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(getTutorialShotTelegraph()).toBeNull();
     });
 
+    it('routes launch and outcome cues from runtime events and match end', async () => {
+        const launchCue = vi.fn();
+        const outcomeCue = vi.fn();
+
+        vi.resetModules();
+        vi.doMock('./audioCues.js', () => ({
+            playShotLaunchCue: launchCue,
+            playShotOutcomeCue: outcomeCue,
+        }));
+
+        try {
+            const { gameInit, applyMatchShotOutcome } = await import('./main.js');
+
+            gameInit();
+            expect(launchCue).toHaveBeenCalledTimes(1);
+
+            applyMatchShotOutcome('saved');
+            expect(outcomeCue).toHaveBeenLastCalledWith('saved', { matchComplete: false });
+
+            applyMatchShotOutcome('conceded');
+            applyMatchShotOutcome('conceded');
+            applyMatchShotOutcome('conceded');
+            applyMatchShotOutcome('conceded');
+            expect(outcomeCue).toHaveBeenLastCalledWith('conceded', { matchComplete: true });
+        } finally {
+            vi.doUnmock('./audioCues.js');
+            vi.resetModules();
+        }
+    });
+
     it('keeps shot lifecycle, aggregate counts, and score ownership separated through public orchestration', async () => {
         const {
             applyKeeperHandIk,
