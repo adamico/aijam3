@@ -20,6 +20,7 @@ function mirrorSide(side) {
 
 function resolveRelativeLane(relativeLane, side) {
   const isLeft = side === 'left';
+
   switch (relativeLane) {
     case RELATIVE_LANES.sameOuter:
       return isLeft ? 'outerLeft' : 'outerRight';
@@ -40,6 +41,7 @@ function resolveRelativeCurveDirection(relativeCurveDirection, side) {
   if (relativeCurveDirection === undefined) return undefined;
 
   const isLeft = side === 'left';
+
   switch (relativeCurveDirection) {
     case RELATIVE_CURVE_DIRECTIONS.inward:
       return isLeft ? 1 : -1;
@@ -54,7 +56,7 @@ function mergePressureTags(...groups) {
   return [...new Set(groups.flat())];
 }
 
-function createSetpieceShot(shot, shotDesigner, template, side) {
+function createSetpieceShot(shot, shotDesigner, blueprint, side) {
   const resolvedShot = {
     hex: shot.hex,
     originLane: resolveRelativeLane(shot.originLane, side),
@@ -71,342 +73,205 @@ function createSetpieceShot(shot, shotDesigner, template, side) {
     shot: resolvedShot,
     designer: {
       label: shotDesigner.label,
-      difficultyBand: template.difficultyBand,
-      pressureTags: mergePressureTags(template.pressureTags, shotDesigner.pressureTags),
-      intendedFailureMode: template.intendedFailureMode,
+      difficultyBand: blueprint.difficultyBand,
+      pressureTags: mergePressureTags(blueprint.pressureTags, shotDesigner.pressureTags),
+      intendedFailureMode: blueprint.intendedFailureMode,
       opener: false,
     },
   };
 }
 
-function instantiateSetpiece(template, side) {
+function instantiateSetpiece(blueprint, side) {
   return {
-    key: template.key,
-    label: template.label,
-    difficultyBand: template.difficultyBand,
-    pressureTags: [...template.pressureTags],
-    intendedFailureMode: template.intendedFailureMode,
+    key: blueprint.key,
+    label: blueprint.label,
+    difficultyBand: blueprint.difficultyBand,
+    pressureTags: [...blueprint.pressureTags],
+    intendedFailureMode: blueprint.intendedFailureMode,
     side,
     mirrorSide: mirrorSide(side),
-    shots: template.shots.map((shot) => createSetpieceShot(shot.shot, shot.designer, template, side)),
+    shots: blueprint.shots.map((shot) => createSetpieceShot(shot.shot, shot.designer, blueprint, side)),
   };
 }
 
+function createBlueprint({
+  key,
+  label,
+  difficultyBand,
+  pressureTags,
+  intendedFailureMode,
+  shots,
+}) {
+  return {
+    key,
+    label,
+    difficultyBand,
+    pressureTags,
+    intendedFailureMode,
+    shots,
+  };
+}
+
+const HEAVY_BAIT_OPPOSITE_PUNISH = createBlueprint({
+  key: 'heavy-bait-opposite-punish',
+  label: 'heavy bait into opposite punish',
+  difficultyBand: 'readable variety',
+  pressureTags: ['heavy-bait', 'opposite-punish', 'commitment'],
+  intendedFailureMode: 'overcommit-punish',
+  shots: [
+    {
+      shot: {
+        hex: 'heavy',
+        originLane: RELATIVE_LANES.sameOuter,
+        targetLane: RELATIVE_LANES.sameOuter,
+        placementHeight: 'low',
+      },
+      designer: {
+        label: 'heavy bait',
+        pressureTags: ['low', 'extreme-side', 'commitment'],
+      },
+    },
+    {
+      shot: {
+        hex: 'standard',
+        originLane: RELATIVE_LANES.oppositeInner,
+        targetLane: RELATIVE_LANES.oppositeOuter,
+        placementHeight: 'high',
+      },
+      designer: {
+        label: 'opposite punish',
+        pressureTags: ['opposite-side', 'punish'],
+      },
+    },
+  ],
+});
+
+const CURVE_BAIT_SWITCH = createBlueprint({
+  key: 'curve-bait-switch',
+  label: 'curve bait into switchback',
+  difficultyBand: 'mixed pressure',
+  pressureTags: ['curve-bait', 'switch', 'shape'],
+  intendedFailureMode: 'curve-misread',
+  shots: [
+    {
+      shot: {
+        hex: 'curve',
+        originLane: RELATIVE_LANES.sameOuter,
+        targetLane: RELATIVE_LANES.sameInner,
+        placementHeight: 'middle',
+        curveDirection: RELATIVE_CURVE_DIRECTIONS.inward,
+      },
+      designer: {
+        label: 'curve bait',
+        pressureTags: ['curve', 'bait'],
+      },
+    },
+    {
+      shot: {
+        hex: 'curve',
+        originLane: RELATIVE_LANES.oppositeOuter,
+        targetLane: RELATIVE_LANES.oppositeInner,
+        placementHeight: 'middle',
+        curveDirection: RELATIVE_CURVE_DIRECTIONS.outward,
+      },
+      designer: {
+        label: 'switchback',
+        pressureTags: ['curve', 'switch'],
+      },
+    },
+  ],
+});
+
+const SAME_SIDE_PIN = createBlueprint({
+  key: 'same-side-pin',
+  label: 'same-side pin into drag',
+  difficultyBand: 'chaos-but-fair',
+  pressureTags: ['same-side', 'pin', 'pressure'],
+  intendedFailureMode: 'same-side-pinning',
+  shots: [
+    {
+      shot: {
+        hex: 'standard',
+        originLane: RELATIVE_LANES.sameInner,
+        targetLane: RELATIVE_LANES.sameInner,
+        placementHeight: 'high',
+      },
+      designer: {
+        label: 'pin high',
+        pressureTags: ['same-side', 'high'],
+      },
+    },
+    {
+      shot: {
+        hex: 'heavy',
+        originLane: RELATIVE_LANES.sameOuter,
+        targetLane: RELATIVE_LANES.sameOuter,
+        placementHeight: 'low',
+      },
+      designer: {
+        label: 'pin low',
+        pressureTags: ['low', 'extreme-side', 'commitment'],
+      },
+    },
+  ],
+});
+
+const HIGH_LOW_ALTERNATION = createBlueprint({
+  key: 'high-low-alternation',
+  label: 'high-low alternation',
+  difficultyBand: 'readable variety',
+  pressureTags: ['high-low', 'alternation', 'read'],
+  intendedFailureMode: 'high-low-misread',
+  shots: [
+    {
+      shot: {
+        hex: 'standard',
+        originLane: RELATIVE_LANES.center,
+        targetLane: RELATIVE_LANES.center,
+        placementHeight: 'high',
+      },
+      designer: {
+        label: 'high center read',
+        pressureTags: ['center', 'high'],
+      },
+    },
+    {
+      shot: {
+        hex: 'fireball',
+        originLane: RELATIVE_LANES.oppositeInner,
+        targetLane: RELATIVE_LANES.oppositeInner,
+        placementHeight: 'low',
+      },
+      designer: {
+        label: 'low opposite snap',
+        pressureTags: ['low', 'opposite-side'],
+      },
+    },
+  ],
+});
+
 const SETPIECE_LIBRARY = {
-  readable: [
-    {
-      key: 'readable-bait-recover',
-      label: 'outer bait into opposite recovery',
-      difficultyBand: 'readable variety',
-      pressureTags: ['bait', 'recovery', 'overcommit'],
-      intendedFailureMode: 'overcommit-punish',
-      shots: [
-        {
-          shot: {
-            hex: 'heavy',
-            originLane: RELATIVE_LANES.sameOuter,
-            targetLane: RELATIVE_LANES.sameOuter,
-            placementHeight: 'low',
-          },
-          designer: {
-            label: 'heavy bait',
-            pressureTags: ['low', 'extreme-side', 'commitment'],
-          },
-        },
-        {
-          shot: {
-            hex: 'standard',
-            originLane: RELATIVE_LANES.oppositeInner,
-            targetLane: RELATIVE_LANES.oppositeInner,
-            placementHeight: 'middle',
-          },
-          designer: {
-            label: 'opposite recovery',
-            pressureTags: ['opposite-side', 'recovery'],
-          },
-        },
-      ],
-    },
-    {
-      key: 'readable-curve-echo',
-      label: 'curve bait into inner correction',
-      difficultyBand: 'readable variety',
-      pressureTags: ['curve', 'shape', 'recovery'],
-      intendedFailureMode: 'curve-misread',
-      shots: [
-        {
-          shot: {
-            hex: 'curve',
-            originLane: RELATIVE_LANES.sameOuter,
-            targetLane: RELATIVE_LANES.sameInner,
-            placementHeight: 'middle',
-            curveDirection: RELATIVE_CURVE_DIRECTIONS.inward,
-          },
-          designer: {
-            label: 'curve bait',
-            pressureTags: ['curve', 'bait'],
-          },
-        },
-        {
-          shot: {
-            hex: 'standard',
-            originLane: RELATIVE_LANES.oppositeInner,
-            targetLane: RELATIVE_LANES.oppositeInner,
-            placementHeight: 'high',
-          },
-          designer: {
-            label: 'inner recovery',
-            pressureTags: ['opposite-side', 'late-recovery'],
-          },
-        },
-      ],
-    },
-    {
-      key: 'readable-low-high',
-      label: 'low bait into higher reset',
-      difficultyBand: 'readable variety',
-      pressureTags: ['high-low', 'reset', 'read'],
-      intendedFailureMode: 'high-low-misread',
-      shots: [
-        {
-          shot: {
-            hex: 'standard',
-            originLane: RELATIVE_LANES.sameInner,
-            targetLane: RELATIVE_LANES.sameInner,
-            placementHeight: 'low',
-          },
-          designer: {
-            label: 'low probe',
-            pressureTags: ['low', 'probe'],
-          },
-        },
-        {
-          shot: {
-            hex: 'standard',
-            originLane: RELATIVE_LANES.oppositeOuter,
-            targetLane: RELATIVE_LANES.oppositeOuter,
-            placementHeight: 'middle',
-          },
-          designer: {
-            label: 'higher reset',
-            pressureTags: ['reset', 'opposite-side'],
-          },
-        },
-      ],
-    },
-  ],
-  mixed: [
-    {
-      key: 'mixed-weight-switch',
-      label: 'heavy drag into opposite squeeze',
-      difficultyBand: 'mixed pressure',
-      pressureTags: ['heavy-bait', 'switch', 'recovery'],
-      intendedFailureMode: 'heavy-bait',
-      shots: [
-        {
-          shot: {
-            hex: 'heavy',
-            originLane: RELATIVE_LANES.sameOuter,
-            targetLane: RELATIVE_LANES.sameOuter,
-            placementHeight: 'low',
-          },
-          designer: {
-            label: 'drag bait',
-            pressureTags: ['low', 'extreme-side', 'commitment'],
-          },
-        },
-        {
-          shot: {
-            hex: 'standard',
-            originLane: RELATIVE_LANES.oppositeOuter,
-            targetLane: RELATIVE_LANES.oppositeOuter,
-            placementHeight: 'high',
-          },
-          designer: {
-            label: 'opposite squeeze',
-            pressureTags: ['opposite-side', 'high'],
-          },
-        },
-      ],
-    },
-    {
-      key: 'mixed-curve-turn',
-      label: 'curve bait into late correction',
-      difficultyBand: 'mixed pressure',
-      pressureTags: ['curve-bait', 'late-correction', 'shape'],
-      intendedFailureMode: 'curve-misread',
-      shots: [
-        {
-          shot: {
-            hex: 'curve',
-            originLane: RELATIVE_LANES.sameOuter,
-            targetLane: RELATIVE_LANES.sameInner,
-            placementHeight: 'middle',
-            curveDirection: RELATIVE_CURVE_DIRECTIONS.inward,
-          },
-          designer: {
-            label: 'curve bait',
-            pressureTags: ['curve', 'bait'],
-          },
-        },
-        {
-          shot: {
-            hex: 'standard',
-            originLane: RELATIVE_LANES.oppositeInner,
-            targetLane: RELATIVE_LANES.oppositeInner,
-            placementHeight: 'high',
-          },
-          designer: {
-            label: 'late correction',
-            pressureTags: ['opposite-side', 'late-recovery'],
-          },
-        },
-      ],
-    },
-    {
-      key: 'mixed-pivot-shift',
-      label: 'pivot from same-side pressure to center reset',
-      difficultyBand: 'mixed pressure',
-      pressureTags: ['pivot', 'center', 'recovery'],
-      intendedFailureMode: 'read-check',
-      shots: [
-        {
-          shot: {
-            hex: 'standard',
-            originLane: RELATIVE_LANES.sameInner,
-            targetLane: RELATIVE_LANES.sameInner,
-            placementHeight: 'high',
-          },
-          designer: {
-            label: 'high probe',
-            pressureTags: ['high', 'same-side'],
-          },
-        },
-        {
-          shot: {
-            hex: 'curve',
-            originLane: RELATIVE_LANES.center,
-            targetLane: RELATIVE_LANES.oppositeOuter,
-            placementHeight: 'middle',
-            curveDirection: RELATIVE_CURVE_DIRECTIONS.outward,
-          },
-          designer: {
-            label: 'center pivot',
-            pressureTags: ['curve', 'switch', 'center'],
-          },
-        },
-      ],
-    },
-  ],
-  chaos: [
-    {
-      key: 'chaos-pin-lock',
-      label: 'same-side pin then hard drag',
-      difficultyBand: 'chaos-but-fair',
-      pressureTags: ['same-side', 'pin', 'pressure'],
-      intendedFailureMode: 'same-side-pinning',
-      shots: [
-        {
-          shot: {
-            hex: 'standard',
-            originLane: RELATIVE_LANES.sameOuter,
-            targetLane: RELATIVE_LANES.sameOuter,
-            placementHeight: 'high',
-          },
-          designer: {
-            label: 'pin high',
-            pressureTags: ['corner', 'late'],
-          },
-        },
-        {
-          shot: {
-            hex: 'heavy',
-            originLane: RELATIVE_LANES.sameOuter,
-            targetLane: RELATIVE_LANES.sameOuter,
-            placementHeight: 'low',
-          },
-          designer: {
-            label: 'pin low',
-            pressureTags: ['low', 'extreme-side', 'commitment', 'finish'],
-          },
-        },
-      ],
-    },
-    {
-      key: 'chaos-curve-whip',
-      label: 'curve whip into opposite squeeze',
-      difficultyBand: 'chaos-but-fair',
-      pressureTags: ['curve-bait', 'whip', 'switch'],
-      intendedFailureMode: 'curve-misread',
-      shots: [
-        {
-          shot: {
-            hex: 'curve',
-            originLane: RELATIVE_LANES.sameOuter,
-            targetLane: RELATIVE_LANES.oppositeInner,
-            placementHeight: 'middle',
-            curveDirection: RELATIVE_CURVE_DIRECTIONS.outward,
-          },
-          designer: {
-            label: 'whip curve',
-            pressureTags: ['curve', 'switch'],
-          },
-        },
-        {
-          shot: {
-            hex: 'standard',
-            originLane: RELATIVE_LANES.oppositeOuter,
-            targetLane: RELATIVE_LANES.oppositeOuter,
-            placementHeight: 'high',
-          },
-          designer: {
-            label: 'opposite squeeze',
-            pressureTags: ['opposite-side', 'corner'],
-          },
-        },
-      ],
-    },
-    {
-      key: 'chaos-turnover',
-      label: 'turnover into late recovery',
-      difficultyBand: 'chaos-but-fair',
-      pressureTags: ['late-recovery', 'pivot', 'pressure'],
-      intendedFailureMode: 'late-recovery',
-      shots: [
-        {
-          shot: {
-            hex: 'standard',
-            originLane: RELATIVE_LANES.sameInner,
-            targetLane: RELATIVE_LANES.oppositeOuter,
-            placementHeight: 'high',
-          },
-          designer: {
-            label: 'turnover start',
-            pressureTags: ['opposite-side', 'high'],
-          },
-        },
-        {
-          shot: {
-            hex: 'curve',
-            originLane: RELATIVE_LANES.oppositeOuter,
-            targetLane: RELATIVE_LANES.sameInner,
-            placementHeight: 'middle',
-            curveDirection: RELATIVE_CURVE_DIRECTIONS.inward,
-          },
-          designer: {
-            label: 'late recovery',
-            pressureTags: ['curve', 'late-recovery'],
-          },
-        },
-      ],
-    },
-  ],
+  'heavy-bait-opposite-punish': HEAVY_BAIT_OPPOSITE_PUNISH,
+  'curve-bait-switch': CURVE_BAIT_SWITCH,
+  'same-side-pin': SAME_SIDE_PIN,
+  'high-low-alternation': HIGH_LOW_ALTERNATION,
+};
+
+const SETPIECE_PHASE_LIBRARY = {
+  readable: [CURVE_BAIT_SWITCH, HIGH_LOW_ALTERNATION],
+  mixed: [HEAVY_BAIT_OPPOSITE_PUNISH, CURVE_BAIT_SWITCH, HIGH_LOW_ALTERNATION],
+  chaos: [HEAVY_BAIT_OPPOSITE_PUNISH, CURVE_BAIT_SWITCH, SAME_SIDE_PIN, HIGH_LOW_ALTERNATION],
 };
 
 export {
-  RELATIVE_LANES,
+  CURVE_BAIT_SWITCH,
+  HEAVY_BAIT_OPPOSITE_PUNISH,
+  HIGH_LOW_ALTERNATION,
   RELATIVE_CURVE_DIRECTIONS,
+  RELATIVE_LANES,
+  SAME_SIDE_PIN,
   SETPIECE_LIBRARY,
+  SETPIECE_PHASE_LIBRARY,
   instantiateSetpiece,
   mirrorSide,
   resolveRelativeCurveDirection,

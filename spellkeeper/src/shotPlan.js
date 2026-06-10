@@ -1,4 +1,4 @@
-import { SETPIECE_LIBRARY, instantiateSetpiece, mirrorSide } from './setpieces.js';
+import { SETPIECE_PHASE_LIBRARY, instantiateSetpiece, mirrorSide } from './setpieces.js';
 
 const DEFAULT_SHOT_PLAN_TOTAL_SHOTS = 30;
 export const DEFAULT_SHOT_PLAN_SEED = 'spellkeeper-default-shot-plan';
@@ -426,9 +426,9 @@ function shuffleWithRng(items, rng) {
 }
 
 function getSetpieceTemplatesForBand(band) {
-  if (band === SHOT_PLAN_DIFFICULTY_BANDS.readable) return SETPIECE_LIBRARY.readable;
-  if (band === SHOT_PLAN_DIFFICULTY_BANDS.mixed) return SETPIECE_LIBRARY.mixed;
-  return SETPIECE_LIBRARY.chaos;
+  if (band === SHOT_PLAN_DIFFICULTY_BANDS.readable) return SETPIECE_PHASE_LIBRARY.readable;
+  if (band === SHOT_PLAN_DIFFICULTY_BANDS.mixed) return SETPIECE_PHASE_LIBRARY.mixed;
+  return SETPIECE_PHASE_LIBRARY.chaos;
 }
 
 function setpieceFitsDistribution(template, hexCounts, hexCountTarget) {
