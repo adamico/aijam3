@@ -51,6 +51,15 @@ vi.mock('littlejsengine', () => {
             this.hex = hex;
             return this;
         }
+        copy() {
+            const clone = new MockColor(this.r, this.g, this.b, this.a);
+            clone.hex = this.hex;
+            return clone;
+        }
+        setAlpha(a) {
+            this.a = a;
+            return this;
+        }
     }
     return {
         clamp: (value, min = 0, max = 1) => (value < min ? min : value > max ? max : value),
@@ -79,6 +88,14 @@ vi.mock('littlejsengine', () => {
         drawCircle: vi.fn((pos, radius, color) => {
             if (!(color instanceof MockColor)) {
                 throw new Error('Assertion failed: color is invalid');
+            }
+        }),
+        drawPoly: vi.fn((points, color, lineWidth, lineColor) => {
+            if (color && !(color instanceof MockColor)) {
+                throw new Error('Assertion failed: fill color is invalid');
+            }
+            if (lineColor && !(lineColor instanceof MockColor)) {
+                throw new Error('Assertion failed: line color is invalid');
             }
         }),
         drawTextScreen: vi.fn((text, pos, size, color) => {

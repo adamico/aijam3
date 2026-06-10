@@ -2,7 +2,7 @@ import {
   engineInit,
   clamp,
   vec2, setCameraPos, setCameraScale,
-  drawLine, drawCircle, drawTextScreen,
+  drawLine, drawCircle, drawPoly, drawTextScreen,
   rgb, Color, setCanvasClearColor,
   mousePos, timeDelta, mainCanvasSize,
   setCanvasMaxAspect, setCanvasMaxSize, setCanvasMinAspect
@@ -922,6 +922,9 @@ function drawGoal() {
 
 function drawPapercraftPanel(points, outlineColor, creaseColor, stress = 0) {
   if (!points || points.length < 3) return;
+
+  const fillColor = outlineColor.copy().setAlpha(0.85);
+  drawPoly(points, fillColor);
 
   for (let index = 0; index < points.length; index += 1) {
     const start = points[index];
