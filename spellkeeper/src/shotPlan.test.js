@@ -240,8 +240,8 @@ describe('shot plan generator', () => {
     });
 
     expect(entries).not.toBeNull();
-    expect(entries[0].designer.label).toBe('curve bait');
-    expect(entries[1].designer.label).toBe('switchback');
+    expect(entries[0].designer.label).toBe('pin high');
+    expect(entries[1].designer.label).toBe('pin low');
     expect(validator).toHaveBeenCalledTimes(6);
     expect(validator.mock.calls.map(([candidate]) => candidate.designer.label)).toEqual([
       'curve bait',
