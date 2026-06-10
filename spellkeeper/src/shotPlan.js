@@ -47,9 +47,9 @@ const HEAVY_PRESSURE_TAGS = ['low', 'extreme-side', 'commitment'];
 const PHASE_SHOT_COUNT = 9;
 
 export const PHASE_LAYOUTS = {
-  readable: ['isolated', 'setpiece', 'isolated', 'isolated', 'setpiece', 'isolated', 'isolated'],
-  mixed: ['isolated', 'setpiece', 'isolated', 'setpiece', 'isolated', 'setpiece'],
-  chaos: ['setpiece', 'isolated', 'setpiece', 'isolated', 'setpiece', 'isolated'],
+  readable: ['isolated', 'isolated', 'setpiece', 'isolated', 'isolated', 'isolated', 'isolated', 'isolated'],
+  mixed: ['isolated', 'setpiece', 'isolated', 'isolated', 'setpiece', 'isolated', 'isolated'],
+  chaos: ['setpiece', 'isolated', 'isolated', 'setpiece', 'isolated', 'isolated'],
 };
 
 const FIXED_OPENER_SHOTS = [
