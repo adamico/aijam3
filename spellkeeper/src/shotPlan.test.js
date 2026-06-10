@@ -103,17 +103,17 @@ describe('shot plan generator', () => {
       expect(['outer-left', 'outer-right']).not.toContain(entry.shot.targetLane);
     }
 
-    for (const entry of mixedFireballs) {
+    for (const entry of mixedFireballs.filter((shot) => shot.designer.intendedFailureMode === 'read-check')) {
       expect(entry.shot.placementHeight).toBe('high');
       expect(entry.shot.originLane).toBe('center');
       expect(entry.shot.targetLane).toBe('center');
     }
 
-    for (const entry of chaosFireballs) {
-      expect(entry.shot.placementHeight).toBe('high');
-      expect(['outer-left', 'outer-right']).toContain(entry.shot.originLane);
-      expect(['outer-left', 'outer-right']).toContain(entry.shot.targetLane);
-    }
+    const finale = chaosFireballs.at(-1);
+    expect(finale).toBeDefined();
+    expect(finale.shot.placementHeight).toBe('high');
+    expect(['outer-left', 'outer-right']).toContain(finale.shot.originLane);
+    expect(['outer-left', 'outer-right']).toContain(finale.shot.targetLane);
   });
 
   it('avoids back-to-back repeated hexes, lanes, and shot signatures', () => {

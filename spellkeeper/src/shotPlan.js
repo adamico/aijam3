@@ -789,9 +789,11 @@ function generateShotPlanAttempt(normalizedSeed, totalShots, attempt) {
     while (bandShotCount < PHASE_SHOT_COUNT) {
       const remainingShots = totalShots - plan.length;
       const missingHexes = SHOT_PLAN_REQUIRED_HEXES.filter((hex) => (hexCounts.get(hex) ?? 0) === 0);
-      const forcedHex = !hexCountTarget && missingHexes.length > 0 && remainingShots <= missingHexes.length
-        ? missingHexes[0]
-        : null;
+      const forcedHex = band === SHOT_PLAN_DIFFICULTY_BANDS.chaos && bandShotCount === PHASE_SHOT_COUNT - 1
+        ? 'fireball'
+        : (!hexCountTarget && missingHexes.length > 0 && remainingShots <= missingHexes.length
+          ? missingHexes[0]
+          : null);
       const generated = buildIsolatedEntry(plan.length, band, plan, rng, planId, hexCounts, hexCountTarget, forcedHex);
       if (!generated) {
         return null;
