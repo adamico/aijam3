@@ -68,14 +68,14 @@ describe('SaveResolver', () => {
     expect(result.outcome).toBe('in-flight');
   });
 
-  it('treats tangent boundary contact as a deterministic save', () => {
+  it('treats tangent boundary contact as a deterministic deflection', () => {
     const ball = { x: 1.75, y: -3.5, radius: 0.45 };
     const result = resolveGoalPlaneSave({ ball, segments: [glove] });
     const overlap = segmentOverlapsBall(glove, ball);
 
     expect(overlap.distance).toBeCloseTo(0.75, 5);
     expect(overlap.overlaps).toBe(true);
-    expect(result.outcome).toBe('saved');
+    expect(result.outcome).toBe('deflected');
   });
 
   it('uses capsule distance for arm and torso/body segment overlap', () => {
