@@ -2,7 +2,7 @@ import {
   engineInit,
   clamp,
   vec2, setCameraPos, setCameraScale,
-  drawLine, drawCircle, drawPoly, drawTextScreen,
+  drawLine, drawCircle, drawTextScreen,
   rgb, Color, setCanvasClearColor,
   mousePos, timeDelta, mainCanvasSize,
   setCanvasMaxAspect, setCanvasMaxSize, setCanvasMinAspect
@@ -802,9 +802,7 @@ function normalizePoint(point) {
   return length > 0 ? vec2(point.x / length, point.y / length) : vec2(0, 0);
 }
 
-function midpoint(a, b) {
-  return vec2((a.x + b.x) / 2, (a.y + b.y) / 2);
-}
+
 
 function addPoint(point, offset) {
   return vec2(point.x + offset.x, point.y + offset.y);
@@ -920,45 +918,21 @@ function drawGoal() {
   drawLine(postTopL.pos, postTopR.pos, lineW, COLOR_GOAL_FRAME); // crossbar
 }
 
-function drawPapercraftPanel(points, outlineColor, creaseColor, stress = 0) {
-  if (!points || points.length < 3) return;
+function drawPapercraftCircle(pos, radius, fillColor, outlineColor, creaseColor, stress = 0) {
+  const borderThickness = 0.065 + stress * 0.02;
+  drawCircle(pos, radius, fillColor, borderThickness, outlineColor);
 
-  const fillColor = outlineColor.copy().setAlpha(0.85);
-  drawPoly(points, fillColor);
+  const creaseThickness = 0.025 + stress * 0.01;
+  const angle1 = 0.5;
+  const angle2 = 2.0;
 
-  for (let index = 0; index < points.length; index += 1) {
-    const start = points[index];
-    const end = points[(index + 1) % points.length];
-    drawLine(start, end, 0.065 + stress * 0.02, outlineColor);
-  }
+  const p1 = vec2(pos.x + Math.cos(angle1) * radius * 0.95, pos.y + Math.sin(angle1) * radius * 0.95);
+  const p2 = vec2(pos.x - Math.cos(angle1) * radius * 0.95, pos.y - Math.sin(angle1) * radius * 0.95);
+  const p3 = vec2(pos.x + Math.cos(angle2) * radius * 0.95, pos.y + Math.sin(angle2) * radius * 0.95);
+  const p4 = vec2(pos.x - Math.cos(angle2) * radius * 0.95, pos.y - Math.sin(angle2) * radius * 0.95);
 
-  if (points.length === 6) {
-    drawLine(points[0], points[2], 0.03 + stress * 0.01, creaseColor);
-    drawLine(points[1], points[3], 0.025 + stress * 0.01, creaseColor);
-  } else if (points.length >= 8) {
-    const half = Math.floor(points.length / 2);
-    drawLine(points[0], points[half], 0.03 + stress * 0.01, creaseColor);
-    drawLine(points[Math.floor(half / 2)], points[Math.floor(half / 2) + half], 0.025 + stress * 0.01, creaseColor);
-  } else if (points.length >= 4) {
-    drawLine(points[0], points[2], 0.03 + stress * 0.01, creaseColor);
-    drawLine(points[1], points[3], 0.025 + stress * 0.01, creaseColor);
-  }
-}
-
-function buildEllipseShell(center, radiusX, radiusY, skewX = 0) {
-  const points = [];
-  const segments = 12;
-  for (let i = 0; i < segments; i += 1) {
-    const theta = (i / segments) * Math.PI * 2;
-    const px = Math.cos(theta) * radiusX;
-    const py = Math.sin(theta) * radiusY;
-
-    // Apply shear/lean proportional to height
-    const skewOffset = (py / radiusY) * skewX;
-
-    points.push(vec2(center.x + px + skewOffset, center.y + py));
-  }
-  return points;
+  drawLine(p1, p2, creaseThickness * 1.2, creaseColor);
+  drawLine(p3, p4, creaseThickness, creaseColor);
 }
 
 function drawPaperStrip(start, end, width, baseColor, stress, accentColor) {
@@ -1032,40 +1006,26 @@ function drawKeeper() {
   const paper = getFamiliarPapercraftState();
   const revealGlowScale = 1 + reveal.visibility * 0.35;
 
-  const torsoCenter = midpoint(
-    midpoint(fam(Familiar.leftShoulder.x, Familiar.leftShoulder.y).pos, fam(Familiar.rightShoulder.x, Familiar.rightShoulder.y).pos),
-    midpoint(fam(Familiar.leftHip.x, Familiar.leftHip.y).pos, fam(Familiar.rightHip.x, Familiar.rightHip.y).pos),
-  );
-  const shoulderSpan = Math.hypot(
-    fam(Familiar.rightShoulder.x, Familiar.rightShoulder.y).pos.x - fam(Familiar.leftShoulder.x, Familiar.leftShoulder.y).pos.x,
-    fam(Familiar.rightShoulder.x, Familiar.rightShoulder.y).pos.y - fam(Familiar.leftShoulder.x, Familiar.leftShoulder.y).pos.y,
-  );
-  const hipSpan = Math.hypot(
-    fam(Familiar.rightHip.x, Familiar.rightHip.y).pos.x - fam(Familiar.leftHip.x, Familiar.leftHip.y).pos.x,
-    fam(Familiar.rightHip.x, Familiar.rightHip.y).pos.y - fam(Familiar.leftHip.x, Familiar.leftHip.y).pos.y,
-  );
-  const torsoWidth = Math.max(0.42, Math.max(shoulderSpan, hipSpan) * (0.48 + paper.torso.flap * 0.08));
   const torsoAnchor = fam(Familiar.torsoPos.x, Familiar.torsoPos.y);
-  const torsoHeight = Math.max(0.72, Math.hypot(
-    torsoCenter.x - torsoAnchor.pos.x,
-    torsoCenter.y - torsoAnchor.pos.y,
-  ) * 1.8 + 0.66);
-  const torsoSkew = paper.torso.lean * 0.24 * Math.sign(Familiar.rightShoulder.x - Familiar.leftShoulder.x || 1);
-  drawPapercraftPanel(
-    buildEllipseShell(torsoCenter, torsoWidth, torsoHeight, torsoSkew),
+  drawPapercraftCircle(
+    torsoAnchor.pos,
+    Familiar.torsoRadius * torsoAnchor.scale,
+    COLOR_FAMILIAR_TORSO.copy().setAlpha(0.85),
     COLOR_FAMILIAR_TORSO,
     FAMILIAR_PAPER_EDGE_COLOR,
     paper.torso.squash,
   );
 
   const head = fam(Familiar.headPos.x, Familiar.headPos.y);
-  const headShell = buildEllipseShell(
-    addPoint(head.pos, vec2((paper.head.lagX - 0.5) * 0.08 * Math.sign(Familiar.rightShoulder.x - Familiar.leftShoulder.x || 1), -paper.head.lagY * 0.12)),
-    Familiar.headRadius * (1.02 + paper.head.wobble * 0.14),
-    Familiar.headRadius * (1.15 + paper.head.wobble * 0.18),
-    (paper.head.lagX - 0.5) * 0.18,
+  const headPosWithLag = addPoint(head.pos, vec2((paper.head.lagX - 0.5) * 0.08 * Math.sign(Familiar.rightShoulder.x - Familiar.leftShoulder.x || 1), -paper.head.lagY * 0.12));
+  drawPapercraftCircle(
+    headPosWithLag,
+    Familiar.headRadius * head.scale,
+    COLOR_FAMILIAR_HEAD.copy().setAlpha(0.85),
+    COLOR_FAMILIAR_HEAD,
+    FAMILIAR_PAPER_EDGE_COLOR,
+    paper.head.wobble,
   );
-  drawPapercraftPanel(headShell, COLOR_FAMILIAR_HEAD, FAMILIAR_PAPER_EDGE_COLOR, paper.head.wobble);
 
   if (reveal.isActive) {
     const leftEye = vec2(
@@ -1135,10 +1095,10 @@ function drawKeeper() {
   drawPaperLimb(lHip.pos, lKnee.pos, lFoot.pos, FAMILIAR_THIGH_THICKNESS, paper.leftLeg.stress * 0.88);
   drawPaperLimb(rHip.pos, rKnee.pos, rFoot.pos, FAMILIAR_THIGH_THICKNESS, paper.rightLeg.stress * 0.88);
 
-  drawPapercraftPanel(buildEllipseShell(lHand.pos, Familiar.handRadius * 0.95, Familiar.handRadius * 0.75, paper.leftArm.flap * 0.18), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.leftArm.flap);
-  drawPapercraftPanel(buildEllipseShell(rHand.pos, Familiar.handRadius * 0.95, Familiar.handRadius * 0.75, paper.rightArm.flap * 0.18), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.rightArm.flap);
-  drawPapercraftPanel(buildEllipseShell(lFoot.pos, Familiar.footRadius * 1.05, Familiar.footRadius * 0.65, paper.leftLeg.flap * 0.12), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.leftLeg.flap);
-  drawPapercraftPanel(buildEllipseShell(rFoot.pos, Familiar.footRadius * 1.05, Familiar.footRadius * 0.65, paper.rightLeg.flap * 0.12), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.rightLeg.flap);
+  drawPapercraftCircle(lHand.pos, Familiar.handRadius * lHand.scale, COLOR_FAMILIAR_HAND.copy().setAlpha(0.85), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.leftArm.flap);
+  drawPapercraftCircle(rHand.pos, Familiar.handRadius * rHand.scale, COLOR_FAMILIAR_HAND.copy().setAlpha(0.85), COLOR_FAMILIAR_HAND, FAMILIAR_PAPER_EDGE_COLOR, paper.rightArm.flap);
+  drawPapercraftCircle(lFoot.pos, Familiar.footRadius * lFoot.scale, COLOR_FAMILIAR_ARM.copy().setAlpha(0.85), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.leftLeg.flap);
+  drawPapercraftCircle(rFoot.pos, Familiar.footRadius * rFoot.scale, COLOR_FAMILIAR_ARM.copy().setAlpha(0.85), COLOR_FAMILIAR_ARM, FAMILIAR_PAPER_EDGE_COLOR, paper.rightLeg.flap);
 }
 
 function drawBall() {

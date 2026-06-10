@@ -85,17 +85,12 @@ vi.mock('littlejsengine', () => {
                 throw new Error('Assertion failed: color is invalid');
             }
         }),
-        drawCircle: vi.fn((pos, radius, color) => {
-            if (!(color instanceof MockColor)) {
+        drawCircle: vi.fn((pos, radius, color, lineWidth, lineColor) => {
+            if (color && !(color instanceof MockColor)) {
                 throw new Error('Assertion failed: color is invalid');
             }
-        }),
-        drawPoly: vi.fn((points, color, lineWidth, lineColor) => {
-            if (color && !(color instanceof MockColor)) {
-                throw new Error('Assertion failed: fill color is invalid');
-            }
             if (lineColor && !(lineColor instanceof MockColor)) {
-                throw new Error('Assertion failed: line color is invalid');
+                throw new Error('Assertion failed: lineColor is invalid');
             }
         }),
         drawTextScreen: vi.fn((text, pos, size, color) => {
