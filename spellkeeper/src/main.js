@@ -18,7 +18,7 @@ import {
   shouldTriggerDive,
   startDive,
 } from './diveState.js';
-import { DEFAULT_SHOT_PLAN_SEED, createCalibrationShotChain, createShotPlan, describeShotPlan } from './shotPlan.js';
+import { createCalibrationShotChain, createShotPlan, describeShotPlan } from './shotPlan.js';
 import { createMatchState, isMatchComplete, recordShotResult } from './matchState.js';
 import {
   advanceShotRuntime,
