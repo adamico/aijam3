@@ -1,3 +1,5 @@
+import { SETPIECE_LIBRARY, instantiateSetpiece, mirrorSide } from './setpieces.js';
+
 const DEFAULT_SHOT_PLAN_TOTAL_SHOTS = 30;
 export const DEFAULT_SHOT_PLAN_SEED = 'spellkeeper-default-shot-plan';
 
@@ -42,6 +44,13 @@ const PLACEMENT_HEIGHT_ZONES = {
 };
 const OUTER_LANES = new Set(['outer-left', 'outer-right']);
 const HEAVY_PRESSURE_TAGS = ['low', 'extreme-side', 'commitment'];
+const PHASE_SHOT_COUNT = 9;
+
+export const PHASE_LAYOUTS = {
+  readable: ['isolated', 'setpiece', 'isolated', 'isolated', 'setpiece', 'isolated', 'isolated'],
+  mixed: ['isolated', 'setpiece', 'isolated', 'setpiece', 'isolated', 'setpiece'],
+  chaos: ['setpiece', 'isolated', 'setpiece', 'isolated', 'setpiece', 'isolated'],
+};
 
 const FIXED_OPENER_SHOTS = [
   {
@@ -400,6 +409,100 @@ function createFixedOpenerEntry(template, index, planId) {
   });
 }
 
+function getPhaseLayoutForBand(band) {
+  if (band === SHOT_PLAN_DIFFICULTY_BANDS.readable) return PHASE_LAYOUTS.readable;
+  if (band === SHOT_PLAN_DIFFICULTY_BANDS.mixed) return PHASE_LAYOUTS.mixed;
+  return PHASE_LAYOUTS.chaos;
+}
+
+function shuffleWithRng(items, rng) {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(rng() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+
+  return copy;
+}
+
+function getSetpieceTemplatesForBand(band) {
+  if (band === SHOT_PLAN_DIFFICULTY_BANDS.readable) return SETPIECE_LIBRARY.readable;
+  if (band === SHOT_PLAN_DIFFICULTY_BANDS.mixed) return SETPIECE_LIBRARY.mixed;
+  return SETPIECE_LIBRARY.chaos;
+}
+
+function setpieceFitsDistribution(template, hexCounts, hexCountTarget) {
+  if (!hexCountTarget) return true;
+
+  const requiredCounts = new Map();
+  for (const shot of template.shots) {
+    requiredCounts.set(shot.shot.hex, (requiredCounts.get(shot.shot.hex) ?? 0) + 1);
+  }
+
+  for (const [hex, requiredCount] of requiredCounts.entries()) {
+    const remainingForHex = hexCountTarget[hex] - (hexCounts.get(hex) ?? 0);
+    if (remainingForHex < requiredCount) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function buildIsolatedEntry(index, band, plan, rng, planId, hexCounts, hexCountTarget, forcedHex = null) {
+  const pool = SHOT_PHASE_POOLS[phaseIndexForBand(band)];
+  const candidates = (forcedHex ? pool.filter((template) => template.shot.hex === forcedHex) : pool)
+    .filter((template) => candidateFitsDistribution(template, hexCounts, hexCountTarget));
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const retries = Math.max(6, candidates.length);
+  for (let attempt = 0; attempt < retries; attempt += 1) {
+    const candidate = pickWeightedCandidate(candidates, plan, band, rng, hexCounts, hexCountTarget);
+    const generated = createShotTemplateEntry(candidate, index, band, rng, planId);
+    if (isCandidateValid(generated, plan, band)) {
+      return generated;
+    }
+  }
+
+  const shuffled = shuffleWithRng(candidates, rng);
+  for (const candidate of shuffled) {
+    const generated = createShotTemplateEntry(candidate, index, band, rng, planId);
+    if (isCandidateValid(generated, plan, band)) {
+      return generated;
+    }
+  }
+
+  return null;
+}
+
+function buildSetpieceEntries(index, band, plan, rng, planId, hexCounts, hexCountTarget) {
+  const templates = shuffleWithRng(getSetpieceTemplatesForBand(band).filter((template) => setpieceFitsDistribution(template, hexCounts, hexCountTarget)), rng);
+
+  if (templates.length === 0) {
+    return null;
+  }
+
+  for (const template of templates) {
+    const primarySide = rng() < 0.5 ? 'left' : 'right';
+    for (const side of [primarySide, mirrorSide(primarySide)]) {
+      const resolved = instantiateSetpiece(template, side);
+      const generatedEntries = resolved.shots.map((shotTemplate, offset) => createShotTemplateEntry(shotTemplate, index + offset, band, rng, planId));
+
+      const firstValid = isCandidateValid(generatedEntries[0], plan, band);
+      const secondValid = firstValid && isCandidateValid(generatedEntries[1], [...plan, generatedEntries[0]], band);
+
+      if (firstValid && secondValid) {
+        return generatedEntries;
+      }
+    }
+  }
+
+  return null;
+}
+
 function candidateSignature(candidate) {
   return [
     candidate.shot.hex,
@@ -599,53 +702,97 @@ function generateShotPlanAttempt(normalizedSeed, totalShots, attempt) {
   const plan = [];
   const hexCounts = new Map(SHOT_PLAN_REQUIRED_HEXES.map((hex) => [hex, 0]));
 
-  for (let index = 0; index < totalShots; index += 1) {
-    if (index < FIXED_OPENER_SHOTS.length) {
-      const opener = FIXED_OPENER_SHOTS[index];
-      const openerEntry = createFixedOpenerEntry(opener, index, planId);
-      openerEntry.designer.opener = true;
-      plan.push(openerEntry);
-      hexCounts.set(openerEntry.shot.hex, (hexCounts.get(openerEntry.shot.hex) ?? 0) + 1);
-      continue;
+  for (let index = 0; index < FIXED_OPENER_SHOTS.length; index += 1) {
+    const opener = FIXED_OPENER_SHOTS[index];
+    const openerEntry = createFixedOpenerEntry(opener, index, planId);
+    openerEntry.designer.opener = true;
+    plan.push(openerEntry);
+    hexCounts.set(openerEntry.shot.hex, (hexCounts.get(openerEntry.shot.hex) ?? 0) + 1);
+  }
+
+  if (totalShots !== DEFAULT_SHOT_PLAN_TOTAL_SHOTS) {
+    for (let index = FIXED_OPENER_SHOTS.length; index < totalShots; index += 1) {
+      const band = bandForIndex(index, totalShots);
+      const remainingShots = totalShots - index;
+      const missingHexes = SHOT_PLAN_REQUIRED_HEXES.filter((hex) => (hexCounts.get(hex) ?? 0) === 0);
+      const forcedHex = !hexCountTarget && missingHexes.length > 0 && remainingShots <= missingHexes.length
+        ? missingHexes[0]
+        : null;
+      const generated = buildIsolatedEntry(index, band, plan, rng, planId, hexCounts, hexCountTarget, forcedHex);
+      if (!generated) {
+        return null;
+      }
+
+      plan.push(generated);
+      hexCounts.set(generated.shot.hex, (hexCounts.get(generated.shot.hex) ?? 0) + 1);
     }
 
-    const band = bandForIndex(index, totalShots);
-    const pool = SHOT_PHASE_POOLS[phaseIndexForBand(band)];
-    const remainingSlots = totalShots - index;
-    const missingHexes = SHOT_PLAN_REQUIRED_HEXES.filter((hex) => (hexCounts.get(hex) ?? 0) === 0);
-    const forcedHex = !hexCountTarget && missingHexes.length > 0 && remainingSlots <= missingHexes.length
-      ? missingHexes[0]
-      : null;
-    const candidates = (forcedHex ? pool.filter((template) => template.shot.hex === forcedHex) : pool)
-      .filter((template) => candidateFitsDistribution(template, hexCounts, hexCountTarget));
+    return plan.length === totalShots ? plan : null;
+  }
 
-    let template = null;
-    const retries = Math.max(6, candidates.length);
-    for (let attempt = 0; attempt < retries && !template; attempt += 1) {
-      const candidate = pickWeightedCandidate(candidates, plan, band, rng, hexCounts, hexCountTarget);
-      const generated = createShotTemplateEntry(candidate, index, band, rng, planId);
-      if (isCandidateValid(generated, plan, band)) {
-        template = candidate;
+  const phaseBands = [
+    SHOT_PLAN_DIFFICULTY_BANDS.readable,
+    SHOT_PLAN_DIFFICULTY_BANDS.mixed,
+    SHOT_PLAN_DIFFICULTY_BANDS.chaos,
+  ];
+
+  for (const band of phaseBands) {
+    const layout = getPhaseLayoutForBand(band);
+    let bandShotCount = 0;
+
+    for (const slot of layout) {
+      if (slot === 'isolated') {
+        const remainingShots = totalShots - plan.length;
+        const missingHexes = SHOT_PLAN_REQUIRED_HEXES.filter((hex) => (hexCounts.get(hex) ?? 0) === 0);
+        const forcedHex = !hexCountTarget && missingHexes.length > 0 && remainingShots <= missingHexes.length
+          ? missingHexes[0]
+          : null;
+        const generated = buildIsolatedEntry(plan.length, band, plan, rng, planId, hexCounts, hexCountTarget, forcedHex);
+        if (!generated) {
+          return null;
+        }
+
         plan.push(generated);
         hexCounts.set(generated.shot.hex, (hexCounts.get(generated.shot.hex) ?? 0) + 1);
+        bandShotCount += 1;
+        continue;
       }
-    }
 
-    if (!template) {
-      for (const fallbackCandidate of candidates) {
-        const generated = createShotTemplateEntry(fallbackCandidate, index, band, rng, planId);
-        if (isCandidateValid(generated, plan, band)) {
-          plan.push(generated);
-          hexCounts.set(generated.shot.hex, (hexCounts.get(generated.shot.hex) ?? 0) + 1);
-          template = fallbackCandidate;
-          break;
+      const setpieceEntries = buildSetpieceEntries(plan.length, band, plan, rng, planId, hexCounts, hexCountTarget);
+      if (setpieceEntries) {
+        for (const entry of setpieceEntries) {
+          plan.push(entry);
+          hexCounts.set(entry.shot.hex, (hexCounts.get(entry.shot.hex) ?? 0) + 1);
         }
+        bandShotCount += 2;
+        continue;
       }
+
+      const firstFallback = buildIsolatedEntry(plan.length, band, plan, rng, planId, hexCounts, hexCountTarget);
+      if (!firstFallback) {
+        return null;
+      }
+
+      plan.push(firstFallback);
+      hexCounts.set(firstFallback.shot.hex, (hexCounts.get(firstFallback.shot.hex) ?? 0) + 1);
+
+      const secondFallback = buildIsolatedEntry(plan.length, band, plan, rng, planId, hexCounts, hexCountTarget);
+      if (!secondFallback) {
+        return null;
+      }
+
+      plan.push(secondFallback);
+      hexCounts.set(secondFallback.shot.hex, (hexCounts.get(secondFallback.shot.hex) ?? 0) + 1);
+      bandShotCount += 2;
     }
 
-    if (!template) {
+    if (bandShotCount !== PHASE_SHOT_COUNT) {
       return null;
     }
+  }
+
+  if (plan.length !== totalShots) {
+    return null;
   }
 
   return plan;
