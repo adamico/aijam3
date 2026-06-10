@@ -49,7 +49,7 @@ const PHASE_SHOT_COUNT = 9;
 export const PHASE_LAYOUTS = {
   readable: ['isolated', 'isolated', 'setpiece', 'isolated', 'isolated', 'isolated', 'isolated', 'isolated'],
   mixed: ['isolated', 'setpiece', 'isolated', 'isolated', 'setpiece', 'isolated', 'isolated'],
-  chaos: ['setpiece', 'isolated', 'isolated', 'setpiece', 'isolated', 'isolated'],
+  chaos: ['setpiece', 'isolated', 'isolated', 'setpiece', 'isolated', 'isolated', 'isolated'],
 };
 
 const FIXED_OPENER_SHOTS = [
