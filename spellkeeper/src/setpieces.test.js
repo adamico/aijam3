@@ -12,14 +12,14 @@ describe('setpieces', () => {
     expect(left.mirrorSide).toBe('right');
     expect(right.mirrorSide).toBe('left');
 
-    expect(left.shots[0].shot.originLane).toBe('outer-left');
-    expect(left.shots[0].shot.targetLane).toBe('inner-left');
+    expect(left.shots[0].shot.originLane).toBe('outerLeft');
+    expect(left.shots[0].shot.targetLane).toBe('innerLeft');
     expect(left.shots[0].shot.curveDirection).toBe(1);
-    expect(right.shots[0].shot.originLane).toBe('outer-right');
-    expect(right.shots[0].shot.targetLane).toBe('inner-right');
+    expect(right.shots[0].shot.originLane).toBe('outerRight');
+    expect(right.shots[0].shot.targetLane).toBe('innerRight');
     expect(right.shots[0].shot.curveDirection).toBe(-1);
 
-    expect(left.shots[1].shot.targetLane).toBe('inner-right');
-    expect(right.shots[1].shot.targetLane).toBe('inner-left');
+    expect(left.shots[1].shot.targetLane).toBe('innerRight');
+    expect(right.shots[1].shot.targetLane).toBe('innerLeft');
   });
 });

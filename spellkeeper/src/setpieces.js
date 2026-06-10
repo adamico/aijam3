@@ -22,13 +22,13 @@ function resolveRelativeLane(relativeLane, side) {
   const isLeft = side === 'left';
   switch (relativeLane) {
     case RELATIVE_LANES.sameOuter:
-      return isLeft ? 'outer-left' : 'outer-right';
+      return isLeft ? 'outerLeft' : 'outerRight';
     case RELATIVE_LANES.sameInner:
-      return isLeft ? 'inner-left' : 'inner-right';
+      return isLeft ? 'innerLeft' : 'innerRight';
     case RELATIVE_LANES.oppositeOuter:
-      return isLeft ? 'outer-right' : 'outer-left';
+      return isLeft ? 'outerRight' : 'outerLeft';
     case RELATIVE_LANES.oppositeInner:
-      return isLeft ? 'inner-right' : 'inner-left';
+      return isLeft ? 'innerRight' : 'innerLeft';
     case RELATIVE_LANES.center:
       return 'center';
     default:
