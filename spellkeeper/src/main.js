@@ -63,8 +63,11 @@ const GOAL_CROSSBAR_RIGHT = vec2(PITCH_CENTER_X + GOAL_WIDTH / 2, GROUND_Y + GOA
 const FAMILIAR_TORSO_RADIUS = 0.65;
 const FAMILIAR_HEAD_RADIUS = 0.45;
 const FAMILIAR_HAND_RADIUS = 0.3;
+const FAMILIAR_FOOT_RADIUS = 0.18;
 const FAMILIAR_UPPER_ARM_THICKNESS = 0.18;
 const FAMILIAR_FOREARM_THICKNESS = 0.15;
+const FAMILIAR_THIGH_THICKNESS = 0.16;
+const FAMILIAR_SHIN_THICKNESS = 0.14;
 const COLOR_FAMILIAR_TORSO = c('#4d82cb');
 const COLOR_FAMILIAR_HEAD = c('#2c4d7e');
 const COLOR_FAMILIAR_ARM = c('#3d6db0');
@@ -79,6 +82,12 @@ const FAMILIAR_INIT_ELBOW_X = 0.8;
 const FAMILIAR_INIT_ELBOW_Y = 0.9;
 const FAMILIAR_INIT_HAND_X = 1.2;
 const FAMILIAR_INIT_HAND_Y = 1.2;
+const FAMILIAR_INIT_HIP_X = 0.22;
+const FAMILIAR_INIT_HIP_Y = 0.45;
+const FAMILIAR_INIT_KNEE_X = 0.34;
+const FAMILIAR_INIT_KNEE_Y = -0.05;
+const FAMILIAR_INIT_FOOT_X = 0.48;
+const FAMILIAR_INIT_FOOT_Y = -0.45;
 const FAMILIAR_UPPER_ARM_LENGTH = Math.hypot(
   FAMILIAR_INIT_ELBOW_X - FAMILIAR_INIT_SHOULDER_X,
   FAMILIAR_INIT_ELBOW_Y - FAMILIAR_INIT_SHOULDER_Y,
@@ -105,6 +114,12 @@ const FAMILIAR_BODY_OFFSETS = {
   head: { x: 0, y: FAMILIAR_INIT_HEAD_Y - FAMILIAR_INIT_TORSO_Y },
   leftShoulder: { x: -FAMILIAR_INIT_SHOULDER_X, y: FAMILIAR_INIT_SHOULDER_Y - FAMILIAR_INIT_TORSO_Y },
   rightShoulder: { x: FAMILIAR_INIT_SHOULDER_X, y: FAMILIAR_INIT_SHOULDER_Y - FAMILIAR_INIT_TORSO_Y },
+  leftHip: { x: -FAMILIAR_INIT_HIP_X, y: FAMILIAR_INIT_HIP_Y - FAMILIAR_INIT_TORSO_Y },
+  rightHip: { x: FAMILIAR_INIT_HIP_X, y: FAMILIAR_INIT_HIP_Y - FAMILIAR_INIT_TORSO_Y },
+  leftKnee: { x: -FAMILIAR_INIT_KNEE_X, y: FAMILIAR_INIT_KNEE_Y - FAMILIAR_INIT_TORSO_Y },
+  rightKnee: { x: FAMILIAR_INIT_KNEE_X, y: FAMILIAR_INIT_KNEE_Y - FAMILIAR_INIT_TORSO_Y },
+  leftFoot: { x: -FAMILIAR_INIT_FOOT_X, y: FAMILIAR_INIT_FOOT_Y - FAMILIAR_INIT_TORSO_Y },
+  rightFoot: { x: FAMILIAR_INIT_FOOT_X, y: FAMILIAR_INIT_FOOT_Y - FAMILIAR_INIT_TORSO_Y },
 };
 
 // All dimensions and joints are defined in physical meters relative to the ground.
@@ -117,9 +132,16 @@ const Familiar = {
   rightElbow: vec2(PITCH_CENTER_X + FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y),
   leftHand: vec2(PITCH_CENTER_X - FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y),
   rightHand: vec2(PITCH_CENTER_X + FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y),
+  leftHip: vec2(PITCH_CENTER_X - FAMILIAR_INIT_HIP_X, GROUND_Y + FAMILIAR_INIT_HIP_Y),
+  rightHip: vec2(PITCH_CENTER_X + FAMILIAR_INIT_HIP_X, GROUND_Y + FAMILIAR_INIT_HIP_Y),
+  leftKnee: vec2(PITCH_CENTER_X - FAMILIAR_INIT_KNEE_X, GROUND_Y + FAMILIAR_INIT_KNEE_Y),
+  rightKnee: vec2(PITCH_CENTER_X + FAMILIAR_INIT_KNEE_X, GROUND_Y + FAMILIAR_INIT_KNEE_Y),
+  leftFoot: vec2(PITCH_CENTER_X - FAMILIAR_INIT_FOOT_X, GROUND_Y + FAMILIAR_INIT_FOOT_Y),
+  rightFoot: vec2(PITCH_CENTER_X + FAMILIAR_INIT_FOOT_X, GROUND_Y + FAMILIAR_INIT_FOOT_Y),
   torsoRadius: FAMILIAR_TORSO_RADIUS,
   headRadius: FAMILIAR_HEAD_RADIUS,
   handRadius: FAMILIAR_HAND_RADIUS,
+  footRadius: FAMILIAR_FOOT_RADIUS,
 };
 
 // --- Ball Structure at Spawn ---
@@ -193,12 +215,7 @@ const CAMERA_CENTER_Y = -6.0;  // centers the scene vertically on screen
 const CAMERA_VISIBLE_HEIGHT = 10; // selected responsive prototype height-fit framing
 
 function resetFamiliarPose() {
-  Familiar.torsoPos = vec2(PITCH_CENTER_X, GROUND_Y + FAMILIAR_INIT_TORSO_Y);
-  setFamiliarTorsoX(Familiar.torsoPos.x);
-  Familiar.leftElbow = vec2(PITCH_CENTER_X - FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y);
-  Familiar.rightElbow = vec2(PITCH_CENTER_X + FAMILIAR_INIT_ELBOW_X, GROUND_Y + FAMILIAR_INIT_ELBOW_Y);
-  Familiar.leftHand = vec2(PITCH_CENTER_X - FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y);
-  Familiar.rightHand = vec2(PITCH_CENTER_X + FAMILIAR_INIT_HAND_X, GROUND_Y + FAMILIAR_INIT_HAND_Y);
+  setFamiliarPoseFromTorso(vec2(PITCH_CENTER_X, GROUND_Y + FAMILIAR_INIT_TORSO_Y));
 }
 
 function cloneRuntimeShotSample(sample) {
@@ -501,17 +518,23 @@ export function getShotPlanDebugInfo() {
   return describeShotPlan(Match.plan);
 }
 
-function setFamiliarTorsoX(x) {
-  Familiar.torsoPos = vec2(x, Familiar.torsoPos.y);
-  Familiar.headPos = vec2(x + FAMILIAR_BODY_OFFSETS.head.x, Familiar.torsoPos.y + FAMILIAR_BODY_OFFSETS.head.y);
+function setFamiliarPoseFromTorso(torsoPos) {
+  Familiar.torsoPos = vec2(torsoPos.x, torsoPos.y);
+  Familiar.headPos = vec2(torsoPos.x + FAMILIAR_BODY_OFFSETS.head.x, torsoPos.y + FAMILIAR_BODY_OFFSETS.head.y);
   Familiar.leftShoulder = vec2(
-    x + FAMILIAR_BODY_OFFSETS.leftShoulder.x,
-    Familiar.torsoPos.y + FAMILIAR_BODY_OFFSETS.leftShoulder.y,
+    torsoPos.x + FAMILIAR_BODY_OFFSETS.leftShoulder.x,
+    torsoPos.y + FAMILIAR_BODY_OFFSETS.leftShoulder.y,
   );
   Familiar.rightShoulder = vec2(
-    x + FAMILIAR_BODY_OFFSETS.rightShoulder.x,
-    Familiar.torsoPos.y + FAMILIAR_BODY_OFFSETS.rightShoulder.y,
+    torsoPos.x + FAMILIAR_BODY_OFFSETS.rightShoulder.x,
+    torsoPos.y + FAMILIAR_BODY_OFFSETS.rightShoulder.y,
   );
+  Familiar.leftHip = vec2(torsoPos.x + FAMILIAR_BODY_OFFSETS.leftHip.x, torsoPos.y + FAMILIAR_BODY_OFFSETS.leftHip.y);
+  Familiar.rightHip = vec2(torsoPos.x + FAMILIAR_BODY_OFFSETS.rightHip.x, torsoPos.y + FAMILIAR_BODY_OFFSETS.rightHip.y);
+  Familiar.leftKnee = vec2(torsoPos.x + FAMILIAR_BODY_OFFSETS.leftKnee.x, torsoPos.y + FAMILIAR_BODY_OFFSETS.leftKnee.y);
+  Familiar.rightKnee = vec2(torsoPos.x + FAMILIAR_BODY_OFFSETS.rightKnee.x, torsoPos.y + FAMILIAR_BODY_OFFSETS.rightKnee.y);
+  Familiar.leftFoot = vec2(torsoPos.x + FAMILIAR_BODY_OFFSETS.leftFoot.x, torsoPos.y + FAMILIAR_BODY_OFFSETS.leftFoot.y);
+  Familiar.rightFoot = vec2(torsoPos.x + FAMILIAR_BODY_OFFSETS.rightFoot.x, torsoPos.y + FAMILIAR_BODY_OFFSETS.rightFoot.y);
 }
 
 function updateFamiliarBodyRig(target, dt = 1 / 60) {
@@ -524,7 +547,7 @@ function updateFamiliarBodyRig(target, dt = 1 / 60) {
     dt,
   });
 
-  setFamiliarTorsoX(pose.torso.x);
+  setFamiliarPoseFromTorso(vec2(pose.torso.x, Familiar.torsoPos.y));
   return pose;
 }
 
@@ -567,10 +590,10 @@ function getDiveBodyModel() {
 
 function clearDivePoseFromFamiliar() {
   const pose = Dive.visualPose;
-  Familiar.torsoPos = vec2(Familiar.torsoPos.x - pose.torso.x, Familiar.torsoPos.y - pose.torso.y);
-  Familiar.headPos = vec2(Familiar.headPos.x - pose.head.x, Familiar.headPos.y - pose.head.y);
-  Familiar.leftShoulder = vec2(Familiar.leftShoulder.x - pose.shoulders.x, Familiar.leftShoulder.y - pose.shoulders.y);
-  Familiar.rightShoulder = vec2(Familiar.rightShoulder.x - pose.shoulders.x, Familiar.rightShoulder.y - pose.shoulders.y);
+  setFamiliarPoseFromTorso(vec2(
+    Familiar.torsoPos.x - pose.torso.x,
+    Familiar.torsoPos.y - pose.torso.y,
+  ));
   Dive.visualPose = cloneDiveVisualPose();
 }
 
@@ -594,10 +617,10 @@ function applyDivePoseToFamiliar(diveState, bodyModel) {
     y: torsoOffset.y,
   };
 
-  Familiar.torsoPos = vec2(Familiar.torsoPos.x + torsoOffset.x, Familiar.torsoPos.y + torsoOffset.y);
-  Familiar.headPos = vec2(Familiar.headPos.x + headOffset.x, Familiar.headPos.y + headOffset.y);
-  Familiar.leftShoulder = vec2(Familiar.leftShoulder.x + shoulderOffset.x, Familiar.leftShoulder.y + shoulderOffset.y);
-  Familiar.rightShoulder = vec2(Familiar.rightShoulder.x + shoulderOffset.x, Familiar.rightShoulder.y + shoulderOffset.y);
+  setFamiliarPoseFromTorso(vec2(
+    Familiar.torsoPos.x + torsoOffset.x,
+    Familiar.torsoPos.y + torsoOffset.y,
+  ));
   Dive.visualPose = { torso: torsoOffset, head: headOffset, shoulders: shoulderOffset };
 
   return { isActive: true, offset: torsoOffset, reachBonus, extension };
@@ -659,6 +682,12 @@ export function getFamiliarPose() {
     rightElbow: { x: Familiar.rightElbow.x, y: Familiar.rightElbow.y },
     leftHand: { x: Familiar.leftHand.x, y: Familiar.leftHand.y },
     rightHand: { x: Familiar.rightHand.x, y: Familiar.rightHand.y },
+    leftHip: { x: Familiar.leftHip.x, y: Familiar.leftHip.y },
+    rightHip: { x: Familiar.rightHip.x, y: Familiar.rightHip.y },
+    leftKnee: { x: Familiar.leftKnee.x, y: Familiar.leftKnee.y },
+    rightKnee: { x: Familiar.rightKnee.x, y: Familiar.rightKnee.y },
+    leftFoot: { x: Familiar.leftFoot.x, y: Familiar.leftFoot.y },
+    rightFoot: { x: Familiar.rightFoot.x, y: Familiar.rightFoot.y },
   };
 }
 
@@ -671,6 +700,12 @@ export function getFamiliarSaveSegments() {
     { id: 'rightUpperArm', start: Familiar.rightShoulder, end: Familiar.rightElbow, radius: FAMILIAR_UPPER_ARM_THICKNESS / 2 },
     { id: 'rightForearm', start: Familiar.rightElbow, end: Familiar.rightHand, radius: FAMILIAR_FOREARM_THICKNESS / 2 },
     { id: 'rightHand', center: Familiar.rightHand, radius: Familiar.handRadius },
+    { id: 'leftThigh', type: 'deflection', start: Familiar.leftHip, end: Familiar.leftKnee, radius: FAMILIAR_THIGH_THICKNESS / 2 },
+    { id: 'leftShin', type: 'deflection', start: Familiar.leftKnee, end: Familiar.leftFoot, radius: FAMILIAR_SHIN_THICKNESS / 2 },
+    { id: 'leftFoot', type: 'deflection', center: Familiar.leftFoot, radius: Familiar.footRadius },
+    { id: 'rightThigh', type: 'deflection', start: Familiar.rightHip, end: Familiar.rightKnee, radius: FAMILIAR_THIGH_THICKNESS / 2 },
+    { id: 'rightShin', type: 'deflection', start: Familiar.rightKnee, end: Familiar.rightFoot, radius: FAMILIAR_SHIN_THICKNESS / 2 },
+    { id: 'rightFoot', type: 'deflection', center: Familiar.rightFoot, radius: Familiar.footRadius },
   ];
 }
 
@@ -721,14 +756,26 @@ function drawKeeper() {
   const rShoulder = fam(Familiar.rightShoulder.x, Familiar.rightShoulder.y);
   const rElbow = fam(Familiar.rightElbow.x, Familiar.rightElbow.y);
   const rHand = fam(Familiar.rightHand.x, Familiar.rightHand.y);
+  const lHip = fam(Familiar.leftHip.x, Familiar.leftHip.y);
+  const lKnee = fam(Familiar.leftKnee.x, Familiar.leftKnee.y);
+  const lFoot = fam(Familiar.leftFoot.x, Familiar.leftFoot.y);
+  const rHip = fam(Familiar.rightHip.x, Familiar.rightHip.y);
+  const rKnee = fam(Familiar.rightKnee.x, Familiar.rightKnee.y);
+  const rFoot = fam(Familiar.rightFoot.x, Familiar.rightFoot.y);
 
   drawLine(lShoulder.pos, lElbow.pos, FAMILIAR_UPPER_ARM_THICKNESS * lShoulder.scale, COLOR_FAMILIAR_ARM);
   drawLine(lElbow.pos, lHand.pos, FAMILIAR_FOREARM_THICKNESS * lElbow.scale, COLOR_FAMILIAR_ARM);
   drawLine(rShoulder.pos, rElbow.pos, FAMILIAR_UPPER_ARM_THICKNESS * rShoulder.scale, COLOR_FAMILIAR_ARM);
   drawLine(rElbow.pos, rHand.pos, FAMILIAR_FOREARM_THICKNESS * rElbow.scale, COLOR_FAMILIAR_ARM);
+  drawLine(lHip.pos, lKnee.pos, FAMILIAR_THIGH_THICKNESS * lHip.scale, COLOR_FAMILIAR_ARM);
+  drawLine(lKnee.pos, lFoot.pos, FAMILIAR_SHIN_THICKNESS * lKnee.scale, COLOR_FAMILIAR_ARM);
+  drawLine(rHip.pos, rKnee.pos, FAMILIAR_THIGH_THICKNESS * rHip.scale, COLOR_FAMILIAR_ARM);
+  drawLine(rKnee.pos, rFoot.pos, FAMILIAR_SHIN_THICKNESS * rKnee.scale, COLOR_FAMILIAR_ARM);
 
   drawCircle(lHand.pos, Familiar.handRadius * lHand.scale, COLOR_FAMILIAR_HAND);
   drawCircle(rHand.pos, Familiar.handRadius * rHand.scale, COLOR_FAMILIAR_HAND);
+  drawCircle(lFoot.pos, Familiar.footRadius * lFoot.scale, COLOR_FAMILIAR_ARM);
+  drawCircle(rFoot.pos, Familiar.footRadius * rFoot.scale, COLOR_FAMILIAR_ARM);
 }
 
 function drawBall() {

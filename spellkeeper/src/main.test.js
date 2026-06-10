@@ -166,6 +166,34 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(pose.rightShoulder.x).toBeCloseTo(pose.torso.x + 0.3, 5);
     });
 
+    it('shows dangling lower limbs that move with the torso instead of planting on the ground', async () => {
+        const { gameInit, getFamiliarPose } = await import('./main.js');
+
+        gameInit();
+        const pose = getFamiliarPose();
+
+        expect(pose.leftHip.x).toBeLessThan(pose.torso.x);
+        expect(pose.rightHip.x).toBeGreaterThan(pose.torso.x);
+        expect(pose.leftKnee.y).toBeLessThan(pose.leftHip.y);
+        expect(pose.leftFoot.y).toBeLessThan(pose.leftKnee.y);
+        expect(pose.rightKnee.y).toBeLessThan(pose.rightHip.y);
+        expect(pose.rightFoot.y).toBeLessThan(pose.rightKnee.y);
+    });
+
+    it('exposes lower limbs as deflection save segments', async () => {
+        const { gameInit, getFamiliarSaveSegments } = await import('./main.js');
+
+        gameInit();
+        expect(getFamiliarSaveSegments()).toEqual(expect.arrayContaining([
+            expect.objectContaining({ id: 'leftThigh', type: 'deflection' }),
+            expect.objectContaining({ id: 'leftShin', type: 'deflection' }),
+            expect.objectContaining({ id: 'leftFoot', type: 'deflection' }),
+            expect.objectContaining({ id: 'rightThigh', type: 'deflection' }),
+            expect.objectContaining({ id: 'rightShin', type: 'deflection' }),
+            expect.objectContaining({ id: 'rightFoot', type: 'deflection' }),
+        ]));
+    });
+
     it('enters a committed lateral dive on a hard threatening reach while hands keep aiming live', async () => {
         const { gameInit, updateBallShot, applyKeeperHandIk, getDiveState, getFamiliarPose } = await import('./main.js');
 
@@ -181,7 +209,7 @@ describe('Spell Keeper basic gameplay scene', () => {
         expect(firstResult.dive.isActive).toBe(true);
         expect(firstPose.torso.x).toBeGreaterThan(firstResult.body.torso.x);
         expect(firstPose.torso.y).toBeGreaterThan(firstResult.body.torso.y);
-        expect(firstPose.head.x).toBeGreaterThan(firstPose.torso.x);
+        expect(firstPose.head.y).toBeGreaterThan(firstPose.torso.y);
         expect(firstResult.left.requestedTarget).toEqual(firstTarget);
         expect(firstResult.right.requestedTarget).toEqual(firstTarget);
         expect(firstPose.leftHand.x).toBeGreaterThan(firstPose.leftShoulder.x);

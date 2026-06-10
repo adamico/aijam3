@@ -110,4 +110,24 @@ describe('SaveResolver', () => {
     expect(result.outcome).toBe('deflected');
     expect(result.segmentId).toBe('rightForearm');
   });
+
+  it('keeps lower-limb contacts tagged as deflections', () => {
+    const foot = {
+      id: 'leftFoot',
+      type: 'deflection',
+      center: { x: 0, y: -5.1 },
+      radius: 0.18,
+    };
+
+    const result = resolveGoalPlaneSave({
+      ball: { x: 0.05, y: -5.1, radius: 0.4 },
+      segments: [foot],
+    });
+
+    expect(result.outcome).toBe('deflected');
+    expect(result.segmentId).toBe('leftFoot');
+    expect(result.contactSegments).toEqual([
+      expect.objectContaining({ id: 'leftFoot', segmentType: 'deflection', isGlove: false }),
+    ]);
+  });
 });
