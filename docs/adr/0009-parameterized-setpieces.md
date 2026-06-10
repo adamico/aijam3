@@ -1,0 +1,3 @@
+# Parameterized Pressure Setpieces for Shot Generation
+
+We decided to formalize Spell Keeper's multi-shot difficulty beats into reusable, parameterized templates called **[Pressure Setpieces](file:///Users/kc00l/aijam3/CONTEXT.md#L65)**. These setpieces define shot sequences using relative lane targeting (e.g., `same-outer`, `opposite-inner`) and curve directions (`inward`, `outward`) relative to a dynamically rolled base side (`left` or `right`). The shot plan generator will inject these setpieces into fixed positions using **[Phase Layout](file:///Users/kc00l/aijam3/CONTEXT.md#L72)** pacing templates, falling back to isolated shots if strict anti-repeat validation rules fail on both sides.
